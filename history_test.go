@@ -189,3 +189,52 @@ func TestSameNameTwoPackages(t *testing.T) {
 		t.Fatalf("got:\n%s", b.Text)
 	}
 }
+
+// Review of 0.2, second pass, A: a -json or -v run where nothing passed (a
+// broken build, all skipped) doesn't make missing tests fixed.
+func TestNoPassesIsNotFixed(t *testing.T) {
+	run1 := `{"Action":"run","Package":"example.com/a","Test":"TestA"}
+{"Action":"output","Package":"example.com/a","Test":"TestA","Output":"    a_test.go:9: bad\n"}
+{"Action":"fail","Package":"example.com/a","Test":"TestA","Elapsed":0}
+{"Action":"fail","Package":"example.com/a","Elapsed":0.1}
+`
+	run2 := `{"ImportPath":"example.com/a","Action":"build-output","Output":"a.go:3:1: syntax error\n"}
+{"ImportPath":"example.com/a","Action":"build-fail"}
+{"Action":"fail","Package":"example.com/a","Elapsed":0,"FailedBuild":"example.com/a"}
+`
+	a, _ := Reduce(strings.NewReader(run1), Options{Track: true})
+	b, err := Reduce(strings.NewReader(run2), Options{Track: true, History: []Run{*a.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.Text, "fixed") || !strings.Contains(b.Text, "not run: TestA") {
+		t.Fatalf("got:\n%s", b.Text)
+	}
+	v1 := "=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- FAIL: TestB (0.00s)\n=== RUN   TestC\n--- FAIL: TestC (0.00s)\nFAIL\nFAIL\texample.com/a\t0.01s\n"
+	v2 := "=== RUN   TestB\n--- FAIL: TestB (0.00s)\n=== RUN   TestC\n--- SKIP: TestC (0.00s)\nFAIL\nFAIL\texample.com/a\t0.01s\n"
+	a, _ = Reduce(strings.NewReader(v1), Options{Track: true})
+	b, _ = Reduce(strings.NewReader(v2), Options{Track: true, History: []Run{*a.Run}})
+	if strings.Contains(b.Text, "fixed") || !strings.Contains(b.Text, "not run: TestC") {
+		t.Fatalf("skipped test:\n%s", b.Text)
+	}
+}
+
+// Review of 0.2, second pass, B: a run cut short before its package line
+// still matches its tests with the next run's.
+func TestCutShortRunMatches(t *testing.T) {
+	run1 := "=== RUN   TestB\n    b_test.go:5: bad\n--- FAIL: TestB (0.00s)\n=== RUN   TestC\n"
+	run2 := "=== RUN   TestB\n    b_test.go:5: bad\n--- FAIL: TestB (0.00s)\n=== RUN   TestC\n--- PASS: TestC (0.00s)\nFAIL\nFAIL\texample.com/x\t0.01s\n"
+	a, _ := Reduce(strings.NewReader(run1), Options{Track: true})
+	b, err := Reduce(strings.NewReader(run2), Options{Track: true, History: []Run{*a.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.Text, "since run 1: 1 fixed, 1 still failing (longest for 2 runs)") || !strings.Contains(b.Text, "fixed: TestC (no result: the run stopped)") {
+		t.Fatalf("got:\n%s", b.Text)
+	}
+	// And the other way round: a qualified run, then one cut short.
+	c, _ := Reduce(strings.NewReader(run1), Options{Track: true, History: []Run{*a.Run, *b.Run}})
+	if !strings.Contains(c.Text, "1 new, 1 still failing (longest for 3 runs)") {
+		t.Fatalf("cut short after a full run:\n%s", c.Text)
+	}
+}

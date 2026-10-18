@@ -9,6 +9,12 @@ import (
 	"strings"
 )
 
+// MaxGood is how many passing tests a run keeps in full. A bigger suite
+// keeps only those that failed in one of the runs kept, which is what
+// telling fixed from not run needs; flaky detection there counts only the
+// changes after a test's first failure in the window.
+const MaxGood = 100000
+
 // FlakyWindow is how many runs, the current one included, are looked at to
 // decide whether an item is flaky, and FlakyFlips how many times its status
 // must change in them.
@@ -55,6 +61,11 @@ type RunItem struct {
 	Streak int `json:"streak"`
 	// Sel is the reference selector that shows it in this run's original.
 	Sel string `json:"sel,omitempty"`
+	// Name is a go test's name without its package; Bare is true when the
+	// run didn't print the package (it was cut short), so the item is
+	// matched by Name with the same test in the other run.
+	Name string `json:"name,omitempty"`
+	Bare bool   `json:"bare,omitempty"`
 }
 
 // Trim drops what only the last FlakyWindow runs need from a run older than
@@ -103,6 +114,8 @@ type item struct {
 	test bool
 	head string
 	sel  string
+	name string // a go test's own name
+	bare bool   // its package wasn't printed
 }
 
 func hashKey(s string) string {
@@ -145,7 +158,11 @@ func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDo
 				continue
 			}
 			seen[k] = true
-			bad = append(bad, item{key: k, test: test, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)})
+			it := item{key: k, test: test, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)}
+			if test && g.ex.Name != "" {
+				it.name, it.bare = g.ex.Name, g.ex.Name == g.ex.ID
+			}
+			bad = append(bad, it)
 		}
 	}
 	// Every passing test, past the cap on distinct groups too.
@@ -229,7 +246,7 @@ func flips(st []byte) int {
 
 // computeDelta compares the current run with history (oldest first) and
 // fills in cur's counts and streaks.
-func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tests bool) *Delta {
+func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[string]bool, tests bool) *Delta {
 	d := &Delta{Run: cur.N, Exit: cur.Exit, Tests: tests, Failing: len(bad)}
 	cur.Failing = len(bad)
 	var prev *Run
@@ -240,13 +257,17 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 	if prev == nil || !prev.Full {
 		// Nothing to compare with: every failure starts a streak.
 		for _, it := range bad {
-			cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: 1, Sel: it.sel}
+			cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: 1, Sel: it.sel, Name: it.name, Bare: it.bare}
 		}
 		if prev != nil {
 			d.Since = 0
 		}
+		if tests {
+			cur.Good = packGood(keepGood(good, nil))
+		}
 		return d
 	}
+	prevBad := matchBare(prev.Bad, bad)
 	d.Identical = prev.ID == cur.ID
 
 	// The window: the full runs among the last FlakyWindow-1, then this one.
@@ -259,6 +280,12 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 	}
 	for i, j := 0, len(win)-1; i < j; i, j = i+1, j-1 {
 		win[i], win[j] = win[j], win[i]
+	}
+	if len(win) > 0 {
+		// The previous run as matched with this one.
+		p := *win[len(win)-1]
+		p.Bad = prevBad
+		win[len(win)-1] = &p
 	}
 	goods := make([]map[string]bool, len(win))
 	for i, r := range win {
@@ -283,11 +310,11 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 	for _, it := range bad {
 		curSet[it.key] = true
 		streak := 1
-		p, wasBad := prev.Bad[it.key]
+		p, wasBad := prevBad[it.key]
 		if wasBad {
 			streak = p.Streak + 1
 		}
-		cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: streak, Sel: it.sel}
+		cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: streak, Sel: it.sel, Name: it.name, Bare: it.bare}
 		di := DeltaItem{Key: it.key, Head: it.head, Ref: ref(cur.ID, it.sel), Streak: streak, Window: window}
 		if f := flips(statuses(it.key, it.test, 'F')); f >= FlakyFlips {
 			di.Flips, di.Now = f, "failing"
@@ -310,7 +337,7 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 		it  RunItem
 	}
 	var was []gone
-	for k, it := range prev.Bad {
+	for k, it := range prevBad {
 		if !curSet[k] {
 			was = append(was, gone{k, it})
 		}
@@ -327,6 +354,11 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 	})
 	for _, w := range was {
 		now := statusIn(cur, good, w.key, w.it.Test)
+		if now == '-' && w.it.Bare && passNames[w.it.Name] {
+			// Failing in a run cut short before its package was printed,
+			// passing now under its package.
+			now = 'P'
+		}
 		di := DeltaItem{Key: w.key, Head: w.it.Head, Ref: ref(prev.ID, w.it.Sel), Window: window}
 		if f := flips(statuses(w.key, w.it.Test, now)); f >= FlakyFlips {
 			di.Flips, di.Now = f, "passing"
@@ -342,7 +374,7 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 			d.NotRun = append(d.NotRun, di)
 		}
 	}
-	d.SameFailures = len(d.New) == 0 && len(d.Fixed) == 0 && len(d.NotRun) == 0 && len(curSet) == len(prev.Bad)
+	d.SameFailures = len(d.New) == 0 && len(d.Fixed) == 0 && len(d.NotRun) == 0 && len(curSet) == len(prevBad)
 	if d.SameFailures {
 		// Flaky items that are failing as they were before change nothing.
 		for _, f := range d.Flaky {
@@ -358,7 +390,85 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 	}
 	cur.New = len(d.New)
 	cur.Fixed = len(d.Fixed)
+	if tests {
+		cur.Good = packGood(keepGood(good, win))
+	}
 	return d
+}
+
+// keepGood is the passing tests a run keeps: all of them, or past MaxGood
+// those that failed in one of the window's runs.
+func keepGood(good map[string]bool, win []*Run) map[string]bool {
+	if len(good) <= MaxGood {
+		return good
+	}
+	out := map[string]bool{}
+	for _, r := range win {
+		for k := range r.Bad {
+			if good[k] {
+				out[k] = true
+			}
+		}
+	}
+	return out
+}
+
+// matchBare pairs go tests printed without their package (a run cut short
+// before the package's result line) with the same test, by name, in the
+// other run. Current items take the previous run's key; previous items take
+// the current key. It returns the previous run's failures as matched.
+func matchBare(prevBad map[string]RunItem, bad []item) map[string]RunItem {
+	prevByName := map[string][]string{}
+	for k, it := range prevBad {
+		if it.Name != "" {
+			prevByName[it.Name] = append(prevByName[it.Name], k)
+		}
+	}
+	taken := map[string]bool{}
+	for _, it := range bad {
+		taken[it.key] = true
+	}
+	for i, it := range bad {
+		if !it.bare {
+			continue
+		}
+		if ks := prevByName[it.name]; len(ks) == 1 && !taken[ks[0]] {
+			delete(taken, it.key)
+			bad[i].key = ks[0]
+			taken[ks[0]] = true
+		}
+	}
+	curByName := map[string][]string{}
+	for _, it := range bad {
+		if it.name != "" {
+			curByName[it.name] = append(curByName[it.name], it.key)
+		}
+	}
+	out := prevBad
+	copied := false
+	for k, it := range prevBad {
+		if !it.Bare {
+			continue
+		}
+		ks := curByName[it.Name]
+		if len(ks) != 1 || ks[0] == k {
+			continue
+		}
+		if _, clash := prevBad[ks[0]]; clash {
+			continue
+		}
+		if !copied {
+			// Don't change the history's own map.
+			out = make(map[string]RunItem, len(prevBad))
+			for kk, vv := range prevBad {
+				out[kk] = vv
+			}
+			copied = true
+		}
+		delete(out, k)
+		out[ks[0]] = it
+	}
+	return out
 }
 
 // sameExit compares exit statuses; an unknown one (a reduce of piped

@@ -59,7 +59,13 @@ v0.2.0 adds the run-to-run delta:
   status changes folded into "no change", run ignoring signals, concurrent
   runs of one key, run's exit on a failed reduction, docs, passing tests
   past the group cap). All fixed, with tests (history_test.go, store and
-  cmd tests). `run` doesn't use process groups on purpose: a signal goes to
+  cmd tests). A second pass found 5 more, 3 caused by the fixes (a run
+  with no passes made missing tests fixed; tests of a run cut short before
+  its package line; signals after the command exited; reduce -key holding
+  the lock while reading a pipe; memory of buffered go test results). All
+  fixed: Anon only when the adapter shows unnamed passes, matchBare by test
+  name, cancellable lock wait, stdin spooled, only failures buffered,
+  MaxGood cap. `run` doesn't use process groups on purpose: a signal goes to
   the command, as it would without abbreviatory in front.
 
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't

@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -187,16 +188,50 @@ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		defer file.Close()
 		in = file
 	}
-	if err := reduceAndPrint(in, opt, f, stdout, stderr); err != nil {
+	if f.key != "" && (fs.NArg() == 0 || fs.Arg(0) == "-") {
+		// With a history the lock is held from reading the history to
+		// writing this run. Read piped input to a file first, so the lock
+		// isn't held while whatever writes the pipe is still running.
+		sp, err := spoolInput(in)
+		if err != nil {
+			fmt.Fprintln(stderr, "abbreviatory:", err)
+			return 1
+		}
+		defer os.Remove(sp.Name())
+		defer sp.Close()
+		in = sp
+	}
+	if err := reduceAndPrint(in, opt, f, nil, stdout, stderr); err != nil {
 		fmt.Fprintln(stderr, "abbreviatory:", err)
 		return 1
 	}
 	return 0
 }
 
+// spoolInput copies in to a temporary file and returns it, rewound.
+func spoolInput(in io.Reader) (*os.File, error) {
+	sp, err := os.CreateTemp("", "abbreviatory-in-*")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := io.Copy(sp, in); err != nil {
+		sp.Close()
+		os.Remove(sp.Name())
+		return nil, err
+	}
+	if _, err := sp.Seek(0, io.SeekStart); err != nil {
+		sp.Close()
+		os.Remove(sp.Name())
+		return nil, err
+	}
+	return sp, nil
+}
+
 // reduceAndPrint reduces in, storing the original and recording the run in
 // the history when asked, and prints the report.
-func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, stdout, stderr io.Writer) error {
+// Closing cancel stops a wait for the history's lock; the report is then
+// made without a comparison.
+func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, cancel <-chan struct{}, stdout, stderr io.Writer) error {
 	var st *store.Store
 	if !f.noStore || f.key != "" {
 		s, err := openStore(f.dir)
@@ -241,7 +276,7 @@ func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, stdo
 		// Compare and record under the history's lock, so a run of the
 		// same key at the same time waits and then compares with this one.
 		var reduceErr error
-		err := st.Update(f.key, func(h *store.History) (*abbreviatory.Run, error) {
+		err := st.UpdateCancel(f.key, cancel, func(h *store.History) (*abbreviatory.Run, error) {
 			opt.Track = true
 			opt.History = h.Runs
 			if reduceErr = reduce(); reduceErr != nil {
@@ -384,8 +419,9 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	// printed. A second one kills it.
 	sigs := make(chan os.Signal, 2)
 	signal.Notify(sigs, stopSignals...)
-	defer signal.Stop(sigs)
+	forwarded := make(chan struct{})
 	go func() {
+		defer close(forwarded)
 		n := 0
 		for sig := range sigs {
 			if n++; n == 1 && cmd.Process.Signal(sig) == nil {
@@ -402,47 +438,91 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if err != nil {
 		io.Copy(io.Discard, r)
 		cmd.Wait()
+		signal.Stop(sigs)
 		fmt.Fprintln(stderr, "abbreviatory:", err)
 		return exitOf(cmd, 1)
 	}
 	defer os.Remove(spool.Name())
 	defer spool.Close()
+	var written atomic.Int64
 	copied := make(chan error, 1)
 	go func() {
-		_, err := io.Copy(spool, r)
+		_, err := io.Copy(countingWriter{spool, &written}, r)
 		copied <- err
 	}()
 	waitErr := cmd.Wait()
 	status := exitOf(cmd, 1)
+	signal.Stop(sigs)
+	close(sigs)
+	<-forwarded
 	if waitErr != nil && cmd.ProcessState == nil {
 		fmt.Fprintln(stderr, "abbreviatory:", waitErr)
 	}
+
+	// The command is gone. From here a first signal stops any wait for the
+	// history's lock (the report comes without a comparison), a second
+	// exits with the command's status.
+	post := make(chan os.Signal, 2)
+	signal.Notify(post, stopSignals...)
+	defer signal.Stop(post)
+	cancel := make(chan struct{})
+	go func() {
+		n := 0
+		for range post {
+			if n++; n == 1 {
+				close(cancel)
+				continue
+			}
+			os.Remove(spool.Name())
+			os.Exit(status)
+		}
+	}()
+
 	// Something the command started in the background can keep the output
-	// open after the command is gone; stop reading after a grace period.
-	var copyErr error
+	// open after the command is gone; reduce what came within a grace
+	// period and leave the rest.
+	var in io.Reader
 	select {
-	case copyErr = <-copied:
+	case err := <-copied:
+		r.Close()
+		if err != nil {
+			fmt.Fprintln(stderr, "abbreviatory: reading the command's output:", err)
+			return status
+		}
+		if _, err := spool.Seek(0, io.SeekStart); err != nil {
+			fmt.Fprintln(stderr, "abbreviatory:", err)
+			return status
+		}
+		in = spool
 	case <-time.After(outputGrace):
 		fmt.Fprintf(stderr, "abbreviatory: the output was still open %s after the command exited (a process it started in the background?); reading stopped\n", outputGrace)
-		r.Close()
-		<-copied
-	}
-	r.Close()
-	if copyErr != nil {
-		fmt.Fprintln(stderr, "abbreviatory: reading the command's output:", copyErr)
-		return status
-	}
-	if _, err := spool.Seek(0, io.SeekStart); err != nil {
-		fmt.Fprintln(stderr, "abbreviatory:", err)
-		return status
+		rf, err := os.Open(spool.Name())
+		if err != nil {
+			fmt.Fprintln(stderr, "abbreviatory:", err)
+			return status
+		}
+		defer rf.Close()
+		in = io.LimitReader(rf, written.Load())
 	}
 	opt.Exit = &status
-	if err := reduceAndPrint(spool, opt, f, stdout, stderr); err != nil {
+	if err := reduceAndPrint(in, opt, f, cancel, stdout, stderr); err != nil {
 		// The command's status decides the exit either way: a CI step
 		// shouldn't pass or fail because of the report.
 		fmt.Fprintln(stderr, "abbreviatory: could not reduce the output:", err)
 	}
 	return status
+}
+
+// countingWriter counts what it writes.
+type countingWriter struct {
+	w io.Writer
+	n *atomic.Int64
+}
+
+func (c countingWriter) Write(p []byte) (int, error) {
+	n, err := c.w.Write(p)
+	c.n.Add(int64(n))
+	return n, err
 }
 
 // outputGrace is how long run keeps reading output after the command exits.

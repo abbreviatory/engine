@@ -191,9 +191,7 @@ func (s *sim) output(run int, rng *rand.Rand) string {
 	return b.String()
 }
 
-// known is the status used for comparing: F, P, or '-' for unknown. When a
-// run's output names no passing test (go test without -v, or a verbose run
-// where nothing passed), a test missing from it counts as passing.
+// known is the status used for comparing: F, P, or '-' for unknown.
 func (s *sim) known(run, i int) byte {
 	c := s.status[run][i]
 	if c == 'F' {
@@ -202,25 +200,15 @@ func (s *sim) known(run, i int) byte {
 	if !s.tests {
 		return 'P' // a log error that didn't appear didn't happen
 	}
-	if c == 'P' && s.verbose {
+	if !s.verbose {
+		// Plain go test names only failures; its package lines show the
+		// rest ran, so a missing test passed.
 		return 'P'
 	}
-	if !s.namesPasses(run) {
+	if c == 'P' {
 		return 'P'
 	}
 	return '-'
-}
-
-func (s *sim) namesPasses(run int) bool {
-	if !s.verbose {
-		return false
-	}
-	for _, c := range s.status[run] {
-		if c == 'P' {
-			return true
-		}
-	}
-	return false
 }
 
 type expected struct {

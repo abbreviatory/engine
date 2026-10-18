@@ -56,6 +56,14 @@ type Record struct {
 	Detail []string
 	// Lines are the original lines the record came from.
 	Lines []Range
+	// Name is a test's own name, without its package, for the formats that
+	// have packages (go test). Run history uses it to match a test whose
+	// package wasn't printed (a run cut short) with the same test in
+	// another run.
+	Name string
+	// NoHistory keeps a passing test out of the grouper's list for run
+	// history, because its adapter reports it separately.
+	NoHistory bool
 }
 
 func (r *Record) addLine(n int64) {

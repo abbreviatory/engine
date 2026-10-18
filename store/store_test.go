@@ -270,7 +270,7 @@ func TestLockKeptFresh(t *testing.T) {
 	lockTouch, lockStale = 20*time.Millisecond, 150*time.Millisecond
 	s, _ := Open(t.TempDir())
 	os.MkdirAll(s.historyDir(), 0o700)
-	unlock, err := s.lock(s.historyPath("k") + ".lock")
+	unlock, err := s.lock(s.historyPath("k")+".lock", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func TestLockKeptFresh(t *testing.T) {
 	// Held and touched: a second taker must wait, not break it.
 	got := make(chan bool)
 	go func() {
-		u, err := s.lock(s.historyPath("k") + ".lock")
+		u, err := s.lock(s.historyPath("k")+".lock", nil)
 		if err == nil {
 			u()
 		}

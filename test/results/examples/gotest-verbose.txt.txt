@@ -1,21 +1,21 @@
 [abbreviatory] go test output, 2,453 lines (100.7 kB), ref c49121257087
 tests: 1,204 passed, 7 failed, 1 skipped; 1 error
 FAILED (7):
-- TestPickPast (0.00s) [ref c49121257087:g1]
-- TestFieldSpaces (0.00s) [ref c49121257087:g1206]
+- TestPickPast (example.com/gosample/crash, 0.00s) [ref c49121257087:g2]
+- TestFieldSpaces (example.com/gosample/parse, 0.00s) [ref c49121257087:g1207]
     parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax
     parse_test.go:36: Field("width = 12") = 0, want 12
-- TestFieldHex (0.00s) [ref c49121257087:g1207]
+- TestFieldHex (example.com/gosample/parse, 0.00s) [ref c49121257087:g1208]
     parse_test.go:43: Field("mask=0xff"): strconv.Atoi: parsing "0xff": invalid syntax
-- TestFieldUnits (0.00s) [ref c49121257087:g1208]
-- TestFieldUnits/timeout=30s (0.00s) [ref c49121257087:g1209]
+- TestFieldUnits (example.com/gosample/parse, 0.00s) [ref c49121257087:g1209]
+- TestFieldUnits/timeout=30s (example.com/gosample/parse, 0.00s) [ref c49121257087:g1210]
     parse_test.go:52: Field("timeout=30s"): strconv.Atoi: parsing "30s": invalid syntax
-- TestFieldUnits/size=4KB (0.00s) [ref c49121257087:g1210]
+- TestFieldUnits/size=4KB (example.com/gosample/parse, 0.00s) [ref c49121257087:g1211]
     parse_test.go:52: Field("size=4KB"): strconv.Atoi: parsing "4KB": invalid syntax
-- TestFieldUnits/rate=12/s (0.00s) [ref c49121257087:g1211]
+- TestFieldUnits/rate=12/s (example.com/gosample/parse, 0.00s) [ref c49121257087:g1212]
     parse_test.go:52: Field("rate=12/s"): strconv.Atoi: parsing "12/s": invalid syntax
 ERRORS (1):
-- panic: runtime error: index out of range [2] with length 2 [recovered] [ref c49121257087:g2]
+- panic: runtime error: index out of range [2] with length 2 [recovered] [ref c49121257087:g0]
     	panic: runtime error: index out of range [2] with length 2
     
     goroutine 19 [running]:
@@ -34,7 +34,7 @@ ERRORS (1):
     created by testing.(*T).Run in goroutine 1
     	/usr/local/go1.24.7/src/testing/testing.go:1851 +0x413
 OTHER (4):
-- x2 FAIL [ref c49121257087:g1214]
+- x2 FAIL [ref c49121257087:g4]
 - FAIL	example.com/gosample/crash	0.005s [ref c49121257087:g3]
 - FAIL	example.com/gosample/parse	0.020s [ref c49121257087:g1215]
 not shown: 1,204 passed tests [ref c49121257087:pass]

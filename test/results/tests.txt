@@ -1,39 +1,25 @@
 # Every test, verbose
-# recorded 2026-10-18 20:39 UTC at d0d473f, Abbreviatory 0.1.0, go1.24.7 linux/amd64
+# recorded 2026-10-18 21:24 UTC at 9464859, Abbreviatory 0.2.0, go1.24.7 linux/amd64
 # Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
 # command: go test -count=1 -v ./...
 
+=== RUN   TestTrackedPromise
+--- PASS: TestTrackedPromise (14.68s)
+=== RUN   TestFirstRunAndNoChange
+--- PASS: TestFirstRunAndNoChange (0.00s)
+=== RUN   TestTrimmedHistory
+--- PASS: TestTrimmedHistory (0.00s)
+=== RUN   TestTrackedNoRefs
+--- PASS: TestTrackedNoRefs (0.00s)
+=== RUN   TestGoodPacking
+--- PASS: TestGoodPacking (0.00s)
+=== RUN   TestPlainGoTestFixed
+--- PASS: TestPlainGoTestFixed (0.00s)
+=== RUN   TestSameNameTwoPackages
+--- PASS: TestSameNameTwoPackages (0.00s)
 === RUN   TestDetection
---- PASS: TestDetection (0.21s)
+--- PASS: TestDetection (0.20s)
 === RUN   TestPromise
-=== RUN   TestPromise/pytest-verbose.txt/256
-=== PAUSE TestPromise/pytest-verbose.txt/256
-=== RUN   TestPromise/pytest-verbose.txt/512
-=== PAUSE TestPromise/pytest-verbose.txt/512
-=== RUN   TestPromise/pytest-verbose.txt/700
-=== PAUSE TestPromise/pytest-verbose.txt/700
-=== RUN   TestPromise/pytest-verbose.txt/1024
-=== PAUSE TestPromise/pytest-verbose.txt/1024
-=== RUN   TestPromise/pytest-verbose.txt/2048
-=== PAUSE TestPromise/pytest-verbose.txt/2048
-=== RUN   TestPromise/pytest-verbose.txt/4096
-=== PAUSE TestPromise/pytest-verbose.txt/4096
-=== RUN   TestPromise/pytest-verbose.txt/16384
-=== PAUSE TestPromise/pytest-verbose.txt/16384
-=== RUN   TestPromise/api-response.json/256
-=== PAUSE TestPromise/api-response.json/256
-=== RUN   TestPromise/api-response.json/512
-=== PAUSE TestPromise/api-response.json/512
-=== RUN   TestPromise/api-response.json/700
-=== PAUSE TestPromise/api-response.json/700
-=== RUN   TestPromise/api-response.json/1024
-=== PAUSE TestPromise/api-response.json/1024
-=== RUN   TestPromise/api-response.json/2048
-=== PAUSE TestPromise/api-response.json/2048
-=== RUN   TestPromise/api-response.json/4096
-=== PAUSE TestPromise/api-response.json/4096
-=== RUN   TestPromise/api-response.json/16384
-=== PAUSE TestPromise/api-response.json/16384
 === RUN   TestPromise/app.log/256
 === PAUSE TestPromise/app.log/256
 === RUN   TestPromise/app.log/512
@@ -118,25 +104,37 @@
 === PAUSE TestPromise/pytest-short.txt/4096
 === RUN   TestPromise/pytest-short.txt/16384
 === PAUSE TestPromise/pytest-short.txt/16384
-=== CONT  TestPromise/pytest-verbose.txt/256
-=== CONT  TestPromise/pytest-short.txt/16384
-=== CONT  TestPromise/gotest-short.txt/256
-=== CONT  TestPromise/pytest-short.txt/4096
-=== CONT  TestPromise/gotest-json.txt/16384
-=== CONT  TestPromise/gotest-json.txt/4096
-=== CONT  TestPromise/gotest-json.txt/2048
-=== CONT  TestPromise/gotest-json.txt/1024
-=== CONT  TestPromise/gotest-json.txt/700
-=== CONT  TestPromise/gotest-json.txt/512
-=== CONT  TestPromise/gotest-json.txt/256
-=== CONT  TestPromise/app.log/16384
-=== CONT  TestPromise/app.log/4096
-=== CONT  TestPromise/app.log/2048
-=== CONT  TestPromise/app.log/1024
-=== CONT  TestPromise/app.log/700
-=== CONT  TestPromise/app.log/512
+=== RUN   TestPromise/pytest-verbose.txt/256
+=== PAUSE TestPromise/pytest-verbose.txt/256
+=== RUN   TestPromise/pytest-verbose.txt/512
+=== PAUSE TestPromise/pytest-verbose.txt/512
+=== RUN   TestPromise/pytest-verbose.txt/700
+=== PAUSE TestPromise/pytest-verbose.txt/700
+=== RUN   TestPromise/pytest-verbose.txt/1024
+=== PAUSE TestPromise/pytest-verbose.txt/1024
+=== RUN   TestPromise/pytest-verbose.txt/2048
+=== PAUSE TestPromise/pytest-verbose.txt/2048
+=== RUN   TestPromise/pytest-verbose.txt/4096
+=== PAUSE TestPromise/pytest-verbose.txt/4096
+=== RUN   TestPromise/pytest-verbose.txt/16384
+=== PAUSE TestPromise/pytest-verbose.txt/16384
+=== RUN   TestPromise/api-response.json/256
+=== PAUSE TestPromise/api-response.json/256
+=== RUN   TestPromise/api-response.json/512
+=== PAUSE TestPromise/api-response.json/512
+=== RUN   TestPromise/api-response.json/700
+=== PAUSE TestPromise/api-response.json/700
+=== RUN   TestPromise/api-response.json/1024
+=== PAUSE TestPromise/api-response.json/1024
+=== RUN   TestPromise/api-response.json/2048
+=== PAUSE TestPromise/api-response.json/2048
+=== RUN   TestPromise/api-response.json/4096
+=== PAUSE TestPromise/api-response.json/4096
+=== RUN   TestPromise/api-response.json/16384
+=== PAUSE TestPromise/api-response.json/16384
 === CONT  TestPromise/app.log/256
 === CONT  TestPromise/api-response.json/16384
+=== CONT  TestPromise/junit-pytest.xml/256
 === CONT  TestPromise/api-response.json/4096
 === CONT  TestPromise/api-response.json/2048
 === CONT  TestPromise/api-response.json/1024
@@ -149,18 +147,12 @@
 === CONT  TestPromise/pytest-verbose.txt/1024
 === CONT  TestPromise/pytest-verbose.txt/700
 === CONT  TestPromise/pytest-verbose.txt/512
+=== CONT  TestPromise/pytest-verbose.txt/256
+=== CONT  TestPromise/pytest-short.txt/16384
+=== CONT  TestPromise/pytest-short.txt/4096
 === CONT  TestPromise/pytest-short.txt/2048
 === CONT  TestPromise/pytest-short.txt/1024
 === CONT  TestPromise/pytest-short.txt/700
-=== CONT  TestPromise/pytest-short.txt/512
-=== CONT  TestPromise/pytest-short.txt/256
-=== CONT  TestPromise/junit-pytest.xml/16384
-=== CONT  TestPromise/junit-pytest.xml/4096
-=== CONT  TestPromise/junit-pytest.xml/2048
-=== CONT  TestPromise/junit-pytest.xml/1024
-=== CONT  TestPromise/junit-pytest.xml/700
-=== CONT  TestPromise/junit-pytest.xml/512
-=== CONT  TestPromise/junit-pytest.xml/256
 === CONT  TestPromise/gotest-verbose.txt/16384
 === CONT  TestPromise/gotest-verbose.txt/4096
 === CONT  TestPromise/gotest-verbose.txt/2048
@@ -174,65 +166,87 @@
 === CONT  TestPromise/gotest-short.txt/1024
 === CONT  TestPromise/gotest-short.txt/700
 === CONT  TestPromise/gotest-short.txt/512
+=== CONT  TestPromise/gotest-short.txt/256
+=== CONT  TestPromise/gotest-json.txt/16384
+=== CONT  TestPromise/gotest-json.txt/4096
+=== CONT  TestPromise/gotest-json.txt/2048
+=== CONT  TestPromise/gotest-json.txt/1024
+=== CONT  TestPromise/gotest-json.txt/700
+=== CONT  TestPromise/gotest-json.txt/512
+=== CONT  TestPromise/gotest-json.txt/256
+=== CONT  TestPromise/app.log/16384
+=== CONT  TestPromise/app.log/4096
+=== CONT  TestPromise/app.log/2048
+=== CONT  TestPromise/app.log/1024
+=== CONT  TestPromise/app.log/700
+=== CONT  TestPromise/app.log/512
+=== CONT  TestPromise/pytest-short.txt/512
+=== CONT  TestPromise/pytest-short.txt/256
+=== CONT  TestPromise/junit-pytest.xml/16384
+=== CONT  TestPromise/junit-pytest.xml/4096
+=== CONT  TestPromise/junit-pytest.xml/2048
+=== CONT  TestPromise/junit-pytest.xml/1024
+=== CONT  TestPromise/junit-pytest.xml/700
+=== CONT  TestPromise/junit-pytest.xml/512
 --- PASS: TestPromise (0.01s)
-    --- PASS: TestPromise/pytest-verbose.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-short.txt/256 (0.00s)
-    --- PASS: TestPromise/pytest-short.txt/4096 (0.03s)
-    --- PASS: TestPromise/pytest-short.txt/16384 (0.03s)
-    --- PASS: TestPromise/gotest-json.txt/16384 (0.36s)
-    --- PASS: TestPromise/gotest-json.txt/4096 (0.39s)
-    --- PASS: TestPromise/gotest-json.txt/2048 (0.33s)
-    --- PASS: TestPromise/gotest-json.txt/1024 (0.36s)
-    --- PASS: TestPromise/gotest-json.txt/700 (0.36s)
-    --- PASS: TestPromise/gotest-json.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-json.txt/512 (0.44s)
-    --- PASS: TestPromise/app.log/16384 (4.20s)
-    --- PASS: TestPromise/app.log/4096 (4.12s)
-    --- PASS: TestPromise/app.log/2048 (9.88s)
-    --- PASS: TestPromise/app.log/1024 (12.26s)
-    --- PASS: TestPromise/app.log/700 (10.98s)
     --- PASS: TestPromise/app.log/256 (0.00s)
-    --- PASS: TestPromise/api-response.json/16384 (0.47s)
-    --- PASS: TestPromise/api-response.json/4096 (0.52s)
-    --- PASS: TestPromise/api-response.json/2048 (0.66s)
-    --- PASS: TestPromise/api-response.json/1024 (0.65s)
-    --- PASS: TestPromise/app.log/512 (11.08s)
-    --- PASS: TestPromise/api-response.json/700 (0.80s)
+    --- PASS: TestPromise/junit-pytest.xml/256 (0.00s)
+    --- PASS: TestPromise/api-response.json/16384 (0.55s)
+    --- PASS: TestPromise/api-response.json/4096 (0.56s)
+    --- PASS: TestPromise/api-response.json/2048 (0.64s)
+    --- PASS: TestPromise/api-response.json/1024 (0.67s)
+    --- PASS: TestPromise/api-response.json/700 (0.86s)
     --- PASS: TestPromise/api-response.json/256 (0.00s)
+    --- PASS: TestPromise/api-response.json/512 (0.85s)
     --- PASS: TestPromise/pytest-verbose.txt/16384 (0.09s)
-    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.10s)
-    --- PASS: TestPromise/api-response.json/512 (0.81s)
-    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.11s)
-    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.11s)
-    --- PASS: TestPromise/pytest-verbose.txt/700 (0.09s)
+    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.08s)
+    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.13s)
+    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.13s)
     --- PASS: TestPromise/pytest-verbose.txt/512 (0.05s)
-    --- PASS: TestPromise/pytest-short.txt/2048 (0.03s)
+    --- PASS: TestPromise/pytest-verbose.txt/256 (0.00s)
+    --- PASS: TestPromise/pytest-short.txt/16384 (0.03s)
+    --- PASS: TestPromise/pytest-verbose.txt/700 (0.12s)
+    --- PASS: TestPromise/pytest-short.txt/4096 (0.02s)
+    --- PASS: TestPromise/pytest-short.txt/2048 (0.02s)
     --- PASS: TestPromise/pytest-short.txt/1024 (0.03s)
     --- PASS: TestPromise/pytest-short.txt/700 (0.02s)
-    --- PASS: TestPromise/pytest-short.txt/256 (0.00s)
-    --- PASS: TestPromise/pytest-short.txt/512 (0.02s)
-    --- PASS: TestPromise/junit-pytest.xml/16384 (0.11s)
-    --- PASS: TestPromise/junit-pytest.xml/4096 (0.11s)
-    --- PASS: TestPromise/junit-pytest.xml/2048 (0.14s)
-    --- PASS: TestPromise/junit-pytest.xml/1024 (0.12s)
-    --- PASS: TestPromise/junit-pytest.xml/512 (0.11s)
-    --- PASS: TestPromise/junit-pytest.xml/256 (0.00s)
-    --- PASS: TestPromise/junit-pytest.xml/700 (0.13s)
-    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.09s)
+    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.10s)
     --- PASS: TestPromise/gotest-verbose.txt/4096 (0.10s)
-    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.12s)
-    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.12s)
-    --- PASS: TestPromise/gotest-verbose.txt/700 (0.10s)
+    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.10s)
+    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.11s)
+    --- PASS: TestPromise/gotest-verbose.txt/700 (0.09s)
     --- PASS: TestPromise/gotest-verbose.txt/256 (0.00s)
     --- PASS: TestPromise/gotest-short.txt/16384 (0.01s)
-    --- PASS: TestPromise/gotest-short.txt/4096 (0.02s)
-    --- PASS: TestPromise/gotest-verbose.txt/512 (0.11s)
-    --- PASS: TestPromise/gotest-short.txt/2048 (0.01s)
+    --- PASS: TestPromise/gotest-short.txt/4096 (0.01s)
+    --- PASS: TestPromise/gotest-verbose.txt/512 (0.10s)
     --- PASS: TestPromise/gotest-short.txt/1024 (0.01s)
+    --- PASS: TestPromise/gotest-short.txt/2048 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/700 (0.01s)
+    --- PASS: TestPromise/gotest-short.txt/256 (0.00s)
     --- PASS: TestPromise/gotest-short.txt/512 (0.01s)
+    --- PASS: TestPromise/gotest-json.txt/4096 (0.32s)
+    --- PASS: TestPromise/gotest-json.txt/16384 (0.33s)
+    --- PASS: TestPromise/gotest-json.txt/2048 (0.35s)
+    --- PASS: TestPromise/gotest-json.txt/1024 (0.36s)
+    --- PASS: TestPromise/gotest-json.txt/700 (0.34s)
+    --- PASS: TestPromise/gotest-json.txt/256 (0.00s)
+    --- PASS: TestPromise/gotest-json.txt/512 (0.35s)
+    --- PASS: TestPromise/app.log/16384 (4.09s)
+    --- PASS: TestPromise/app.log/4096 (4.11s)
+    --- PASS: TestPromise/app.log/2048 (9.63s)
+    --- PASS: TestPromise/app.log/1024 (11.48s)
+    --- PASS: TestPromise/app.log/700 (10.85s)
+    --- PASS: TestPromise/pytest-short.txt/512 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/256 (0.00s)
+    --- PASS: TestPromise/junit-pytest.xml/16384 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/4096 (0.08s)
+    --- PASS: TestPromise/junit-pytest.xml/2048 (0.08s)
+    --- PASS: TestPromise/junit-pytest.xml/1024 (0.08s)
+    --- PASS: TestPromise/junit-pytest.xml/700 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/512 (0.07s)
+    --- PASS: TestPromise/app.log/512 (10.78s)
 === RUN   TestGroupsCoverInput
---- PASS: TestGroupsCoverInput (0.33s)
+--- PASS: TestGroupsCoverInput (0.27s)
 === RUN   TestExpectedContent
 --- PASS: TestExpectedContent (0.17s)
 === RUN   TestRatios
@@ -240,7 +254,7 @@
     promise_test.go:385: ratio app.log              logs           5630070 bytes  63369 lines ->  3075 bytes  42 lines (0.05% of the input)
     promise_test.go:385: ratio gotest-json.txt      gotest-json     808325 bytes   4880 lines ->  2383 bytes  39 lines (0.29% of the input)
     promise_test.go:385: ratio gotest-short.txt     gotest            1735 bytes     35 lines ->  1815 bytes  36 lines (104.61% of the input)
-    promise_test.go:385: ratio gotest-verbose.txt   gotest          100652 bytes   2453 lines ->  2256 bytes  41 lines (2.24% of the input)
+    promise_test.go:385: ratio gotest-verbose.txt   gotest          100652 bytes   2453 lines ->  2449 bytes  41 lines (2.43% of the input)
     promise_test.go:385: ratio junit-pytest.xml     junit            82024 bytes    117 lines ->  3961 bytes  89 lines (4.83% of the input)
     promise_test.go:385: ratio pytest-short.txt     pytest            7479 bytes    169 lines ->  3898 bytes  87 lines (52.12% of the input)
     promise_test.go:385: ratio pytest-verbose.txt   pytest           79443 bytes   1072 lines ->  3893 bytes  88 lines (4.90% of the input)
@@ -258,7 +272,7 @@
 === RUN   TestReviewPytestFailAndTeardownError
 --- PASS: TestReviewPytestFailAndTeardownError (0.00s)
 === RUN   TestReviewDetailCapped
---- PASS: TestReviewDetailCapped (0.09s)
+--- PASS: TestReviewDetailCapped (0.08s)
 === RUN   TestReviewGoTestJSONEscapes
 --- PASS: TestReviewGoTestJSONEscapes (0.00s)
 === RUN   TestReviewJUnitVariants
@@ -310,16 +324,27 @@
 === RUN   TestManyDistinctBounded
 --- PASS: TestManyDistinctBounded (0.10s)
 === RUN   TestRandomLogs
---- PASS: TestRandomLogs (1.38s)
+--- PASS: TestRandomLogs (1.33s)
 === RUN   TestLargeInputMemory
-    robust_test.go:440: memory: 1107 MB input, 12485370 lines, peak heap in use 16.8 MB, output 539 bytes, 33.3 s (33 MB/s)
---- PASS: TestLargeInputMemory (33.27s)
+    robust_test.go:440: memory: 68 MB input, 780335 lines, peak heap in use 7.4 MB, output 515 bytes, 1.9 s (36 MB/s)
+--- PASS: TestLargeInputMemory (1.92s)
+=== RUN   TestSimulatedRuns
+=== RUN   TestSimulatedRuns/go_test_-v
+    delta_test.go:450: 500 runs: map[fixed:508 flaky:1399 new:544 new notes:539 not run:45 one line:57 report:443 still:2386 streak notes:1859]
+=== RUN   TestSimulatedRuns/go_test
+    delta_test.go:450: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
+=== RUN   TestSimulatedRuns/log
+    delta_test.go:450: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
+--- PASS: TestSimulatedRuns (3.33s)
+    --- PASS: TestSimulatedRuns/go_test_-v (1.33s)
+    --- PASS: TestSimulatedRuns/go_test (1.04s)
+    --- PASS: TestSimulatedRuns/log (0.96s)
 PASS
-ok  	github.com/abbreviatory/engine	66.229s
+ok  	github.com/abbreviatory/engine	52.511s
 === RUN   TestReduceAndExpand
 --- PASS: TestReduceAndExpand (0.01s)
 === RUN   TestReduceFileAndJSON
---- PASS: TestReduceFileAndJSON (0.01s)
+--- PASS: TestReduceFileAndJSON (0.00s)
 === RUN   TestNoStore
 --- PASS: TestNoStore (0.00s)
 === RUN   TestErrors
@@ -328,14 +353,22 @@ ok  	github.com/abbreviatory/engine	66.229s
 --- PASS: TestVersionFormatsPrune (0.00s)
 === RUN   TestParseSize
 --- PASS: TestParseSize (0.00s)
+=== RUN   TestReduceWithKeyAndHistory
+--- PASS: TestReduceWithKeyAndHistory (0.03s)
+=== RUN   TestRunKeepsExitStatus
+--- PASS: TestRunKeepsExitStatus (0.04s)
+=== RUN   TestRunEdgeCases
+--- PASS: TestRunEdgeCases (0.34s)
+=== RUN   TestRunPassesSignalsOn
+--- PASS: TestRunPassesSignalsOn (1.06s)
 PASS
-ok  	github.com/abbreviatory/engine/cmd/abbreviatory	0.037s
+ok  	github.com/abbreviatory/engine/cmd/abbreviatory	1.478s
 === RUN   TestStoreRoundTrip
---- PASS: TestStoreRoundTrip (0.01s)
+--- PASS: TestStoreRoundTrip (0.03s)
 === RUN   TestStoreMissing
 --- PASS: TestStoreMissing (0.00s)
 === RUN   TestStoreAbortLeavesNothing
---- PASS: TestStoreAbortLeavesNothing (0.01s)
+--- PASS: TestStoreAbortLeavesNothing (0.00s)
 === RUN   TestStoreDamaged
 --- PASS: TestStoreDamaged (0.01s)
 === RUN   TestPrune
@@ -344,5 +377,15 @@ ok  	github.com/abbreviatory/engine/cmd/abbreviatory	0.037s
 --- PASS: TestDefaultDir (0.00s)
 === RUN   TestPruneNowOncePerHour
 --- PASS: TestPruneNowOncePerHour (0.00s)
+=== RUN   TestHistoryRecord
+--- PASS: TestHistoryRecord (0.01s)
+=== RUN   TestHistoryLock
+--- PASS: TestHistoryLock (0.00s)
+=== RUN   TestPruneOldHistory
+--- PASS: TestPruneOldHistory (0.00s)
+=== RUN   TestHistoryUpdateTakesTurns
+--- PASS: TestHistoryUpdateTakesTurns (0.26s)
+=== RUN   TestLockKeptFresh
+--- PASS: TestLockKeptFresh (0.71s)
 PASS
-ok  	github.com/abbreviatory/engine/store	0.055s
+ok  	github.com/abbreviatory/engine/store	1.047s

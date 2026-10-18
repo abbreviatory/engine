@@ -46,6 +46,9 @@ type grouper struct {
 	// passIDs collects every passing test's identity, for run history,
 	// when it isn't nil.
 	passIDs map[string]bool
+	// passNames holds the passing tests' own names (without a package),
+	// to match a failure from a run cut short before its package line.
+	passNames map[string]bool
 }
 
 func newGrouper(rules preserve, keep []*regexp.Regexp) *grouper {
@@ -83,8 +86,11 @@ func (g *grouper) addN(r Record, n int64) {
 	if strings.TrimSpace(r.Head) == "" {
 		r.Head = "(blank line)"
 	}
-	if g.passIDs != nil && r.Kind == KindPass && r.ID != "" {
+	if g.passIDs != nil && r.Kind == KindPass && r.ID != "" && !r.NoHistory {
 		g.passIDs[hashKey("t\x00"+r.ID)] = true
+		if r.Name != "" {
+			g.passNames[r.Name] = true
+		}
 	}
 	// Keep rules match lines of the input; a record with no lines has none.
 	kept := len(g.keep) > 0 && len(r.Lines) > 0 && g.matches(&r)

@@ -1,0 +1,42 @@
+[abbreviatory] go test -json output, 4,882 lines (808.5 kB), ref 3e35712ad529
+run 2; since run 1: 1 new, 1 fixed, 6 still failing (longest for 2 runs)
+new: TestFieldSpaces (example.com/gosample/parse, 0.00s) [ref 3e35712ad529:g1205]
+fixed: TestLegacyFormat (example.com/gosample/parse, 0.00s) [ref 6f92e70f603c:g1213]
+tests: 1,205 passed, 7 failed, 1 skipped
+FAILED (7):
+- TestFieldSpaces (example.com/gosample/parse, 0.00s) (new) [ref 3e35712ad529:g1205]
+    parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax
+    parse_test.go:36: Field("width = 12") = 0, want 12
+- TestPickPast (example.com/gosample/crash, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1]
+    panic: runtime error: index out of range [2] with length 2 [recovered]
+    	panic: runtime error: index out of range [2] with length 2
+    
+    goroutine 7 [running]:
+    testing.tRunner.func1.2({0x567de0, 0xc0000242b8})
+    	/usr/local/go1.24.7/src/testing/testing.go:1734 +0x21c
+    testing.tRunner.func1()
+    	/usr/local/go1.24.7/src/testing/testing.go:1737 +0x35e
+    panic({0x567de0?, 0xc0000242b8?})
+    	/usr/local/go1.24.7/src/runtime/panic.go:792 +0x132
+    example.com/gosample/crash.Pick(...)
+    	/home/claude/engine/test/fixtures/src/gosample/crash/crash.go:5
+    example.com/gosample/crash.TestPickPast(0xc000003c00?)
+    	/home/claude/engine/test/fixtures/src/gosample/crash/crash_test.go:13 +0x16
+    testing.tRunner(0xc000003c00, 0x5843a8)
+    	/usr/local/go1.24.7/src/testing/testing.go:1792 +0xf4
+    created by testing.(*T).Run in goroutine 1
+    	/usr/local/go1.24.7/src/testing/testing.go:1851 +0x413
+- TestFieldHex (example.com/gosample/parse, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1206]
+    parse_test.go:43: Field("mask=0xff"): strconv.Atoi: parsing "0xff": invalid syntax
+- TestFieldUnits/timeout=30s (example.com/gosample/parse, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1207]
+    parse_test.go:52: Field("timeout=30s"): strconv.Atoi: parsing "30s": invalid syntax
+- TestFieldUnits/size=4KB (example.com/gosample/parse, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1208]
+    parse_test.go:52: Field("size=4KB"): strconv.Atoi: parsing "4KB": invalid syntax
+- TestFieldUnits/rate=12/s (example.com/gosample/parse, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1209]
+    parse_test.go:52: Field("rate=12/s"): strconv.Atoi: parsing "12/s": invalid syntax
+- TestFieldUnits (example.com/gosample/parse, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1210]
+OTHER (2):
+- FAIL example.com/gosample/crash (0.01s) [ref 3e35712ad529:g2]
+- FAIL example.com/gosample/parse (0.02s) [ref 3e35712ad529:g1213]
+not shown: 1,205 passed tests [ref 3e35712ad529:pass]
+not shown: 1 skipped test [ref 3e35712ad529:skip]

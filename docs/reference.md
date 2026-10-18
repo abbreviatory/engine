@@ -59,7 +59,11 @@ It exits with the command's exit status, or 128 plus the signal number when a
 signal ended the command; 127 when the command can't be found and 126 when it
 can't be started. An interrupt or a SIGTERM sent to `run` (a CI timeout, a
 cancelled job, Ctrl-C) is passed on to the command, and the report is still
-made from what it printed; a second one kills the command. If something the
+made from what it printed; a second one kills the command. The signal goes to
+the command itself, not to processes it started, as it would without
+`abbreviatory` in front. Once the command has exited, a signal stops any wait
+for the history's lock (the report then comes without a comparison), and a
+second one exits with the command's status. If something the
 command started in the background keeps the output open after the command
 exits, reading stops 5 seconds later, with a warning. If the output can't be
 reduced (it is binary, say), the error is printed and the exit status is
@@ -222,9 +226,13 @@ it. What is compared are the failures and errors the report preserves (as
 
 Each item has a status in each run: failing; passing (a test that passed, or
 anything that isn't a test and didn't appear); or unknown (a test that was
-skipped or didn't appear). When the output names no passing test at all, as
-go test without `-v` and pytest without `-v` don't, a test that doesn't
-appear is taken to have passed. Against the previous run:
+skipped or didn't appear). When the output shows tests passed without naming
+them (go test without `-v`, whose package lines say the package ran, and
+pytest without `-v`, whose summary counts them), a test that doesn't appear is
+taken to have passed. A run that names no passing test because none passed
+(a broken build) leaves missing tests unknown. A go test failure printed
+without its package (the run was cut short before the package's result line)
+is matched by its name with the same test in the other run. Against the previous run:
 
 | In the report | Meaning |
 |---|---|
@@ -253,10 +261,15 @@ how many failures there are. `-full` gives the whole report instead, with
 
 A history keeps the last 50 runs of its key. The last 10 keep their failures
 and the names of the tests that passed, which flaky detection needs; older
-ones keep their counts for `history`. The history is a JSON file under
+ones keep their counts for `history`. A run with more than 100,000 passing
+tests keeps only those that failed in one of the last 10 runs; for such a
+suite flaky detection counts only the changes after a test's first failure
+in that window. The history is a JSON file under
 `history/` in the store. A run locks its history from reading it to writing
-the new run, so a second run of the same key at the same moment waits and
-then compares with the first. A history nobody added
+the new run, so a second run of the same key at the same moment waits (up to
+5 minutes) and then compares with the first. `reduce -key` reads piped input
+to a temporary file first, so the lock isn't held while the program writing
+the pipe still runs. A history nobody added
 to for 90 days is removed by pruning.
 
 ## The store

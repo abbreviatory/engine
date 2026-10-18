@@ -71,10 +71,19 @@ func (s *Store) History(key string) (*History, error) {
 // take turns: the second compares with the first. A damaged history is
 // handed over empty, and replaced.
 func (s *Store) Update(key string, fn func(h *History) (*abbreviatory.Run, error)) error {
+	return s.UpdateCancel(key, nil, fn)
+}
+
+// ErrCancelled is returned when the wait for a history's lock was cancelled.
+var ErrCancelled = errors.New("store: stopped waiting for the history lock")
+
+// UpdateCancel is Update with a channel that, when closed, stops the wait for
+// the lock.
+func (s *Store) UpdateCancel(key string, cancel <-chan struct{}, fn func(h *History) (*abbreviatory.Run, error)) error {
 	if err := os.MkdirAll(s.historyDir(), 0o700); err != nil {
 		return err
 	}
-	unlock, err := s.lock(s.historyPath(key) + ".lock")
+	unlock, err := s.lock(s.historyPath(key)+".lock", cancel)
 	if err != nil {
 		return err
 	}
@@ -199,7 +208,7 @@ var (
 
 // lock takes a lock file, waiting for another run to let go of it, and
 // keeps it fresh until it is released.
-func (s *Store) lock(path string) (func(), error) {
+func (s *Store) lock(path string, cancel <-chan struct{}) (func(), error) {
 	deadline := time.Now().Add(lockWait)
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
@@ -234,6 +243,11 @@ func (s *Store) lock(path string) (func(), error) {
 			// waiters can't both remove it and then each other's new lock.
 			aside := path + ".stale-" + strconv.FormatInt(time.Now().UnixNano(), 36)
 			if os.Rename(path, aside) == nil {
+				if info, err := os.Stat(aside); err == nil && time.Since(info.ModTime()) <= lockStale {
+					// Another waiter got there first and this is its new
+					// lock: put it back.
+					os.Link(aside, path)
+				}
 				os.Remove(aside)
 			}
 			continue
@@ -241,6 +255,10 @@ func (s *Store) lock(path string) (func(), error) {
 		if time.Now().After(deadline) {
 			return nil, errors.New("store: history is locked by another run (" + path + ")")
 		}
-		time.Sleep(50 * time.Millisecond)
+		select {
+		case <-cancel:
+			return nil, ErrCancelled
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
 }

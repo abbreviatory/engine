@@ -1,5 +1,5 @@
 # Reduction of each fixture at the default budget (4,096 bytes)
-# recorded 2026-10-18 20:42 UTC at d0d473f, Abbreviatory 0.1.0, go1.24.7 linux/amd64
+# recorded 2026-10-18 21:29 UTC at 9464859, Abbreviatory 0.2.0, go1.24.7 linux/amd64
 # Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
 # command: go test -count=1 -v -run TestRatios .
 
@@ -7,7 +7,7 @@ api-response.json    json            719368 bytes  37527 lines ->  3185 bytes 12
 app.log              logs           5630070 bytes  63369 lines ->  3075 bytes  42 lines (0.05% of the input)
 gotest-json.txt      gotest-json     808325 bytes   4880 lines ->  2383 bytes  39 lines (0.29% of the input)
 gotest-short.txt     gotest            1735 bytes     35 lines ->  1815 bytes  36 lines (104.61% of the input)
-gotest-verbose.txt   gotest          100652 bytes   2453 lines ->  2256 bytes  41 lines (2.24% of the input)
+gotest-verbose.txt   gotest          100652 bytes   2453 lines ->  2449 bytes  41 lines (2.43% of the input)
 junit-pytest.xml     junit            82024 bytes    117 lines ->  3961 bytes  89 lines (4.83% of the input)
 pytest-short.txt     pytest            7479 bytes    169 lines ->  3898 bytes  87 lines (52.12% of the input)
 pytest-verbose.txt   pytest           79443 bytes   1072 lines ->  3893 bytes  88 lines (4.90% of the input)

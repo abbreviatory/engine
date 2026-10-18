@@ -250,7 +250,7 @@ generated application log and API response. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks, and every finding of an independent review before the release has its own test in [review_test.go](review_test.go). In all, 52 Go tests pass (with 56 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 and v0.2.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 69 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
@@ -259,7 +259,7 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 | app.log | generated application log | 5,630,070 | 63,369 | 3,075 | 0.05% |
 | gotest-json.txt | go test -json | 808,325 | 4,880 | 2,383 | 0.29% |
 | api-response.json | generated API response | 719,368 | 37,527 | 3,185 | 0.44% |
-| gotest-verbose.txt | go test -v | 100,652 | 2,453 | 2,256 | 2.2% |
+| gotest-verbose.txt | go test -v | 100,652 | 2,453 | 2,449 | 2.4% |
 | junit-pytest.xml | pytest's JUnit report | 82,024 | 117 | 3,961 | 4.8% |
 | pytest-verbose.txt | pytest -v | 79,443 | 1,072 | 3,893 | 4.9% |
 | pytest-short.txt | pytest | 7,479 | 169 | 3,898 | 52% |
@@ -267,7 +267,7 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 
 The last one is small enough that the whole input fits the budget, so it is shown whole with a one-line header.
 
-A generated log of 1,107 MB (12.5 million lines) streamed through in 32.7 seconds with a peak heap of 15.1 MB
+A generated log of 1,107 MB (12.5 million lines) streamed through in 32.3 seconds with a peak heap of 12.1 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in
@@ -309,9 +309,12 @@ the report matched what was worked out separately from the known statuses
   a new one, and the same error with a different stack trace too.
 - In a JSON document, error fields are compared by their path and value with
   array positions aside, so the same error at two positions counts once.
-- When the output names no passing test (go test or pytest without `-v`),
-  a failing test that disappears counts as fixed, even if it was deleted
-  or not run. With `-v` or `-json` it counts as not run.
+- When the output doesn't name passing tests (go test or pytest without
+  `-v`), a failing test that disappears counts as fixed, even if it was
+  deleted or not run. With `-v` or `-json` it counts as not run.
+- `run` signals the command, not the processes it started. With a history,
+  a test suite of a million tests takes a few hundred MB while it is
+  compared (about 225 MB for 750,000 tests in one package).
 - Flaky detection needs the last 10 runs; a history trimmed or started fresh
   sees nothing as flaky at first.
 - No HTTP service or MCP server yet; they are planned for 0.3.

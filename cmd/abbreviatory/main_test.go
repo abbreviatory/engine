@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -281,5 +283,39 @@ func TestRunPassesSignalsOn(t *testing.T) {
 	code := cmd.ProcessState.ExitCode()
 	if code != 143 || !strings.Contains(out.String(), "run 1, exit status 143") || !strings.Contains(out.String(), "ERROR stopped by signal") {
 		t.Fatalf("exit %d (%v):\n%s", code, err, out.String())
+	}
+}
+
+// Review of 0.2, second pass, C: after the command exits, a signal stops
+// the wait for a busy history lock instead of being lost.
+func TestRunSignalDuringLockWait(t *testing.T) {
+	if runtime.GOOS == "windows" || testing.Short() {
+		t.Skip("needs a built binary and signals")
+	}
+	bin := filepath.Join(t.TempDir(), "abbreviatory")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Skipf("can't build: %v %s", err, out)
+	}
+	dir := t.TempDir()
+	h := sha256.Sum256([]byte("k"))
+	os.MkdirAll(filepath.Join(dir, "history"), 0o700)
+	lock := filepath.Join(dir, "history", hex.EncodeToString(h[:8])+".json.lock")
+	os.WriteFile(lock, nil, 0o600) // fresh: another run holds it
+	cmd := exec.Command(bin, "run", "-store", dir, "-key", "k", "--", "sh", "-c", "echo x ERROR boom")
+	var out, errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &errb
+	cmd.Start()
+	time.Sleep(700 * time.Millisecond)
+	cmd.Process.Signal(syscall.SIGTERM)
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		cmd.Process.Kill()
+		t.Fatal("still waiting for the lock after a signal")
+	}
+	if code := cmd.ProcessState.ExitCode(); code != 0 || !strings.Contains(out.String(), "ERROR boom") || !strings.Contains(errb.String(), "no comparison with the last run") {
+		t.Fatalf("exit %d\n%s%s", code, out.String(), errb.String())
 	}
 }

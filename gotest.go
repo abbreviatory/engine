@@ -124,7 +124,7 @@ func (g *goTestJSON) line(n int64, text string, emit func(Record)) {
 	case "pass", "fail", "skip":
 		p.add(n, "", false)
 		kind := map[string]Kind{"pass": KindPass, "fail": KindFail, "skip": KindSkip}[ev.Action]
-		r := Record{Kind: kind, ID: ev.Package + "." + ev.Test,
+		r := Record{Kind: kind, ID: ev.Package + "." + ev.Test, Name: ev.Test,
 			Head:  ev.Test + " (" + ev.Package + ", " + strconv.FormatFloat(ev.Elapsed, 'f', 2, 64) + "s)",
 			Lines: p.lines}
 		r.Detail = trimDetail(p.detail)
@@ -181,7 +181,7 @@ func (g *goTestJSON) finish(emit func(Record)) []string {
 			continue
 		}
 		parts := strings.SplitN(key, "\x00", 2)
-		emit(Record{Kind: KindFail, ID: parts[0] + "." + parts[1], Head: parts[1] + " (" + parts[0] + ", no result: the run stopped)",
+		emit(Record{Kind: KindFail, ID: parts[0] + "." + parts[1], Name: parts[1], Head: parts[1] + " (" + parts[0] + ", no result: the run stopped)",
 			Detail: trimDetail(p.detail), Lines: p.lines})
 	}
 	for _, m := range []map[string]*pending{g.pkgs, g.builds} {
@@ -218,25 +218,54 @@ type goTestText struct {
 	indent  int
 	block   *Record // "# pkg" build errors or a panic
 	blockOn bool
-	// Results wait for their package's "ok" or "FAIL" line, which names
-	// the package: a test is known by its package and its name, as in
-	// go test -json.
-	done []Record
+	// Failed tests wait for their package's "ok" or "FAIL" line, which
+	// names the package: a test is known by its package and its name, as
+	// in go test -json. Passing tests go on at once (only their names wait,
+	// for onPass), so memory stays small on packages with many tests.
+	fails  []Record
+	passes []string
+	onPass func(id, name string)
+	sawRun bool // verbose output: tests are named as they start
+	sawPkg bool
 }
 
 func newGoTestText() *goTestText { return &goTestText{tests: map[string]*pending{}} }
 
 func (g *goTestText) flushResult(emit func(Record)) {
-	if g.result != nil {
-		g.result.Detail = trimDetail(g.result.Detail)
-		g.done = append(g.done, *g.result)
-		g.result = nil
+	if g.result == nil {
+		return
 	}
+	r := g.result
+	g.result = nil
+	r.Detail = trimDetail(r.Detail)
+	if r.Kind == KindFail {
+		g.fails = append(g.fails, *r)
+		return
+	}
+	if r.Kind == KindPass && g.onPass != nil {
+		g.passes = append(g.passes, r.ID)
+		r.NoHistory = true
+	}
+	emit(*r)
 }
 
-// flushDone emits the waiting results, qualified with pkg when it is known.
+// unnamedPasses reports output that doesn't name passing tests (go test
+// without -v): a test missing from it passed, if its package ran.
+func (g *goTestText) unnamedPasses() bool { return g.sawPkg && !g.sawRun }
+
+// flushDone emits the waiting failures, qualified with pkg when it is known,
+// and reports the passing tests.
 func (g *goTestText) flushDone(pkg string, emit func(Record)) {
-	for _, r := range g.done {
+	for _, name := range g.passes {
+		id := name
+		if pkg != "" {
+			id = pkg + "." + name
+		}
+		g.onPass(id, name)
+	}
+	g.passes = g.passes[:0]
+	for _, r := range g.fails {
+		r.Name = r.ID
 		if pkg != "" {
 			r.ID = pkg + "." + r.ID
 			name, rest := r.Head, ""
@@ -251,7 +280,7 @@ func (g *goTestText) flushDone(pkg string, emit func(Record)) {
 		}
 		emit(r)
 	}
-	g.done = g.done[:0]
+	g.fails = g.fails[:0]
 }
 
 // packageOf returns the package an "ok" or "FAIL" line names.
@@ -307,6 +336,7 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 
 	for _, m := range []string{"=== RUN", "=== CONT", "=== PAUSE", "=== NAME"} {
 		if strings.HasPrefix(t, m) {
+			g.sawRun = true
 			g.flushResult(emit)
 			name := strings.TrimSpace(t[len(m):])
 			g.cur = name
@@ -345,6 +375,7 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 	switch {
 	case isGoPackageLine(t):
 		if pkg := packageOf(t); pkg != "" {
+			g.sawPkg = true
 			g.flushDone(pkg, emit)
 		}
 		k := KindInfo
@@ -388,7 +419,7 @@ func (g *goTestText) finish(emit func(Record)) []string {
 		if p == nil {
 			continue
 		}
-		emit(Record{Kind: KindFail, ID: name, Head: name + " (no result: the run stopped)", Detail: trimDetail(p.detail), Lines: p.lines})
+		emit(Record{Kind: KindFail, ID: name, Name: name, Head: name + " (no result: the run stopped)", Detail: trimDetail(p.detail), Lines: p.lines})
 	}
 	return nil
 }

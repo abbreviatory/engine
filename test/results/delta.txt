@@ -1,0 +1,18 @@
+# 500 simulated CI runs with known changes, each delta checked against the known statuses
+# recorded 2026-10-18 21:29 UTC at 9464859, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
+# command: go test -count=1 -v -run TestSimulatedRuns .
+
+=== RUN   TestSimulatedRuns
+=== RUN   TestSimulatedRuns/go_test_-v
+    delta_test.go:450: 500 runs: map[fixed:508 flaky:1399 new:544 new notes:539 not run:45 one line:57 report:443 still:2386 streak notes:1859]
+=== RUN   TestSimulatedRuns/go_test
+    delta_test.go:450: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
+=== RUN   TestSimulatedRuns/log
+    delta_test.go:450: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
+--- PASS: TestSimulatedRuns (3.58s)
+    --- PASS: TestSimulatedRuns/go_test_-v (1.42s)
+    --- PASS: TestSimulatedRuns/go_test (1.07s)
+    --- PASS: TestSimulatedRuns/log (1.10s)
+PASS
+ok  	github.com/abbreviatory/engine	3.588s
