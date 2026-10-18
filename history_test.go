@@ -160,3 +160,32 @@ func TestGoodPacking(t *testing.T) {
 		t.Fatal("flips miscounted")
 	}
 }
+
+// Review of 0.2, finding 1: go test without -v names no passing test, so a
+// failing test that disappears passed.
+func TestPlainGoTestFixed(t *testing.T) {
+	run1 := "--- FAIL: TestAlpha (0.00s)\n    a_test.go:9: bad\n--- FAIL: TestBeta (0.00s)\n    a_test.go:19: bad\nFAIL\nFAIL\texample.com/a\t0.01s\n"
+	run2 := "--- FAIL: TestBeta (0.00s)\n    a_test.go:19: bad\nFAIL\nFAIL\texample.com/a\t0.01s\n"
+	a, _ := Reduce(strings.NewReader(run1), Options{Track: true})
+	b, err := Reduce(strings.NewReader(run2), Options{Track: true, History: []Run{*a.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.Text, "since run 1: 1 fixed, 1 still failing") || !strings.Contains(b.Text, "fixed: TestAlpha (example.com/a, 0.00s)") {
+		t.Fatalf("got:\n%s", b.Text)
+	}
+}
+
+// Review of 0.2, finding 2: the same test name in two packages is two tests.
+func TestSameNameTwoPackages(t *testing.T) {
+	run1 := "=== RUN   TestOpen\n--- FAIL: TestOpen (0.00s)\nFAIL\nFAIL\texample.com/a\t0.01s\n=== RUN   TestOpen\n--- PASS: TestOpen (0.00s)\nPASS\nok  \texample.com/b\t0.01s\n"
+	run2 := "=== RUN   TestOpen\n--- PASS: TestOpen (0.00s)\nPASS\nok  \texample.com/a\t0.01s\n=== RUN   TestOpen\n    b_test.go:5: other\n--- FAIL: TestOpen (0.00s)\nFAIL\nFAIL\texample.com/b\t0.01s\n"
+	a, _ := Reduce(strings.NewReader(run1), Options{Track: true})
+	b, err := Reduce(strings.NewReader(run2), Options{Track: true, History: []Run{*a.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(b.Text, "1 new, 1 fixed") || !strings.Contains(b.Text, "new: TestOpen (example.com/b, 0.00s)") {
+		t.Fatalf("got:\n%s", b.Text)
+	}
+}

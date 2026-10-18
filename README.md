@@ -130,7 +130,10 @@ The same run again:
 For logs the same works on error kinds: new, gone, recurring and intermittent.
 `run` runs the command, reduces what it prints (standard output and standard
 error together) and exits with the command's exit status, so it can stand in
-for the command in CI. `abbreviatory history` lists the runs.
+for the command in CI. A CI timeout or cancel that signals `run` reaches the
+command too, and the report is still printed. A change in exit status alone
+(a job killed after the same output) is reported, not folded into "no
+change". `abbreviatory history` lists the runs.
 
 ## What the report holds
 
@@ -270,10 +273,11 @@ doesn't grow with the input.
 Before-and-after reports for each fixture are in
 [test/results/examples](test/results/examples), with a run-to-run example.
 
-The history was checked on 500 simulated CI runs of a 40-test suite and 500
-of a log with 25 error kinds, with tests breaking, getting fixed, flaking,
-being skipped and going missing at random, and some runs changing nothing
-([delta_test.go](delta_test.go)). Each run went through the whole command
+The history was checked on 500 simulated CI runs each of a 40-test suite
+printed by `go test -v`, the same suite by plain `go test`, and a log with 25
+error kinds: tests breaking, getting fixed, flaking, being skipped and going
+missing at random, the same test names in two packages, exit statuses
+changing, and some runs changing nothing ([delta_test.go](delta_test.go)). Each run went through the whole command
 path, its history written to the store and read back for the next run, at a
 random budget. For every run the reported new, fixed, not run, still
 failing and flaky items, the streaks, the "no change" line and the notes in
@@ -305,9 +309,9 @@ the report matched what was worked out separately from the known statuses
   a new one, and the same error with a different stack trace too.
 - In a JSON document, error fields are compared by their path and value with
   array positions aside, so the same error at two positions counts once.
-- Two runs of the same key at the same moment both compare with the run
-  before them; the history file is locked while it is written, so neither
-  run is lost.
+- When the output names no passing test (go test or pytest without `-v`),
+  a failing test that disappears counts as fixed, even if it was deleted
+  or not run. With `-v` or `-json` it counts as not run.
 - Flaky detection needs the last 10 runs; a history trimmed or started fresh
   sees nothing as flaky at first.
 - No HTTP service or MCP server yet; they are planned for 0.3.

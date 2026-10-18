@@ -138,7 +138,14 @@ func writeAtomic(path string, data []byte) error {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Rename(f.Name(), path)
+		// On Windows a rename over a file someone is reading fails for a
+		// moment; try again briefly.
+		for i := 0; ; i++ {
+			if err = os.Rename(f.Name(), path); err == nil || i == 20 {
+				break
+			}
+			time.Sleep(25 * time.Millisecond)
+		}
 	}
 	if err != nil {
 		os.Remove(f.Name())

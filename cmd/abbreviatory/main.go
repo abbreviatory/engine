@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -204,18 +205,6 @@ func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, stdo
 		}
 		st = s
 	}
-	var hist *store.History
-	if f.key != "" {
-		h, err := st.History(f.key)
-		if err != nil {
-			// Don't lose the report over a damaged history; start a new one.
-			fmt.Fprintln(stderr, "abbreviatory: warning:", err)
-			h = &store.History{Key: f.key}
-		}
-		hist = h
-		opt.Track = true
-		opt.History = h.Runs
-	}
 	var pend *store.Pending
 	if !f.noStore {
 		p, err := st.Begin()
@@ -225,27 +214,60 @@ func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, stdo
 		pend = p
 		opt.Sink = pend
 	}
-	res, err := abbreviatory.Reduce(in, opt)
-	if err != nil {
+	var res *abbreviatory.Result
+	reduce := func() error {
+		var err error
+		res, err = abbreviatory.Reduce(in, opt)
+		if err != nil {
+			if pend != nil {
+				pend.Abort()
+			}
+			return err
+		}
 		if pend != nil {
-			pend.Abort()
+			if err := pend.Commit(res.Index); err != nil {
+				// The report is still worth having; say its references
+				// won't expand.
+				fmt.Fprintln(stderr, "abbreviatory: warning: the original could not be stored, so the references in this report can't be expanded:", err)
+			}
 		}
-		return err
+		return nil
 	}
-	if pend != nil {
-		if err := pend.Commit(res.Index); err != nil {
-			// The report is still worth having; say its references won't
-			// expand.
-			fmt.Fprintln(stderr, "abbreviatory: warning: the original could not be stored, so the references in this report can't be expanded:", err)
-		} else {
-			st.PruneNow()
+	if f.key == "" {
+		if err := reduce(); err != nil {
+			return err
+		}
+	} else {
+		// Compare and record under the history's lock, so a run of the
+		// same key at the same time waits and then compares with this one.
+		var reduceErr error
+		err := st.Update(f.key, func(h *store.History) (*abbreviatory.Run, error) {
+			opt.Track = true
+			opt.History = h.Runs
+			if reduceErr = reduce(); reduceErr != nil {
+				return nil, nil
+			}
+			res.Run.Time = time.Now().UTC().Format(time.RFC3339)
+			return res.Run, nil
+		})
+		if reduceErr != nil {
+			return reduceErr
+		}
+		if err != nil {
+			if res == nil {
+				// The history couldn't be locked or read: report without it.
+				fmt.Fprintln(stderr, "abbreviatory: warning: no comparison with the last run:", err)
+				opt.Track, opt.History = false, nil
+				if err := reduce(); err != nil {
+					return err
+				}
+			} else {
+				fmt.Fprintln(stderr, "abbreviatory: warning: this run could not be added to the history:", err)
+			}
 		}
 	}
-	if hist != nil {
-		res.Run.Time = time.Now().UTC().Format(time.RFC3339)
-		if err := st.Record(hist.Key, res.Run); err != nil {
-			fmt.Fprintln(stderr, "abbreviatory: warning: this run could not be added to the history:", err)
-		}
+	if st != nil {
+		st.PruneNow()
 	}
 	if f.asJSON {
 		out := map[string]any{
@@ -274,7 +296,7 @@ func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, stdo
 		enc.SetIndent("", "  ")
 		return enc.Encode(out)
 	}
-	_, err = io.WriteString(stdout, res.Text)
+	_, err := io.WriteString(stdout, res.Text)
 	return err
 }
 
@@ -357,7 +379,23 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	w.Close()
 
-	// The exit status is only known once the output ends, and the report
+	// A signal meant to stop the job (a CI timeout or cancel, Ctrl-C) is
+	// passed on to the command; the report is still made from what it
+	// printed. A second one kills it.
+	sigs := make(chan os.Signal, 2)
+	signal.Notify(sigs, stopSignals...)
+	defer signal.Stop(sigs)
+	go func() {
+		n := 0
+		for sig := range sigs {
+			if n++; n == 1 && cmd.Process.Signal(sig) == nil {
+				continue
+			}
+			cmd.Process.Kill()
+		}
+	}()
+
+	// The exit status is only known once the command ends, and the report
 	// shows it: spool the output to disk first (memory stays flat), then
 	// reduce it.
 	spool, err := os.CreateTemp("", "abbreviatory-run-*")
@@ -369,13 +407,27 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	defer os.Remove(spool.Name())
 	defer spool.Close()
-	_, copyErr := io.Copy(spool, r)
-	r.Close()
+	copied := make(chan error, 1)
+	go func() {
+		_, err := io.Copy(spool, r)
+		copied <- err
+	}()
 	waitErr := cmd.Wait()
 	status := exitOf(cmd, 1)
 	if waitErr != nil && cmd.ProcessState == nil {
 		fmt.Fprintln(stderr, "abbreviatory:", waitErr)
 	}
+	// Something the command started in the background can keep the output
+	// open after the command is gone; stop reading after a grace period.
+	var copyErr error
+	select {
+	case copyErr = <-copied:
+	case <-time.After(outputGrace):
+		fmt.Fprintf(stderr, "abbreviatory: the output was still open %s after the command exited (a process it started in the background?); reading stopped\n", outputGrace)
+		r.Close()
+		<-copied
+	}
+	r.Close()
 	if copyErr != nil {
 		fmt.Fprintln(stderr, "abbreviatory: reading the command's output:", copyErr)
 		return status
@@ -386,15 +438,18 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	opt.Exit = &status
 	if err := reduceAndPrint(spool, opt, f, stdout, stderr); err != nil {
-		// The command's status still decides the exit: a CI step shouldn't
-		// pass or fail because of the report.
+		// The command's status decides the exit either way: a CI step
+		// shouldn't pass or fail because of the report.
 		fmt.Fprintln(stderr, "abbreviatory: could not reduce the output:", err)
-		if status == 0 {
-			return 1
-		}
 	}
 	return status
 }
+
+// outputGrace is how long run keeps reading output after the command exits.
+var outputGrace = 5 * time.Second
+
+// stopSignals are the signals run passes on to the command.
+var stopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
 
 // exitOf is the command's exit status: its own code, 128 plus the signal
 // number when a signal ended it, or def if it never ran.

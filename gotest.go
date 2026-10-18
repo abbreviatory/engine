@@ -218,6 +218,10 @@ type goTestText struct {
 	indent  int
 	block   *Record // "# pkg" build errors or a panic
 	blockOn bool
+	// Results wait for their package's "ok" or "FAIL" line, which names
+	// the package: a test is known by its package and its name, as in
+	// go test -json.
+	done []Record
 }
 
 func newGoTestText() *goTestText { return &goTestText{tests: map[string]*pending{}} }
@@ -225,9 +229,38 @@ func newGoTestText() *goTestText { return &goTestText{tests: map[string]*pending
 func (g *goTestText) flushResult(emit func(Record)) {
 	if g.result != nil {
 		g.result.Detail = trimDetail(g.result.Detail)
-		emit(*g.result)
+		g.done = append(g.done, *g.result)
 		g.result = nil
 	}
+}
+
+// flushDone emits the waiting results, qualified with pkg when it is known.
+func (g *goTestText) flushDone(pkg string, emit func(Record)) {
+	for _, r := range g.done {
+		if pkg != "" {
+			r.ID = pkg + "." + r.ID
+			name, rest := r.Head, ""
+			if i := strings.Index(r.Head, " ("); i >= 0 {
+				name, rest = r.Head[:i], r.Head[i+2:]
+			}
+			if rest != "" {
+				r.Head = name + " (" + pkg + ", " + rest
+			} else {
+				r.Head = name + " (" + pkg + ")"
+			}
+		}
+		emit(r)
+	}
+	g.done = g.done[:0]
+}
+
+// packageOf returns the package an "ok" or "FAIL" line names.
+func packageOf(t string) string {
+	f := strings.Fields(t)
+	if len(f) >= 2 && (f[0] == "ok" || f[0] == "FAIL") {
+		return f[1]
+	}
+	return ""
 }
 
 func (g *goTestText) flushBlock(emit func(Record)) {
@@ -311,6 +344,9 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 
 	switch {
 	case isGoPackageLine(t):
+		if pkg := packageOf(t); pkg != "" {
+			g.flushDone(pkg, emit)
+		}
 		k := KindInfo
 		if strings.Contains(t, "[build failed]") || strings.Contains(t, "[setup failed]") {
 			k = KindError
@@ -345,6 +381,7 @@ func isGoPackageLine(t string) bool {
 
 func (g *goTestText) finish(emit func(Record)) []string {
 	g.flushResult(emit)
+	g.flushDone("", emit)
 	g.flushBlock(emit)
 	for _, name := range g.order {
 		p := g.tests[name]

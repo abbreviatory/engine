@@ -169,6 +169,9 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	in := io.TeeReader(br, io.MultiWriter(writers...))
 
 	g := newGrouper(rules, opt.Keep)
+	if opt.Track {
+		g.passIDs = map[string]bool{}
+	}
 	var summary []string
 	var doc *jsonDoc
 	var small []string
@@ -200,6 +203,9 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 			// damaged to read): read it as a log instead.
 			fi, _ = lookupFormat("logs")
 			g = newGrouper(rules, opt.Keep)
+			if opt.Track {
+				g.passIDs = map[string]bool{}
+			}
 			doc, summary = nil, nil
 			lineSrc = io.MultiReader(bytes.NewReader(data), in)
 		} else {
@@ -284,7 +290,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 		res.Text, res.Overflow, res.Whole = text, overflow, whole
 		return res, nil
 	}
-	if err := trackRun(res, opt, groups, doc, rules, budget, refs, renderAt); err != nil {
+	if err := trackRun(res, opt, groups, g.passIDs, doc, rules, budget, refs, renderAt); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -293,10 +299,10 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 // trackRun compares the reduction with the earlier runs and renders the
 // report with what changed: one line when nothing did, otherwise the changes
 // under the header and notes on the items.
-func trackRun(res *Result, opt Options, groups []*group, doc *jsonDoc, rules preserve, budget int, refs bool,
+func trackRun(res *Result, opt Options, groups []*group, passIDs map[string]bool, doc *jsonDoc, rules preserve, budget int, refs bool,
 	renderAt func(int) (string, bool, bool, error)) error {
 	tests := res.Family == FamilyTests
-	bad, good := runItems(res, groups, doc, rules)
+	bad, good := runItems(res, groups, passIDs, doc, rules)
 	cur := &Run{ID: res.ID, Format: res.Format, Command: opt.Command, Exit: opt.Exit, Records: res.Records, Bad: map[string]RunItem{}, Full: true}
 	cur.N = 1
 	if n := len(opt.History); n > 0 {
@@ -304,6 +310,7 @@ func trackRun(res *Result, opt Options, groups []*group, doc *jsonDoc, rules pre
 	}
 	if tests {
 		cur.Good = packGood(good)
+		cur.Anon = len(good) == 0
 	}
 	d := computeDelta(opt.History, cur, bad, good, tests)
 	res.Run, res.Delta = cur, d

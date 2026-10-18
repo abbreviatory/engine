@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func runCLI(t *testing.T, stdin string, args ...string) (string, string, int) {
@@ -228,5 +231,55 @@ func TestRunKeepsExitStatus(t *testing.T) {
 	out, _, _ = runCLI(t, "", "history", "-store", store)
 	if !strings.Contains(out, ": sh -c echo x ERROR a") {
 		t.Fatalf("default key not listed:\n%s", out)
+	}
+}
+
+func TestRunEdgeCases(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses sh")
+	}
+	store := t.TempDir()
+	// Output that can't be reduced: the command's status still decides.
+	_, errs, code := runCLI(t, "", "run", "-store", store, "--", "sh", "-c", `printf 'a\000b\000c\000\377\376x'`)
+	if code != 0 || !strings.Contains(errs, "could not reduce the output") {
+		t.Fatalf("binary output: exit %d, %s", code, errs)
+	}
+	// A background process holding the output open doesn't hang run.
+	defer func(d time.Duration) { outputGrace = d }(outputGrace)
+	outputGrace = 300 * time.Millisecond
+	start := time.Now()
+	out, errs, code := runCLI(t, "", "run", "-store", store, "--", "sh", "-c", "sleep 5 & echo started; exit 4")
+	if code != 4 || !strings.Contains(out, "started") || !strings.Contains(errs, "still open") || time.Since(start) > 4*time.Second {
+		t.Fatalf("background process: exit %d after %s\n%s%s", code, time.Since(start), out, errs)
+	}
+	// A change in exit status alone is a change: no one-line report.
+	runCLI(t, "", "run", "-store", store, "-key", "st", "--", "sh", "-c", "echo building")
+	out, _, code = runCLI(t, "", "run", "-store", store, "-key", "st", "--", "sh", "-c", "echo building; exit 137")
+	if code != 137 || !strings.Contains(out, "run 2, exit status 137 (was 0); since run 1 (identical input): no failures, as before") || !strings.Contains(out, "building") {
+		t.Fatalf("exit change: exit %d\n%s", code, out)
+	}
+}
+
+// A signal to run reaches the command, and the report is still printed.
+func TestRunPassesSignalsOn(t *testing.T) {
+	if runtime.GOOS == "windows" || testing.Short() {
+		t.Skip("needs sh and a built binary")
+	}
+	bin := filepath.Join(t.TempDir(), "abbreviatory")
+	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+		t.Skipf("can't build: %v %s", err, out)
+	}
+	cmd := exec.Command(bin, "run", "-store", t.TempDir(), "-key", "sig", "--", "sh", "-c", `trap 'echo "ERROR stopped by signal"; exit 143' TERM; echo started; while :; do sleep 0.1; done`)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	cmd.Process.Signal(syscall.SIGTERM)
+	err := cmd.Wait()
+	code := cmd.ProcessState.ExitCode()
+	if code != 143 || !strings.Contains(out.String(), "run 1, exit status 143") || !strings.Contains(out.String(), "ERROR stopped by signal") {
+		t.Fatalf("exit %d (%v):\n%s", code, err, out.String())
 	}
 }

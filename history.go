@@ -37,6 +37,9 @@ type Run struct {
 	Bad map[string]RunItem `json:"bad,omitempty"`
 	// Good holds the hashes of the tests that passed, packed and sorted.
 	Good string `json:"good,omitempty"`
+	// Anon is true when the output named no passing test (go test without
+	// -v, pytest without -v): a test missing from it most likely passed.
+	Anon bool `json:"anon,omitempty"`
 	// Full is false once Bad and Good have been dropped from an old run.
 	Full bool `json:"full,omitempty"`
 }
@@ -62,21 +65,25 @@ func (r *Run) Trim() {
 
 // Delta is what changed since the previous run.
 type Delta struct {
-	Run   int // this run's number
-	Since int // the run compared with; 0 when there is none
-	Exit  *int
-	Tests bool // test output: the words are "fixed", "flaky"; else "gone", "intermittent"
-	// Identical is true when the input is byte for byte the previous one;
-	// Unchanged when the same failures and errors are present.
-	Identical bool
-	Unchanged bool
-	Failing   int
-	New       []DeltaItem
-	Fixed     []DeltaItem // failing before, passing (or for logs, absent) now
-	NotRun    []DeltaItem // a failing test that doesn't appear in this run
-	Flaky     []DeltaItem
-	Still     int // failing before and now, not flaky
-	Longest   int // the longest streak among them
+	Run      int // this run's number
+	Since    int // the run compared with; 0 when there is none
+	Exit     *int
+	PrevExit *int // the previous run's exit status, when it differs
+	Tests    bool // test output: the words are "fixed", "flaky"; else "gone", "intermittent"
+	// Identical is true when the input is byte for byte the previous one.
+	// SameFailures is true when the same failures and errors are present,
+	// and Unchanged when also the exit status is the same: the report is
+	// then one line.
+	Identical    bool
+	SameFailures bool
+	Unchanged    bool
+	Failing      int
+	New          []DeltaItem
+	Fixed        []DeltaItem // failing before, passing (or for logs, absent) now
+	NotRun       []DeltaItem // a failing test that doesn't appear in this run
+	Flaky        []DeltaItem
+	Still        int // failing before and now, not flaky
+	Longest      int // the longest streak among them
 }
 
 // DeltaItem is one line of a delta.
@@ -105,7 +112,7 @@ func hashKey(s string) string {
 
 // runItems lists the failures and errors of a reduction, in the order they
 // appear, and the tests that passed.
-func runItems(res *Result, groups []*group, doc *jsonDoc, rules preserve) (bad []item, good map[string]bool) {
+func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDoc, rules preserve) (bad []item, good map[string]bool) {
 	seen := map[string]bool{}
 	good = map[string]bool{}
 	tests := res.Family == FamilyTests
@@ -141,11 +148,10 @@ func runItems(res *Result, groups []*group, doc *jsonDoc, rules preserve) (bad [
 			bad = append(bad, item{key: k, test: test, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)})
 		}
 	}
-	for _, g := range groups {
-		if tests && g.kind == KindPass && g.ex.ID != "" {
-			if k := hashKey("t\x00" + g.ex.ID); !seen[k] {
-				good[k] = true
-			}
+	// Every passing test, past the cap on distinct groups too.
+	for k := range passIDs {
+		if !seen[k] {
+			good[k] = true
 		}
 	}
 	return bad, good
@@ -199,10 +205,7 @@ func statusIn(r *Run, good map[string]bool, key string, test bool) byte {
 	if _, ok := r.Bad[key]; ok {
 		return 'F'
 	}
-	if !test {
-		return 'P'
-	}
-	if good[key] {
+	if !test || good[key] || r.Anon {
 		return 'P'
 	}
 	return '-'
@@ -317,13 +320,13 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 		if a != b {
 			return a < b
 		}
+		if was[i].it.Head != was[j].it.Head {
+			return was[i].it.Head < was[j].it.Head
+		}
 		return was[i].key < was[j].key
 	})
 	for _, w := range was {
-		now := byte('P')
-		if w.it.Test && !good[w.key] {
-			now = '-'
-		}
+		now := statusIn(cur, good, w.key, w.it.Test)
 		di := DeltaItem{Key: w.key, Head: w.it.Head, Ref: ref(prev.ID, w.it.Sel), Window: window}
 		if f := flips(statuses(w.key, w.it.Test, now)); f >= FlakyFlips {
 			di.Flips, di.Now = f, "passing"
@@ -339,18 +342,29 @@ func computeDelta(history []Run, cur *Run, bad []item, good map[string]bool, tes
 			d.NotRun = append(d.NotRun, di)
 		}
 	}
-	d.Unchanged = len(d.New) == 0 && len(d.Fixed) == 0 && len(d.NotRun) == 0 && len(curSet) == len(prev.Bad)
-	if d.Unchanged {
+	d.SameFailures = len(d.New) == 0 && len(d.Fixed) == 0 && len(d.NotRun) == 0 && len(curSet) == len(prev.Bad)
+	if d.SameFailures {
 		// Flaky items that are failing as they were before change nothing.
 		for _, f := range d.Flaky {
 			if f.Now != "failing" {
-				d.Unchanged = false
+				d.SameFailures = false
 			}
 		}
+	}
+	d.Unchanged = d.SameFailures
+	if !sameExit(prev.Exit, cur.Exit) {
+		d.PrevExit = prev.Exit
+		d.Unchanged = false
 	}
 	cur.New = len(d.New)
 	cur.Fixed = len(d.Fixed)
 	return d
+}
+
+// sameExit compares exit statuses; an unknown one (a reduce of piped
+// output) matches anything.
+func sameExit(a, b *int) bool {
+	return a == nil || b == nil || *a == *b
 }
 
 // selOrder sorts group selectors by number, others after them.
@@ -439,11 +453,16 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	if d.Identical {
 		since += " (identical input)"
 	}
-	if len(parts) == 0 {
+	switch {
+	case len(parts) == 0 && d.Unchanged:
 		first += since + ": no change, no failures"
-	} else if d.Unchanged {
+	case len(parts) == 0:
+		first += since + ": no failures, as before"
+	case d.Unchanged:
 		first += since + ": no change; " + strings.Join(parts, ", ")
-	} else {
+	case d.SameFailures:
+		first += since + ": the same failures; " + strings.Join(parts, ", ")
+	default:
 		first += since + ": " + strings.Join(parts, ", ")
 	}
 	out := []string{first}
@@ -480,6 +499,9 @@ func runLabel(d *Delta) string {
 	s := "run " + strconv.Itoa(d.Run)
 	if d.Exit != nil {
 		s += ", exit status " + strconv.Itoa(*d.Exit)
+		if d.PrevExit != nil {
+			s += " (was " + strconv.Itoa(*d.PrevExit) + ")"
+		}
 	}
 	return s
 }

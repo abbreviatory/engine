@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -206,4 +207,88 @@ func TestPruneOldHistory(t *testing.T) {
 	if _, err := os.Stat(s.historyPath("k")); err == nil {
 		t.Fatal("an unused history should be pruned")
 	}
+}
+
+// Two runs of one key at once take turns: the second compares with the
+// first, so numbers and streaks stay right.
+func TestHistoryUpdateTakesTurns(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	s.Record("k", &abbreviatory.Run{N: 1, Full: true, Bad: map[string]abbreviatory.RunItem{"a": {Head: "alpha", Streak: 1}}})
+	var wg sync.WaitGroup
+	seen := make(chan int, 2)
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func(fails bool) {
+			defer wg.Done()
+			err := s.Update("k", func(h *History) (*abbreviatory.Run, error) {
+				last := h.Last()
+				seen <- last.N
+				time.Sleep(100 * time.Millisecond)
+				run := &abbreviatory.Run{N: last.N + 1, Full: true, Bad: map[string]abbreviatory.RunItem{}}
+				if fails {
+					streak := 1
+					if p, ok := last.Bad["a"]; ok {
+						streak = p.Streak + 1
+					}
+					run.Bad["a"] = abbreviatory.RunItem{Head: "alpha", Streak: streak}
+				}
+				return run, nil
+			})
+			if err != nil {
+				t.Error(err)
+			}
+		}(i == 0)
+	}
+	wg.Wait()
+	close(seen)
+	var got []int
+	for n := range seen {
+		got = append(got, n)
+	}
+	if len(got) != 2 || got[0] == got[1] {
+		t.Fatalf("both runs compared with run %v", got)
+	}
+	h, _ := s.History("k")
+	if len(h.Runs) != 3 || h.Runs[1].N != 2 || h.Runs[2].N != 3 {
+		t.Fatalf("runs %+v", h.Runs)
+	}
+	for _, r := range h.Runs[1:] {
+		if it, ok := r.Bad["a"]; ok {
+			want := 1
+			if p, ok := h.Runs[r.N-2].Bad["a"]; ok {
+				want = p.Streak + 1
+			}
+			if it.Streak != want {
+				t.Fatalf("run %d: streak %d, want %d", r.N, it.Streak, want)
+			}
+		}
+	}
+}
+
+func TestLockKeptFresh(t *testing.T) {
+	defer func(a, b time.Duration) { lockTouch, lockStale = a, b }(lockTouch, lockStale)
+	lockTouch, lockStale = 20*time.Millisecond, 150*time.Millisecond
+	s, _ := Open(t.TempDir())
+	os.MkdirAll(s.historyDir(), 0o700)
+	unlock, err := s.lock(s.historyPath("k") + ".lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(400 * time.Millisecond)
+	// Held and touched: a second taker must wait, not break it.
+	got := make(chan bool)
+	go func() {
+		u, err := s.lock(s.historyPath("k") + ".lock")
+		if err == nil {
+			u()
+		}
+		got <- true
+	}()
+	select {
+	case <-got:
+		t.Fatal("a held lock was taken over")
+	case <-time.After(300 * time.Millisecond):
+	}
+	unlock()
+	<-got
 }

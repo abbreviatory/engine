@@ -43,6 +43,9 @@ type grouper struct {
 	records  map[string]int64
 	lines    map[string]int64
 	bytes    bool // ranges are byte offsets, not lines
+	// passIDs collects every passing test's identity, for run history,
+	// when it isn't nil.
+	passIDs map[string]bool
 }
 
 func newGrouper(rules preserve, keep []*regexp.Regexp) *grouper {
@@ -79,6 +82,9 @@ func (g *grouper) addN(r Record, n int64) {
 	}
 	if strings.TrimSpace(r.Head) == "" {
 		r.Head = "(blank line)"
+	}
+	if g.passIDs != nil && r.Kind == KindPass && r.ID != "" {
+		g.passIDs[hashKey("t\x00"+r.ID)] = true
 	}
 	// Keep rules match lines of the input; a record with no lines has none.
 	kept := len(g.keep) > 0 && len(r.Lines) > 0 && g.matches(&r)

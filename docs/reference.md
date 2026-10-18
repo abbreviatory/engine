@@ -39,7 +39,37 @@ expression, a budget under 512).
 With `-json` the object has `version`, `format`, `family`, `ref` (left out with
 `-no-store`), `input_bytes`, `input_lines`, `overflow`, `records` (counts by
 kind), `lines` (input lines by kind) and `text` (the reduction, within the
-budget).
+budget). With a history it also has `run` (this run's number) and `delta`:
+`since`, `identical`, `unchanged`, `failing`, `new`, `fixed`, `not_run` and
+`flaky` (lists of `{head, ref}`, flaky ones with `now`, `changes` and
+`window`), `still` and `longest`. From `run` it also has `exit`, the
+command's exit status.
+
+### run
+
+`abbreviatory run [flags] -- command [args]` runs the command, with standard
+output and standard error going into one pipe (so they interleave as they
+would in a terminal), spools what it prints to a temporary file, reduces it
+and records the run. It takes the flags of `reduce`, plus `-no-history`. The
+history is named after the project (the enclosing Git repository, or the
+current directory) and the command, as in `/home/me/app: go test ./...`,
+unless `-key` names it.
+
+It exits with the command's exit status, or 128 plus the signal number when a
+signal ended the command; 127 when the command can't be found and 126 when it
+can't be started. An interrupt or a SIGTERM sent to `run` (a CI timeout, a
+cancelled job, Ctrl-C) is passed on to the command, and the report is still
+made from what it printed; a second one kills the command. If something the
+command started in the background keeps the output open after the command
+exits, reading stops 5 seconds later, with a warning. If the output can't be
+reduced (it is binary, say), the error is printed and the exit status is
+still the command's.
+
+### history
+
+`abbreviatory history` lists the histories, most recent first. `abbreviatory
+history KEY` lists the runs of the history whose key is KEY or, failing that,
+the one key that contains KEY. `-json` prints either as JSON.
 
 ### expand
 
@@ -180,7 +210,8 @@ With a history (`-key`, or `run`), each run is compared with the one before
 it. What is compared are the failures and errors the report preserves (as
 `-preserve` sets them), each known by an identity:
 
-- a failed test by its name (with its package for go test);
+- a failed test by its name, with its package for go test (from the
+  package's `ok` or `FAIL` line in plain output);
 - an error from a test runner that has a name for it, such as a package or a
   build that failed, by that name;
 - anything else, such as a log error, by its text with numbers, hex runs and
@@ -191,7 +222,9 @@ it. What is compared are the failures and errors the report preserves (as
 
 Each item has a status in each run: failing; passing (a test that passed, or
 anything that isn't a test and didn't appear); or unknown (a test that was
-skipped or didn't appear). Against the previous run:
+skipped or didn't appear). When the output names no passing test at all, as
+go test without `-v` and pytest without `-v` don't, a test that doesn't
+appear is taken to have passed. Against the previous run:
 
 | In the report | Meaning |
 |---|---|
@@ -204,13 +237,15 @@ skipped or didn't appear). Against the previous run:
 Flaky items are listed as flaky and not as new, fixed or not run. The
 summary line under the header counts each kind; then come the new, fixed,
 not run and flaky items, one line each with a reference: into this run for
-items failing now, into the previous run's original for the others. At most a
+items failing now, into the previous run's original for the others. Items no
+longer failing are listed in the order they had in the previous run. At most a
 third of the budget goes to these lines; past that each list is cut short
 with a count of the rest. In the FAILED and ERRORS sections, new items come
 first, marked `(new)`, then flaky ones, then the rest, marked `(failing for N
 runs)`.
 
-When the same items are failing as in the previous run (or none, as before),
+When the same items are failing as in the previous run (or none, as before)
+and the exit status is the same (or not known, as when output is piped in),
 the report is one line: the header, the run number and "no change since run
 N", or "identical to run N" when the input is byte for byte the same, with
 how many failures there are. `-full` gives the whole report instead, with
@@ -219,7 +254,9 @@ how many failures there are. `-full` gives the whole report instead, with
 A history keeps the last 50 runs of its key. The last 10 keep their failures
 and the names of the tests that passed, which flaky detection needs; older
 ones keep their counts for `history`. The history is a JSON file under
-`history/` in the store, locked while it is written. A history nobody added
+`history/` in the store. A run locks its history from reading it to writing
+the new run, so a second run of the same key at the same moment waits and
+then compares with the first. A history nobody added
 to for 90 days is removed by pruning.
 
 ## The store

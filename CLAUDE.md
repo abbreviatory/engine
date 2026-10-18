@@ -51,8 +51,16 @@ v0.2.0 adds the run-to-run delta:
   last 10 full), a lock file, pruned after 90 days unused.
 - `cmd`: `reduce -key`, `-full`; `run -- cmd` (spools the output, keeps the
   exit status, default key = project dir + command); `history [KEY]`.
-- `delta_test.go`: 500 simulated runs each of a test suite and a log,
+- `delta_test.go`: 500 simulated runs each of go test -v, plain go test
+  (two packages with the same test names) and a log, with exit statuses,
   through Reduce and the store, checked against an independent oracle.
+- An independent review before v0.2.0 found 8 issues (plain go test and
+  pytest never reporting fixed, test names without their package, exit
+  status changes folded into "no change", run ignoring signals, concurrent
+  runs of one key, run's exit on a failed reduction, docs, passing tests
+  past the group cap). All fixed, with tests (history_test.go, store and
+  cmd tests). `run` doesn't use process groups on purpose: a signal goes to
+  the command, as it would without abbreviatory in front.
 
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't
 download Go modules, so v0.1.0 uses a plain file store instead (the same

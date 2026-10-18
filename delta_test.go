@@ -35,14 +35,19 @@ func letters(i int) string {
 // sim holds the known status of every item in every run: 'P' passed (for
 // logs: absent), 'F' failed, 'S' skipped, 'A' not in the run at all.
 type sim struct {
-	names  []string
-	status [][]byte // [run][item], runs from 0
-	tests  bool
+	names   []string // test or error kind names; tests repeat across packages
+	pkg     []int    // each test's package
+	status  [][]byte // [run][item], runs from 0
+	exit    []int    // each run's exit status
+	tests   bool
+	verbose bool // go test -v: passing and skipped tests are named
 }
 
-func newSim(seed int64, n int, tests bool) *sim {
+const simPackages = 2
+
+func newSim(seed int64, n int, tests, verbose bool) *sim {
 	rng := rand.New(rand.NewSource(seed))
-	s := &sim{tests: tests}
+	s := &sim{tests: tests, verbose: verbose}
 	type behave struct {
 		flaky   float64 // chance to fail each run when flaky
 		broken  bool
@@ -53,7 +58,11 @@ func newSim(seed int64, n int, tests bool) *sim {
 	bs := make([]behave, n)
 	for i := range bs {
 		if tests {
-			s.names = append(s.names, "Test"+strings.ToUpper(letters(i)[:1])+letters(i)[1:]+"Case")
+			// The same names in each package: a test is its package and
+			// its name.
+			j := i % (n / simPackages)
+			s.names = append(s.names, "Test"+strings.ToUpper(letters(j)[:1])+letters(j)[1:]+"Case")
+			s.pkg = append(s.pkg, i/(n/simPackages))
 		} else {
 			s.names = append(s.names, "kind"+letters(i))
 		}
@@ -100,8 +109,26 @@ func newSim(seed int64, n int, tests bool) *sim {
 			row[i] = st
 		}
 		s.status = append(s.status, row)
+		exit := 0
+		if strings.ContainsRune(string(row), 'F') {
+			exit = 1
+		}
+		if quiet && run > 0 {
+			exit = s.exit[run-1]
+		} else if rng.Float64() < 0.05 {
+			exit = 137 // killed, whatever the tests said
+		}
+		s.exit = append(s.exit, exit)
 	}
 	return s
+}
+
+// label is an item's identity as the oracle knows it.
+func (s *sim) label(i int) string {
+	if s.tests {
+		return "example.com/" + letters(s.pkg[i]) + "." + s.names[i]
+	}
+	return s.names[i]
 }
 
 // output writes run's output: go test -v for tests, a log otherwise. Numbers
@@ -110,24 +137,41 @@ func (s *sim) output(run int, rng *rand.Rand) string {
 	var b strings.Builder
 	order := rng.Perm(len(s.names))
 	if s.tests {
-		for _, i := range order {
-			name := s.names[i]
-			switch s.status[run][i] {
-			case 'A':
-				continue
-			case 'P':
-				fmt.Fprintf(&b, "=== RUN   %s\n--- PASS: %s (0.00s)\n", name, name)
-			case 'S':
-				fmt.Fprintf(&b, "=== RUN   %s\n    x_test.go:%d: not on this platform\n--- SKIP: %s (0.00s)\n", name, 10+rng.Intn(90), name)
-			case 'F':
-				fmt.Fprintf(&b, "=== RUN   %s\n", name)
-				for k := 0; k < 1+rng.Intn(4); k++ {
-					fmt.Fprintf(&b, "    x_test.go:%d: got %d, want %d\n", 10+rng.Intn(90), rng.Intn(1000), rng.Intn(1000))
+		for p := 0; p < simPackages; p++ {
+			failed := false
+			for _, i := range order {
+				if s.pkg[i] != p {
+					continue
 				}
-				fmt.Fprintf(&b, "--- FAIL: %s (0.00s)\n", name)
+				name := s.names[i]
+				switch st := s.status[run][i]; {
+				case st == 'F':
+					failed = true
+					if s.verbose {
+						fmt.Fprintf(&b, "=== RUN   %s\n", name)
+						for k := 0; k < 1+rng.Intn(4); k++ {
+							fmt.Fprintf(&b, "    x_test.go:%d: got %d, want %d\n", 10+rng.Intn(90), rng.Intn(1000), rng.Intn(1000))
+						}
+						fmt.Fprintf(&b, "--- FAIL: %s (0.00s)\n", name)
+					} else {
+						fmt.Fprintf(&b, "--- FAIL: %s (0.00s)\n", name)
+						for k := 0; k < 1+rng.Intn(4); k++ {
+							fmt.Fprintf(&b, "    x_test.go:%d: got %d, want %d\n", 10+rng.Intn(90), rng.Intn(1000), rng.Intn(1000))
+						}
+					}
+				case !s.verbose || st == 'A':
+				case st == 'P':
+					fmt.Fprintf(&b, "=== RUN   %s\n--- PASS: %s (0.00s)\n", name, name)
+				case st == 'S':
+					fmt.Fprintf(&b, "=== RUN   %s\n    x_test.go:%d: not on this platform\n--- SKIP: %s (0.00s)\n", name, 10+rng.Intn(90), name)
+				}
+			}
+			if failed {
+				fmt.Fprintf(&b, "FAIL\nFAIL\texample.com/%s\t0.42s\n", letters(p))
+			} else {
+				fmt.Fprintf(&b, "ok  \texample.com/%s\t0.42s\n", letters(p))
 			}
 		}
-		b.WriteString("FAIL\nFAIL\texample.com/sim\t0.42s\n")
 		return b.String()
 	}
 	for k := 0; k < 20+rng.Intn(40); k++ {
@@ -147,13 +191,36 @@ func (s *sim) output(run int, rng *rand.Rand) string {
 	return b.String()
 }
 
-// known is the status used for comparing: F, P, or '-' for unknown.
+// known is the status used for comparing: F, P, or '-' for unknown. When a
+// run's output names no passing test (go test without -v, or a verbose run
+// where nothing passed), a test missing from it counts as passing.
 func (s *sim) known(run, i int) byte {
-	switch c := s.status[run][i]; c {
-	case 'F', 'P':
-		return c
+	c := s.status[run][i]
+	if c == 'F' {
+		return 'F'
+	}
+	if !s.tests {
+		return 'P' // a log error that didn't appear didn't happen
+	}
+	if c == 'P' && s.verbose {
+		return 'P'
+	}
+	if !s.namesPasses(run) {
+		return 'P'
 	}
 	return '-'
+}
+
+func (s *sim) namesPasses(run int) bool {
+	if !s.verbose {
+		return false
+	}
+	for _, c := range s.status[run] {
+		if c == 'P' {
+			return true
+		}
+	}
+	return false
 }
 
 type expected struct {
@@ -169,7 +236,8 @@ type expected struct {
 func (s *sim) expect(run int) expected {
 	e := expected{newSet: map[string]bool{}, fixed: map[string]bool{}, notRun: map[string]bool{},
 		flaky: map[string]string{}, flips: map[string]int{}, streak: map[string]int{}}
-	for i, name := range s.names {
+	for i := range s.names {
+		name := s.label(i)
 		now := s.known(run, i)
 		if now == 'F' {
 			e.failing++
@@ -214,7 +282,7 @@ func (s *sim) expect(run int) expected {
 		}
 	}
 	if run > 0 {
-		e.unchanged = true
+		e.unchanged = s.exit[run] == s.exit[run-1]
 		for i := range s.names {
 			if (s.known(run, i) == 'F') != (s.known(run-1, i) == 'F') {
 				e.unchanged = false
@@ -224,14 +292,20 @@ func (s *sim) expect(run int) expected {
 	return e
 }
 
-var simName = regexp.MustCompile(`\b(Test[A-Za-z]+Case|kind[a-z]+)\b`)
+var (
+	simTest = regexp.MustCompile(`\b(Test[A-Za-z]+Case) \((example\.com/[a-z]+),`)
+	simKind = regexp.MustCompile(`\bkind[a-z]+\b`)
+)
 
 func nameOf(t *testing.T, head string) string {
-	m := simName.FindString(head)
-	if m == "" {
-		t.Fatalf("no simulated name in %q", head)
+	if m := simTest.FindStringSubmatch(head); m != nil {
+		return m[2] + "." + m[1]
 	}
-	return m
+	if m := simKind.FindString(head); m != "" {
+		return m
+	}
+	t.Fatalf("no simulated name in %q", head)
+	return ""
 }
 
 func setOf(t *testing.T, items []abbreviatory.DeltaItem) map[string]bool {
@@ -270,13 +344,13 @@ var (
 
 func TestSimulatedRuns(t *testing.T) {
 	for _, tc := range []struct {
-		name  string
-		tests bool
-		n     int
-		seed  int64
-	}{{"go test", true, 40, 1}, {"log", false, 25, 2}} {
+		name           string
+		tests, verbose bool
+		n              int
+		seed           int64
+	}{{"go test -v", true, true, 40, 1}, {"go test", true, false, 40, 3}, {"log", false, false, 25, 2}} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := newSim(tc.seed, tc.n, tc.tests)
+			s := newSim(tc.seed, tc.n, tc.tests, tc.verbose)
 			st, err := store.Open(t.TempDir())
 			if err != nil {
 				t.Fatal(err)
@@ -291,7 +365,8 @@ func TestSimulatedRuns(t *testing.T) {
 				budget := 600 + rng.Intn(5000)
 				full := rng.Float64() < 0.2
 				in := s.output(run, rng)
-				res, err := abbreviatory.Reduce(strings.NewReader(in), abbreviatory.Options{Budget: budget, Track: true, History: h.Runs, Full: full})
+				exit := s.exit[run]
+				res, err := abbreviatory.Reduce(strings.NewReader(in), abbreviatory.Options{Budget: budget, Track: true, History: h.Runs, Full: full, Exit: &exit})
 				if err != nil {
 					t.Fatalf("run %d: %v", run+1, err)
 				}
@@ -379,7 +454,7 @@ func TestSimulatedRuns(t *testing.T) {
 					t.Errorf("no %s in %d runs", k, simRuns)
 				}
 			}
-			if tc.tests && counts["not run"] == 0 {
+			if tc.verbose && counts["not run"] == 0 {
 				t.Errorf("no not-run tests in %d runs", simRuns)
 			}
 			h, _ := st.History("sim")
