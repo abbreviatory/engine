@@ -1,5 +1,5 @@
 # Reduction of each fixture at the default budget (4,096 bytes)
-# recorded 2026-10-18 21:46 UTC at ea534a7, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
 # Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
 # command: go test -count=1 -v -run TestRatios .
 
