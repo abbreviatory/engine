@@ -115,10 +115,26 @@ func detectTests(sample []byte) string {
 			return "junit"
 		}
 	}
-	if bytes.HasPrefix(trim, []byte(`{"Time":`)) || bytes.HasPrefix(trim, []byte(`{"ImportPath":`)) || bytes.HasPrefix(trim, []byte(`{"Action":`)) {
-		if bytes.Contains(sample, []byte(`"Action":`)) {
-			return "gotest-json"
+	// go test -json, even with a few plain lines first ("go: downloading
+	// ...", a wrapper script): most of its lines are test events.
+	events, plain := 0, 0
+	for i, l := range bytes.Split(sample, []byte("\n")) {
+		if i > 2000 {
+			break
 		}
+		l = bytes.TrimSpace(l)
+		if len(l) == 0 {
+			continue
+		}
+		if (bytes.HasPrefix(l, []byte(`{"Time":`)) || bytes.HasPrefix(l, []byte(`{"ImportPath":`)) || bytes.HasPrefix(l, []byte(`{"Action":`))) &&
+			bytes.Contains(l, []byte(`"Action":`)) {
+			events++
+		} else {
+			plain++
+		}
+	}
+	if events > 0 && events >= plain {
+		return "gotest-json"
 	}
 	if bytes.Contains(sample, []byte("test session starts")) || bytes.Contains(sample, []byte("\n=========================== short test summary info")) {
 		return "pytest"

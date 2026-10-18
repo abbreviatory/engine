@@ -13,9 +13,11 @@ type pytest struct {
 	mode       string // "", "failures", "errors", "summary", "warnings"
 	sections   []*pySection
 	cur        *pySection
-	summary    []pyResult // FAILED / ERROR lines from the short summary
-	verbose    map[string]pyResult
+	summary    []pyResult            // FAILED / ERROR lines from the short summary
+	verbose    map[string][]pyResult // non-passing -v lines per node ID
 	vorder     []string
+	addN       func(Record, int64)
+	internal   *Record // an INTERNALERROR> block
 	final      []string
 	finalN     map[string]int64
 	sawVerbose bool
@@ -45,11 +47,31 @@ var (
 )
 
 func newPytest() *pytest {
-	return &pytest{verbose: map[string]pyResult{}, finalN: map[string]int64{}}
+	return &pytest{verbose: map[string][]pyResult{}, finalN: map[string]int64{}}
 }
 
 func (p *pytest) line(n int64, text string, emit func(Record)) {
 	t := strings.TrimRight(text, " \t")
+	// pytest crashed: INTERNALERROR> lines form one error.
+	if strings.HasPrefix(t, "INTERNALERROR>") {
+		if p.internal == nil {
+			p.internal = &Record{Kind: KindError, Head: "pytest INTERNALERROR", Lines: []Range{{n, n}}}
+		} else {
+			p.internal.addLine(n)
+		}
+		if len(p.internal.Detail) < maxDetail {
+			p.internal.Detail = append(p.internal.Detail, strings.TrimSpace(strings.TrimPrefix(t, "INTERNALERROR>")))
+		}
+		return
+	}
+	if p.internal != nil {
+		d := p.internal.Detail
+		if len(d) > 0 {
+			p.internal.Head = "pytest INTERNALERROR: " + d[len(d)-1]
+		}
+		emit(*p.internal)
+		p.internal = nil
+	}
 	if m := pyBanner.FindStringSubmatch(t); m != nil {
 		p.endWarn(emit)
 		title := m[1]
@@ -113,7 +135,8 @@ func (p *pytest) line(n int64, text string, emit func(Record)) {
 		p.result(n, m[1], m[2], emit)
 		return
 	}
-	emit(Record{Kind: KindInfo, Head: t, Lines: []Range{{n, n}}})
+	// Anything else (pip, a setup script, a plugin) keeps its own level.
+	emit(Record{Kind: levelOf(t), Head: t, Lines: []Range{{n, n}}})
 }
 
 func (p *pytest) result(n int64, status, nodeid string, emit func(Record)) {
@@ -127,7 +150,7 @@ func (p *pytest) result(n int64, status, nodeid string, emit func(Record)) {
 		if _, ok := p.verbose[nodeid]; !ok {
 			p.vorder = append(p.vorder, nodeid)
 		}
-		p.verbose[nodeid] = pyResult{status: status, nodeid: nodeid, line: n}
+		p.verbose[nodeid] = append(p.verbose[nodeid], pyResult{status: status, nodeid: nodeid, line: n})
 	}
 }
 
@@ -151,7 +174,9 @@ func (p *pytest) warningLine(n int64, t string, emit func(Record)) bool {
 		if !strings.Contains(p.warn.Head, ": ") && strings.Contains(s, "Warning") {
 			p.warn.Head += ": " + s
 		} else {
-			p.warn.Detail = append(p.warn.Detail, t)
+			if len(p.warn.Detail) < maxDetail {
+				p.warn.Detail = append(p.warn.Detail, t)
+			}
 		}
 		p.warn.addLine(n)
 		return true
@@ -195,8 +220,26 @@ func (p *pytest) sectionFor(nodeid string, errors bool) *pySection {
 
 func (p *pytest) finish(emit func(Record)) []string {
 	p.endWarn(emit)
+	if p.internal != nil {
+		if d := p.internal.Detail; len(d) > 0 {
+			p.internal.Head = "pytest INTERNALERROR: " + d[len(d)-1]
+		}
+		emit(*p.internal)
+		p.internal = nil
+	}
+	// A test can fail and also error in teardown: those are two results,
+	// keyed by status and node ID.
 	seen := map[string]bool{}
+	usedV := map[string]bool{} // verbose lines already given to a record
 	emitFail := func(status, nodeid, msg string, extra []Range) {
+		key := status + "\x00" + nodeid
+		if seen[key] {
+			// A repeated summary line: give its line to no new record,
+			// but keep it accounted for.
+			emit(Record{Kind: KindInfo, Head: "(repeated) " + status + " " + nodeid, Lines: extra})
+			return
+		}
+		seen[key] = true
 		kind := KindFail
 		if status == "ERROR" {
 			kind = KindError
@@ -205,30 +248,41 @@ func (p *pytest) finish(emit func(Record)) []string {
 		if msg != "" {
 			head += " - " + msg
 		}
-		r := Record{Kind: kind, ID: nodeid, Head: head}
+		r := Record{Kind: kind, ID: status + ":" + nodeid, Head: head}
 		if s := p.sectionFor(nodeid, kind == KindError); s != nil {
 			r.Detail = trimDetail(s.detail)
 			r.Lines = append(r.Lines, s.lines...)
 		}
 		r.Lines = append(r.Lines, extra...)
-		if v, ok := p.verbose[nodeid]; ok {
+		for i, v := range p.verbose[nodeid] {
+			vk := strconv.Itoa(i) + "\x00" + nodeid
+			if usedV[vk] || (v.status != status && !(status == "FAILED" && v.status == "XPASS")) {
+				continue
+			}
+			usedV[vk] = true
 			r.Lines = append(r.Lines, Range{v.line, v.line})
 		}
 		r.Lines = mergeRanges(r.Lines)
-		seen[nodeid] = true
 		emit(r)
 	}
 	for _, s := range p.summary {
-		if seen[s.nodeid] {
-			continue
-		}
 		emitFail(s.status, s.nodeid, s.msg, []Range{{s.line, s.line}})
 	}
 	for _, id := range p.vorder {
-		if seen[id] {
-			continue
+		for i, v := range p.verbose[id] {
+			vk := strconv.Itoa(i) + "\x00" + id
+			if usedV[vk] {
+				continue
+			}
+			if seen[v.status+"\x00"+id] {
+				// Its result is already a record: add the line to nothing
+				// new, but keep it accounted for.
+				usedV[vk] = true
+				emit(Record{Kind: KindInfo, Head: v.status + " " + id, Lines: []Range{{v.line, v.line}}})
+				continue
+			}
+			emitFail(v.status, id, "", nil)
 		}
-		emitFail(p.verbose[id].status, id, "", nil)
 	}
 	for _, s := range p.sections {
 		if s.used {
@@ -242,13 +296,9 @@ func (p *pytest) finish(emit func(Record)) []string {
 	}
 	// Without -v there are no per-test pass lines; take the counts from
 	// pytest's own summary so the totals are right.
-	if !p.sawVerbose {
-		for i := int64(0); i < p.finalN["passed"]+p.finalN["xpassed"]; i++ {
-			emit(Record{Kind: KindPass, Head: "passed (counted from pytest's summary)"})
-		}
-		for i := int64(0); i < p.finalN["skipped"]+p.finalN["xfailed"]; i++ {
-			emit(Record{Kind: KindSkip, Head: "skipped (counted from pytest's summary)"})
-		}
+	if !p.sawVerbose && p.addN != nil {
+		p.addN(Record{Kind: KindPass, Head: "passed (counted from pytest's summary)"}, p.finalN["passed"]+p.finalN["xpassed"])
+		p.addN(Record{Kind: KindSkip, Head: "skipped (counted from pytest's summary)"}, p.finalN["skipped"]+p.finalN["xfailed"])
 	}
 	var out []string
 	for _, f := range p.final {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"net/url"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -364,7 +365,7 @@ func renderJSON(res *Result, doc *jsonDoc, budget int, refs bool) (string, bool,
 		if !refs {
 			return ""
 		}
-		return res.ID + ":" + sel
+		return res.ID + ":" + refPointer(sel)
 	}
 	head := headerLine(res, refs) + "\n"
 	shape := "json: " + describe(doc.root) + ", " + plural(doc.values, "value", "values") + ", " + plural(int64(len(doc.errors)), "error field", "error fields") + "\n"
@@ -403,11 +404,9 @@ func renderJSON(res *Result, doc *jsonDoc, budget int, refs bool) (string, bool,
 		}
 	}
 	// Not even the outline fits: the counts and a reference.
-	text := head + shape + "(document too large to outline in this budget)" + footerFor(map[string]bool{})
+	text := head + shape + "(document too large to outline in this budget)\n" + footerFor(map[string]bool{})
 	if refs {
 		text = head + shape + "(document too large to outline in this budget; whole document: [ref " + res.ID + "])\n" + footerFor(map[string]bool{})
-	} else {
-		text += "\n"
 	}
 	if len(text) > budget {
 		return "", false, &BudgetError{Budget: budget, Need: len(text)}
@@ -691,4 +690,18 @@ func (d *jsonDoc) errorLines() []byte {
 		b.WriteByte('\n')
 	}
 	return b.Bytes()
+}
+
+// refPointer writes a JSON pointer for a reference: each segment is
+// percent-encoded, so keys with spaces, quotes or other awkward characters
+// still give a reference that can be copied and expanded.
+func refPointer(ptr string) string {
+	if ptr == "" {
+		return ""
+	}
+	parts := strings.Split(ptr, "/")
+	for i, p := range parts {
+		parts[i] = url.PathEscape(p)
+	}
+	return strings.Join(parts, "/")
 }

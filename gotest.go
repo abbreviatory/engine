@@ -81,7 +81,9 @@ func (g *goTestJSON) line(n int64, text string, emit func(Record)) {
 		emit(Record{Kind: levelOf(text), Head: strings.TrimRight(text, " \t"), Lines: []Range{{n, n}}})
 		return
 	}
-	out := strings.TrimRight(ev.Output, "\r\n")
+	// The output is decoded from JSON only now, so clean it now: escape
+	// sequences arrive as \u001b and would reach the terminal otherwise.
+	out := clean([]byte(strings.TrimRight(ev.Output, "\r\n")))
 	switch ev.Action {
 	case "build-output":
 		p := g.get(g.builds, ev.ImportPath)
@@ -125,9 +127,7 @@ func (g *goTestJSON) line(n int64, text string, emit func(Record)) {
 		r := Record{Kind: kind, ID: ev.Package + "." + ev.Test,
 			Head:  ev.Test + " (" + ev.Package + ", " + strconv.FormatFloat(ev.Elapsed, 'f', 2, 64) + "s)",
 			Lines: p.lines}
-		if kind != KindPass {
-			r.Detail = trimDetail(p.detail)
-		}
+		r.Detail = trimDetail(p.detail)
 		if kind == KindFail {
 			g.pkgFails[ev.Package]++
 		}
@@ -255,13 +255,17 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 	// Indented lines after a result belong to it (the failure messages of
 	// a non-verbose run).
 	if g.result != nil && ind > g.indent && !strings.HasPrefix(t, "--- ") && !strings.HasPrefix(t, "=== ") {
-		g.result.Detail = append(g.result.Detail, strings.TrimRight(text, " \t"))
+		if len(g.result.Detail) < maxDetail {
+			g.result.Detail = append(g.result.Detail, strings.TrimRight(text, " \t"))
+		}
 		g.result.addLine(n)
 		return
 	}
 	if g.block != nil {
 		if g.blockOn && !isGoPackageLine(t) && !strings.HasPrefix(t, "=== RUN") && !strings.HasPrefix(t, "--- ") {
-			g.block.Detail = append(g.block.Detail, strings.TrimRight(text, " \t"))
+			if len(g.block.Detail) < maxDetail {
+				g.block.Detail = append(g.block.Detail, strings.TrimRight(text, " \t"))
+			}
 			g.block.addLine(n)
 			return
 		}
@@ -290,10 +294,7 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 			}
 			p := g.test(name)
 			p.add(n, "", false)
-			r := &Record{Kind: m.k, ID: name, Head: rest, Lines: p.lines}
-			if m.k != KindPass {
-				r.Detail = p.detail
-			}
+			r := &Record{Kind: m.k, ID: name, Head: rest, Lines: p.lines, Detail: p.detail}
 			delete(g.tests, name)
 			if g.cur == name {
 				g.cur = ""

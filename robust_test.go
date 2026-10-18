@@ -63,15 +63,15 @@ func TestUnknownFormatAndPreserve(t *testing.T) {
 }
 
 func TestMalformedJSON(t *testing.T) {
+	// With -format json, a broken document is an error.
 	_, err := Reduce(strings.NewReader(`{"a": [1, 2,`), Options{Format: "json"})
 	if err == nil || !strings.Contains(err.Error(), "JSON") {
 		t.Errorf("got %v", err)
 	}
-	// Auto-detection of something that only looks like JSON falls back to
-	// an error, not a crash.
-	_, err = Reduce(strings.NewReader("{not json at all\nsecond line\n"), Options{})
-	if err == nil {
-		t.Error("no error for broken JSON")
+	// Detected as JSON but not JSON: read as a log.
+	res := reduceString(t, "{not json at all\nsecond line\n", Options{})
+	if res.Format != "logs" {
+		t.Errorf("format %s", res.Format)
 	}
 }
 
@@ -391,8 +391,8 @@ func TestRandomLogs(t *testing.T) {
 // checks that the heap stays far below the input size. The size is set by
 // ABBREVIATORY_BIG_MB (default 64 MB; scripts/record-tests.sh uses 1024).
 func TestLargeInputMemory(t *testing.T) {
-	if testing.Short() {
-		t.Skip("short")
+	if testing.Short() || raceEnabled {
+		t.Skip("short or race")
 	}
 	mb := 64
 	if v := os.Getenv("ABBREVIATORY_BIG_MB"); v != "" {

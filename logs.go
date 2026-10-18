@@ -14,7 +14,8 @@ const levelScan = 160
 // messages) attached to the line they belong to.
 type logs struct {
 	pend  *Record
-	mode  int // what kind of block pend is
+	mode  int   // what kind of block pend is
+	more  int64 // continuation lines past maxDetail
 	emitF func(Record)
 }
 
@@ -40,9 +41,13 @@ func (l *logs) flush(emit func(Record)) {
 			r.Head = last
 		}
 	}
+	if l.more > 0 {
+		r.Detail = append(r.Detail, "... ("+plural(l.more, "more line", "more lines")+")")
+	}
 	emit(r)
 	l.pend = nil
 	l.mode = blockNone
+	l.more = 0
 }
 
 func (l *logs) line(n int64, text string, emit func(Record)) {
@@ -57,7 +62,11 @@ func (l *logs) line(n int64, text string, emit func(Record)) {
 		return
 	}
 	if l.pend != nil && l.continues(text) {
-		l.pend.Detail = append(l.pend.Detail, strings.TrimRight(text, " \t"))
+		if len(l.pend.Detail) < maxDetail {
+			l.pend.Detail = append(l.pend.Detail, strings.TrimRight(text, " \t"))
+		} else {
+			l.more++
+		}
 		l.pend.addLine(n)
 		return
 	}
@@ -87,6 +96,14 @@ func (l *logs) continues(text string) bool {
 	}
 	c := text[0]
 	if c == ' ' || c == '\t' {
+		// An indented line with a higher level than the line above starts
+		// its own record (an ERROR indented under an INFO line), unless it
+		// sits inside a stack trace.
+		if l.mode == blockNone && l.pend.Kind < KindWarn {
+			if k := levelOf(strings.TrimLeft(text, " \t")); k > l.pend.Kind && k >= KindWarn {
+				return false
+			}
+		}
 		return true
 	}
 	if strings.HasPrefix(text, "Caused by:") || strings.HasPrefix(text, "Suppressed:") {
@@ -165,6 +182,11 @@ func (l *logs) finish(emit func(Record)) []string {
 // JSON level fields, bracketed levels, compiler-style "error:" and
 // "warning:", glog prefixes, and the first lines of panics and tracebacks.
 func levelOf(s string) Kind {
+	// Test results that turn up in a log: go test and pytest failures.
+	if t := strings.TrimLeft(s, " "); strings.HasPrefix(t, "--- FAIL: ") || strings.HasPrefix(s, "FAIL\t") ||
+		strings.HasPrefix(s, "FAILED ") || strings.HasPrefix(s, "ERROR: ") {
+		return KindError
+	}
 	if strings.HasPrefix(s, "panic: ") || strings.HasPrefix(s, "fatal error: ") ||
 		strings.HasPrefix(s, "Traceback (most recent call last)") ||
 		strings.HasPrefix(s, "Exception in thread ") || strings.HasPrefix(s, "npm ERR!") {

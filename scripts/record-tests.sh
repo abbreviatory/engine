@@ -47,8 +47,8 @@ big=${ABBREVIATORY_BIG_MB:-1024}
 cmd="ABBREVIATORY_BIG_MB=$big go test -count=1 -v -run TestLargeInputMemory -timeout 30m ."
 { header "A ${big} MB generated log streamed through Reduce: peak heap and speed" "$cmd"; ABBREVIATORY_BIG_MB=$big go test -count=1 -v -run TestLargeInputMemory -timeout 30m . 2>&1; } > "$out/memory.txt"
 
-cmd="python3 -B -m unittest discover -s scripts -p *_test.py -v"
-{ header "The release plan's cases" "$cmd"; $cmd 2>&1; } > "$out/release-plan.txt"
+cmd="python3 -B -m unittest discover -s scripts -p '*_test.py' -v"
+{ header "The release plan's cases" "$cmd"; python3 -B -m unittest discover -s scripts -p '*_test.py' -v 2>&1; } > "$out/release-plan.txt"
 
 # A release-style binary: no cgo, stripped, as the release workflow builds it.
 mkdir "$work/bin"

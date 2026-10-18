@@ -31,10 +31,14 @@ const DefaultBudget = 4096
 // out.
 const MinBudget = 512
 
-// maxWhole is the largest input read whole (JSON documents, JUnit XML).
-// Larger inputs of those formats are an error; logs and test output stream
-// and have no limit.
-const maxWhole = 256 << 20
+// maxWhole is the largest JUnit report read whole, and maxJSON the largest
+// JSON document (a parsed document takes many times its size in memory).
+// Past them an auto-detected input is read as a log, which streams; with
+// -format given, it is an error.
+const (
+	maxWhole = 256 << 20
+	maxJSON  = 16 << 20
+)
 
 // Options control a reduction.
 type Options struct {
@@ -128,18 +132,17 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	}
 
 	br := bufio.NewReaderSize(r, 1<<20)
-	sample, _ := br.Peek(64 << 10)
-	if isBinary(sample) {
+	sample, _ := br.Peek(1 << 20)
+	if isBinary(sample[:min(len(sample), 64<<10)]) {
 		return nil, ErrBinary
 	}
 	fi, err := detect(sample, opt.Format)
 	if err != nil {
 		return nil, err
 	}
+	auto := opt.Format == "" || opt.Format == "auto"
 
 	h := sha256.New()
-	h.Write([]byte(fi.name))
-	h.Write([]byte{'\n'})
 	var count countWriter
 	writers := []io.Writer{h, &count}
 	if opt.Sink != nil {
@@ -147,37 +150,50 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	}
 	in := io.TeeReader(br, io.MultiWriter(writers...))
 
-	res := &Result{Format: fi.name, Family: fi.family, Display: fi.display}
 	g := newGrouper(rules, opt.Keep)
 	var summary []string
 	var doc *jsonDoc
 	var small []string
+	var inputLines int64
+	var lineSrc io.Reader = in
 
-	switch {
-	case fi.name == "json":
-		data, err := readWhole(in)
-		if err != nil {
-			return nil, err
+	if fi.whole {
+		limit := maxWhole
+		if fi.name == "json" {
+			limit = maxJSON
 		}
-		res.InputLines = countLines(data)
-		doc, err = parseJSONDoc(data)
-		if err != nil {
-			return nil, err
+		data, rerr := readWhole(in, limit)
+		var perr error
+		switch {
+		case rerr != nil:
+			perr = rerr
+		case fi.name == "json":
+			doc, perr = parseJSONDoc(data)
+		default:
+			g.bytes = true
+			summary, perr = parseJUnit(data, g.add)
 		}
-	case fi.name == "junit":
-		data, err := readWhole(in)
-		if err != nil {
-			return nil, err
+		if perr == nil {
+			inputLines = countLines(data)
+			lineSrc = nil
+		} else if auto {
+			// It looked like a JSON document or a JUnit report and isn't
+			// one (a log that starts with "[", JSON lines, a report too
+			// damaged to read): read it as a log instead.
+			fi, _ = lookupFormat("logs")
+			g = newGrouper(rules, opt.Keep)
+			doc, summary = nil, nil
+			lineSrc = io.MultiReader(bytes.NewReader(data), in)
+		} else {
+			return nil, perr
 		}
-		res.InputLines = countLines(data)
-		g.bytes = true
-		summary, err = parseJUnit(data, g.add)
-		if err != nil {
-			return nil, err
-		}
-	default:
+	}
+	if lineSrc != nil {
 		ad := fi.new()
-		lr := bufio.NewReaderSize(in, 64<<10)
+		if pt, ok := ad.(*pytest); ok {
+			pt.addN = g.addN
+		}
+		lr := bufio.NewReaderSize(lineSrc, 64<<10)
 		var n int64
 		size := 0
 		for {
@@ -200,7 +216,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 			}
 		}
 		summary = ad.finish(g.add)
-		res.InputLines = n
+		inputLines = n
 	}
 	// Drain anything a whole-format parser didn't read, so the hash, the
 	// count and the sink cover the entire input.
@@ -208,8 +224,9 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 		return nil, err
 	}
 
+	res := &Result{Format: fi.name, Family: fi.family, Display: fi.display, InputLines: inputLines}
 	res.InputBytes = count.n
-	res.ID = hex.EncodeToString(h.Sum(nil))[:12]
+	res.ID = refID(fi.name, opt.Keep, h.Sum(nil))
 	refs := !opt.NoRefs
 
 	if doc != nil {
@@ -242,6 +259,34 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	}
 	res.Text, res.Overflow = text, overflow
 	return res, nil
+}
+
+// refID names a stored input. It covers everything that decides how lines
+// are grouped and numbered (the format and the keep rules) as well as the
+// input itself, so a reference from one run never points into the index of
+// a run with different groups.
+func refID(format string, keep []*regexp.Regexp, contentHash []byte) string {
+	h := sha256.New()
+	h.Write([]byte("abbreviatory/1\n" + format + "\n"))
+	for _, re := range keep {
+		h.Write([]byte(re.String()))
+		h.Write([]byte{0})
+	}
+	h.Write([]byte{'\n'})
+	h.Write(contentHash)
+	return hex.EncodeToString(h.Sum(nil))[:12]
+}
+
+// CheckFormat reports whether Reduce accepts a format name.
+func CheckFormat(name string) error {
+	_, err := detect(nil, name)
+	return err
+}
+
+// CheckPreserve reports whether Reduce accepts a preserve list.
+func CheckPreserve(names []string) error {
+	_, err := preserveRules(names)
+	return err
 }
 
 type preserve struct {
@@ -302,13 +347,13 @@ func readLine(r *bufio.Reader) ([]byte, error) {
 	return buf, err
 }
 
-func readWhole(r io.Reader) ([]byte, error) {
-	data, err := io.ReadAll(io.LimitReader(r, maxWhole+1))
+func readWhole(r io.Reader, limit int) ([]byte, error) {
+	data, err := io.ReadAll(io.LimitReader(r, int64(limit)+1))
 	if err != nil {
-		return nil, err
+		return data, err
 	}
-	if len(data) > maxWhole {
-		return nil, errors.New("input is larger than " + humanBytes(maxWhole) + "; JSON documents and JUnit reports are read whole and are limited to that size")
+	if len(data) > limit {
+		return data, errors.New("input is larger than " + humanBytes(int64(limit)) + ", the most this format reads whole; use -format logs to stream it")
 	}
 	return data, nil
 }

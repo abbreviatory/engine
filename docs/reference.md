@@ -13,9 +13,10 @@ abbreviatory formats                 list the input formats
 abbreviatory version                 print the version
 ```
 
-Exit status: 0 on success, 1 when the work failed (unreadable input, a budget
-too small, an unknown reference), 2 for a usage mistake (unknown command, bad
-flag).
+Exit status: 0 on success, 1 when the work failed (unreadable or binary
+input, a budget too small for this input, an unknown reference), 2 for a usage
+mistake (unknown command, format or preserve value, a bad flag or regular
+expression, a budget under 512).
 
 ### reduce
 
@@ -24,7 +25,7 @@ flag).
 | `-format` | `auto` | `auto`, a family (`test-output`, `logs`, `json`) or a format name (below) |
 | `-budget` | `4096` | most bytes of output; at least 512 |
 | `-preserve` | `errors,failures,warnings` | what is always shown or referenced; empty for nothing |
-| `-keep REGEX` | | also preserve lines matching the regular expression; repeatable |
+| `-keep REGEX` | | also preserve lines matching the regular expression, a passing test's output included; repeatable |
 | `-json` | off | print a JSON object with counts and the text |
 | `-no-store` | off | don't store the original; the output then has no references |
 | `-store DIR` | see below | where originals are stored |
@@ -60,7 +61,11 @@ defaults at most once an hour.
 
 `-format test-output` picks the runner, and reads the input as a log if it
 finds none. JSON lines (one object per line) are read as a log, with the level
-taken from `"level"` or `"severity"`.
+taken from `"level"` or `"severity"`. Detection looks at the first megabyte.
+When auto-detection picks `json` or `junit` and the input turns out not to be
+one (a log whose lines start with `[`, a damaged report), or is too big to
+read whole (16 MB for JSON, 256 MB for JUnit), it is read as a log instead.
+With `-format` given, that is an error.
 
 What each format becomes:
 
@@ -68,15 +73,21 @@ What each format becomes:
   their failure message and output as detail. Go build failures, panics
   outside a test and tests that never finished (the run was killed) are
   reported too. pytest's FAILURES and ERRORS sections are matched to the short
-  summary, so each failure carries its traceback. Without `-v`, pytest's pass
-  and skip totals come from its final count line.
+  summary, so each failure carries its traceback; a test that fails and also
+  errors in teardown is two records. A pytest crash (`INTERNALERROR>`) is an
+  error, and other lines keep their own level. Without `-v`, pytest's pass and
+  skip totals come from its final count line. A JUnit report cut off part way
+  keeps what was read and reports the unfinished testcase as failed; control
+  characters in it are read as `?`.
 - **Logs.** One record per line. Indented lines, `Caused by:`, Python
   tracebacks, Go panics with their goroutine dumps, and a Java exception
   printed right after an error line are attached to the line they belong to.
   The level comes from upper-case words near the start of the line (`ERROR`,
   `WARN`, `FATAL`, `CRITICAL` and others), `level=` and JSON level fields,
   bracketed levels, glog prefixes (`E1018 ...`), compiler style `error:` and
-  `warning:`, and the first line of a panic or traceback.
+  `warning:`, the first line of a panic or traceback, and test results that
+  turn up in a log (`--- FAIL:`, `FAIL<tab>`, `FAILED `). An indented line
+  with a higher level than the line above it starts its own record.
 - **JSON.** An outline of the document that is itself valid JSON. Long arrays
   become their shape, the first elements and every element with an error;
   long strings are cut; deep objects are summarised. Each cut carries a
@@ -93,7 +104,8 @@ trace IDs, UUIDs) and spacing are one group, shown once with a count such as
 different test IDs never group. A stack trace is part of its record, so the
 same error with different traces makes separate groups.
 
-Past 50,000 distinct groups of one kind, further distinct records of that kind
+A record keeps at most 200 detail lines; the rest are counted. Past 50,000
+distinct groups of one kind, further distinct records of that kind
 share one catch-all group. Every line stays referenced.
 
 ## The output
@@ -138,7 +150,9 @@ cut with a count of what is left out. The stored original is never changed.
 ## References
 
 A reference is `ID:selector`. The ID is the first 12 hex digits of a SHA-256
-of the format name and the input, so the same input gives the same ID.
+over the format name, the `-keep` rules and the input, the things that decide
+how lines are grouped and numbered. The same input with the same rules gives
+the same ID, and a reference never points into a different grouping.
 
 | Selector | Expands to |
 |---|---|
@@ -147,7 +161,7 @@ of the format name and the input, so the same input gives the same ID.
 | `fail`, `error`, `warn`, `info`, `pass`, `skip` | every line of that kind |
 | `keep` | every line of the groups a `-keep` rule matched |
 | `L10` or `L10-40` | input lines 10 to 40 |
-| `/items/3` (JSON) | that value as it is in the input (a JSON Pointer, RFC 6901) |
+| `/items/3` (JSON) | that value as it is in the input (a JSON Pointer, RFC 6901, with each segment percent-encoded in references) |
 | `errors` (JSON) | each error field as `pointer<TAB>value` |
 
 Lines come back byte for byte, newlines included, in their input order. A JUnit
@@ -157,7 +171,9 @@ element comes back whole, one per line.
 ## The store
 
 Originals are kept gzipped, each next to a small JSON index of which lines
-each group came from. The directory is `-store`, else `$ABBREVIATORY_STORE`,
+each group came from. If the original can't be stored (a full disk), the
+report is still printed, with a warning that its references won't expand.
+The directory is `-store`, else `$ABBREVIATORY_STORE`,
 else `abbreviatory` in the user's cache directory (`~/.cache` on Linux,
 `~/Library/Caches` on macOS, `%LocalAppData%` on Windows). Nothing leaves the
 machine. Use `-no-store` for output you'd rather not keep, such as logs with

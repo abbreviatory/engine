@@ -3,6 +3,7 @@ package abbreviatory
 import (
 	"bytes"
 	"errors"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,17 +19,17 @@ func ParseRef(s string) (id, sel string, err error) {
 	s = strings.TrimPrefix(s, "ref ")
 	s = strings.TrimSpace(s)
 	id, sel, _ = strings.Cut(s, ":")
-	if !refID.MatchString(id) {
+	if !refIDPattern.MatchString(id) {
 		return "", "", errors.New("not a reference: " + quote(s) + " (expected something like 3f2a9c1b7e04:g12)")
 	}
 	return id, sel, nil
 }
 
 var (
-	refID     = regexp.MustCompile(`^[0-9a-f]{12}$`)
-	lineSel   = regexp.MustCompile(`^L(\d+)(?:-(\d+))?$`)
-	groupSel  = regexp.MustCompile(`^g(\d+)$`)
-	selectors = "the whole input (no selector), Ln or Ln-m (lines), gN (a group), fail, error, warn, info, pass, skip, keep (all groups of that kind), or for JSON a pointer such as /items/3 and errors"
+	refIDPattern = regexp.MustCompile(`^[0-9a-f]{12}$`)
+	lineSel      = regexp.MustCompile(`^L(\d+)(?:-(\d+))?$`)
+	groupSel     = regexp.MustCompile(`^g(\d+)$`)
+	selectors    = "the whole input (no selector), Ln or Ln-m (lines), gN (a group), fail, error, warn, info, pass, skip, keep (all groups of that kind), or for JSON a pointer such as /items/3 and errors"
 )
 
 // Expand returns the part of a stored original that a selector names. Lines
@@ -58,7 +59,11 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 			return doc.errorLines(), nil
 		}
 		if strings.HasPrefix(sel, "/") {
-			n, err := doc.lookup(sel)
+			ptr, err := url.PathUnescape(sel)
+			if err != nil {
+				return nil, errors.New("bad JSON pointer " + quote(sel) + ": " + err.Error())
+			}
+			n, err := doc.lookup(ptr)
 			if err != nil {
 				return nil, err
 			}

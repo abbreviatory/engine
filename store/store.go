@@ -57,10 +57,11 @@ func (s *Store) path(id, ext string) string {
 
 // Pending is an original being written while it is reduced.
 type Pending struct {
-	s    *Store
-	f    *os.File
-	gz   *gzip.Writer
-	done bool
+	s       *Store
+	f       *os.File
+	gz      *gzip.Writer
+	done    bool
+	touched time.Time
 }
 
 // Begin starts storing an original. Write the input to it, then Commit with
@@ -71,10 +72,20 @@ func (s *Store) Begin() (*Pending, error) {
 		return nil, err
 	}
 	gz, _ := gzip.NewWriterLevel(f, gzip.BestSpeed)
-	return &Pending{s: s, f: f, gz: gz}, nil
+	return &Pending{s: s, f: f, gz: gz, touched: time.Now()}, nil
 }
 
-func (p *Pending) Write(b []byte) (int, error) { return p.gz.Write(b) }
+// Write adds input to the pending original. A slow stream (a long CI job
+// piped in) may not flush for a while, so the temporary file's time is
+// kept fresh by hand: Prune only removes temporary files left alone for a
+// day.
+func (p *Pending) Write(b []byte) (int, error) {
+	if now := time.Now(); now.Sub(p.touched) > 5*time.Minute {
+		p.touched = now
+		os.Chtimes(p.f.Name(), now, now)
+	}
+	return p.gz.Write(b)
+}
 
 // Abort throws the pending original away.
 func (p *Pending) Abort() {
@@ -208,7 +219,14 @@ func (s *Store) Prune(maxAge time.Duration, maxBytes int64) (int, int64, error) 
 		name := e.Name()
 		if strings.HasPrefix(name, ".tmp-") {
 			// Left behind by an interrupted run.
-			if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > time.Hour {
+			if info, err := e.Info(); err == nil && now.Sub(info.ModTime()) > 24*time.Hour {
+				os.Remove(filepath.Join(dir, name))
+			}
+			continue
+		}
+		if strings.HasSuffix(name, ".idx.json") {
+			// An index whose original is gone can never be expanded.
+			if _, err := os.Stat(s.path(strings.TrimSuffix(name, ".idx.json"), ".gz")); errors.Is(err, fs.ErrNotExist) {
 				os.Remove(filepath.Join(dir, name))
 			}
 			continue

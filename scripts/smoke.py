@@ -117,7 +117,7 @@ def main():
     r = run([exe, "reduce", "-store", store, "-format", "json"], stdin=b'{"a": [1,', check=False)
     require(r.returncode == 1 and b"JSON" in r.stderr, f"broken JSON: exit {r.returncode}, {r.stderr!r}")
     r = run([exe, "reduce", "-store", store, "-budget", "100"], stdin=b"ERROR x\n", check=False)
-    require(r.returncode == 1 and b"too small" in r.stderr, f"small budget: exit {r.returncode}, {r.stderr!r}")
+    require(r.returncode == 2 and b"at least 512" in r.stderr, f"small budget: exit {r.returncode}, {r.stderr!r}")
     checks += 1
 
     out = run([exe, "prune", "-store", store, "-max-size", "0"]).stdout.decode()

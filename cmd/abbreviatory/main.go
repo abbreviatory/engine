@@ -121,12 +121,24 @@ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		defer f.Close()
 		in = f
 	}
+	if *budget < abbreviatory.MinBudget {
+		fmt.Fprintf(stderr, "abbreviatory: -budget must be at least %d bytes\n", abbreviatory.MinBudget)
+		return 2
+	}
+	if err := abbreviatory.CheckFormat(*format); err != nil {
+		fmt.Fprintln(stderr, "abbreviatory:", err)
+		return 2
+	}
 	opt := abbreviatory.Options{Format: *format, Budget: *budget, NoRefs: *noStore}
 	opt.Preserve = []string{}
 	for _, p := range strings.Split(*preserve, ",") {
 		if p = strings.TrimSpace(p); p != "" {
 			opt.Preserve = append(opt.Preserve, p)
 		}
+	}
+	if err := abbreviatory.CheckPreserve(opt.Preserve); err != nil {
+		fmt.Fprintln(stderr, "abbreviatory:", err)
+		return 2
 	}
 	for _, k := range keep {
 		re, err := regexp.Compile(k)
@@ -162,10 +174,12 @@ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if pend != nil {
 		if err := pend.Commit(res.Index); err != nil {
-			fmt.Fprintln(stderr, "abbreviatory: storing the original:", err)
-			return 1
+			// The report is still worth having; say its references won't
+			// expand.
+			fmt.Fprintln(stderr, "abbreviatory: warning: the original could not be stored, so the references in this report can't be expanded:", err)
+		} else {
+			st.PruneNow()
 		}
-		st.PruneNow()
 	}
 	if *asJSON {
 		out := map[string]any{

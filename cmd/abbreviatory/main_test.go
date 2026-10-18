@@ -90,10 +90,11 @@ func TestErrors(t *testing.T) {
 		code int
 		want string
 	}{
-		{[]string{"reduce", "-store", dir, "-budget", "10"}, 1, "too small"},
-		{[]string{"reduce", "-store", dir, "-format", "yaml"}, 1, "unknown format"},
+		{[]string{"reduce", "-store", dir, "-budget", "10"}, 2, "at least 512"},
+		{[]string{"reduce", "-store", dir, "-budget", "0"}, 2, "at least 512"},
+		{[]string{"reduce", "-store", dir, "-format", "yaml"}, 2, "unknown format"},
 		{[]string{"reduce", "-store", dir, "-keep", "("}, 2, "-keep"},
-		{[]string{"reduce", "-store", dir, "-preserve", "bugs"}, 1, "unknown preserve"},
+		{[]string{"reduce", "-store", dir, "-preserve", "bugs"}, 2, "unknown preserve"},
 		{[]string{"reduce", "-store", dir, filepath.Join(dir, "missing")}, 1, "no such file"},
 		{[]string{"expand", "-store", dir, "nonsense"}, 1, "not a reference"},
 		{[]string{"expand", "-store", dir, "0123456789ab:g0"}, 1, "not in the store"},

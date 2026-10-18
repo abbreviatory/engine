@@ -15,21 +15,37 @@ import (
 func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 	// Records cover byte ranges, not lines: many JUnit writers put the
 	// whole report on one line.
-	d := xml.NewDecoder(bytes.NewReader(data))
+	// Control characters are not allowed in XML, but test runners that
+	// print colours (Jest) put them in reports anyway. Read a copy with
+	// them replaced; it has the same length, so offsets still match.
+	src := data
+	for i, c := range data {
+		if c < 0x20 && c != '\t' && c != '\n' && c != '\r' {
+			if &src[0] == &data[0] {
+				src = append([]byte(nil), data...)
+			}
+			src[i] = '?'
+		}
+	}
+	d := xml.NewDecoder(bytes.NewReader(src))
 	d.Strict = false
 
-	type tc struct {
-		name, class, time string
-		kind              Kind
-		msg               string
-		detail            strings.Builder
-		start             int64
-		inResult          bool
-	}
-	var cur *tc
+	var cur *junitCase
 	var suites []string
-	var tests, failures, errs, skipped int64
-	haveCounts := false
+	var root, sum [4]int64 // tests, failures, errors, skipped
+	haveRoot, haveSum := false, false
+	emitted := 0
+	counts := func(t xml.StartElement) ([4]int64, bool) {
+		v := attr(t, "tests")
+		if v == "" {
+			return [4]int64{}, false
+		}
+		var c [4]int64
+		for i, a := range []string{"tests", "failures", "errors", "skipped"} {
+			c[i], _ = strconv.ParseInt(attr(t, a), 10, 64)
+		}
+		return c, true
+	}
 
 	for {
 		off := d.InputOffset()
@@ -38,25 +54,30 @@ func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 			break
 		}
 		if err != nil {
-			var se *xml.SyntaxError
-			if errors.As(err, &se) && cur == nil && tests+failures > 0 {
-				// A report cut off after the last full testcase: keep
-				// what was read.
-				break
+			if emitted == 0 && cur == nil {
+				return nil, errors.New("JUnit XML: " + err.Error())
 			}
-			return nil, errors.New("JUnit XML: " + err.Error())
+			// A report cut off part way, the usual end of a killed run:
+			// keep what was read, and report the unfinished testcase.
+			if cur != nil {
+				emit(Record{Kind: KindFail, ID: cur.id(), Head: cur.id() + " (the report is cut off inside this testcase)",
+					Detail: trimDetail(splitDetail(cur.detail.String())), Lines: []Range{{cur.start, int64(len(data)) - 1}}})
+			}
+			break
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
 			switch t.Name.Local {
 			case "testsuites", "testsuite":
-				if t.Name.Local == "testsuites" || len(suites) == 0 {
-					if v := attr(t, "tests"); v != "" && (t.Name.Local == "testsuites" || !haveCounts) {
-						haveCounts = true
-						tests, _ = strconv.ParseInt(v, 10, 64)
-						failures, _ = strconv.ParseInt(attr(t, "failures"), 10, 64)
-						errs, _ = strconv.ParseInt(attr(t, "errors"), 10, 64)
-						skipped, _ = strconv.ParseInt(attr(t, "skipped"), 10, 64)
+				if c, ok := counts(t); ok {
+					if t.Name.Local == "testsuites" {
+						root, haveRoot = c, true
+					} else if len(suites) == 0 {
+						// Top-level suites: add them up.
+						for i := range sum {
+							sum[i] += c[i]
+						}
+						haveSum = true
 					}
 				}
 				if t.Name.Local == "testsuite" {
@@ -67,7 +88,7 @@ func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 				if i := bytes.IndexByte(data[start:], '<'); i >= 0 {
 					start += int64(i)
 				}
-				cur = &tc{name: attr(t, "name"), class: attr(t, "classname"), time: attr(t, "time"), kind: KindPass, start: start}
+				cur = &junitCase{name: attr(t, "name"), class: attr(t, "classname"), time: attr(t, "time"), kind: KindPass, start: start}
 			case "failure", "error", "skipped":
 				if cur == nil {
 					continue
@@ -104,10 +125,7 @@ func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 					continue
 				}
 				end := d.InputOffset() - 1
-				id := cur.name
-				if cur.class != "" {
-					id = cur.class + "." + cur.name
-				}
+				id := cur.id()
 				head := id
 				if cur.time != "" {
 					head += " (" + cur.time + "s)"
@@ -120,6 +138,7 @@ func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 					r.Detail = trimDetail(splitDetail(cur.detail.String()))
 				}
 				emit(r)
+				emitted++
 				cur = nil
 			case "testsuite":
 				if len(suites) > 0 {
@@ -128,10 +147,14 @@ func parseJUnit(data []byte, emit func(Record)) ([]string, error) {
 			}
 		}
 	}
-	if !haveCounts {
-		return nil, nil
+	c := root
+	if !haveRoot {
+		if !haveSum {
+			return nil, nil
+		}
+		c = sum
 	}
-	s := "JUnit report: " + group3(tests) + " tests, " + group3(failures) + " failures, " + group3(errs) + " errors, " + group3(skipped) + " skipped"
+	s := "JUnit report: " + group3(c[0]) + " tests, " + group3(c[1]) + " failures, " + group3(c[2]) + " errors, " + group3(c[3]) + " skipped"
 	return []string{s}, nil
 }
 
@@ -161,4 +184,20 @@ func splitDetail(s string) []string {
 		}
 	}
 	return out
+}
+
+type junitCase struct {
+	name, class, time string
+	kind              Kind
+	msg               string
+	detail            strings.Builder
+	start             int64
+	inResult          bool
+}
+
+func (c *junitCase) id() string {
+	if c.class != "" {
+		return c.class + "." + c.name
+	}
+	return c.name
 }

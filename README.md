@@ -12,16 +12,16 @@ keys. The same input always gives the same output.
 
 ```
 $ go test -json ./... | abbreviatory reduce
-[abbreviatory] go test -json output, 4,880 lines (808.3 kB), ref 9f3d6b7b9642
+[abbreviatory] go test -json output, 4,880 lines (808.3 kB), ref 8923c60bd06d
 tests: 1,204 passed, 7 failed, 1 skipped
 FAILED (7):
-- TestFieldSpaces (example.com/gosample/parse, 0.00s) [ref 9f3d6b7b9642:g1205]
+- TestFieldSpaces (example.com/gosample/parse, 0.00s) [ref 8923c60bd06d:g1205]
     parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax
     parse_test.go:36: Field("width = 12") = 0, want 12
 ...
-not shown: 1,204 passed tests [ref 9f3d6b7b9642:pass]
+not shown: 1,204 passed tests [ref 8923c60bd06d:pass]
 
-$ abbreviatory expand 9f3d6b7b9642:g1205
+$ abbreviatory expand 8923c60bd06d:g1205
 {"Time":"...","Action":"run","Package":"example.com/gosample/parse","Test":"TestFieldSpaces"}
 ...
 ```
@@ -79,10 +79,10 @@ Each line of the report that stands for more than itself ends with a
 reference. Expand it to get the original back:
 
 ```
-abbreviatory expand 00c3664f94d8:g10      # one group: an error and its repeats
-abbreviatory expand 00c3664f94d8:error    # every error line
-abbreviatory expand 00c3664f94d8:L200-260 # a line range
-abbreviatory expand 00c3664f94d8          # the whole input
+abbreviatory expand d2f86a61aa96:g10      # one group: an error and its repeats
+abbreviatory expand d2f86a61aa96:error    # every error line
+abbreviatory expand d2f86a61aa96:L200-260 # a line range
+abbreviatory expand d2f86a61aa96          # the whole input
 ```
 
 ## What the report holds
@@ -90,20 +90,20 @@ abbreviatory expand 00c3664f94d8          # the whole input
 A log of 63,369 lines (5.6 MB) at the default budget:
 
 ```
-[abbreviatory] log, 63,369 lines (5.6 MB), ref 00c3664f94d8
+[abbreviatory] log, 63,369 lines (5.6 MB), ref d2f86a61aa96
 lines: 4,313 error, 3,252 warn, 55,804 other; 14 distinct messages
 ERRORS (4 kinds, 4,313 lines):
-- x264 2026-10-18T08:00:07.073Z ERROR checkout failed for order 75504 [ref 00c3664f94d8:g9]
+- x264 2026-10-18T08:00:07.073Z ERROR checkout failed for order 75504 [ref d2f86a61aa96:g9]
     java.lang.IllegalStateException: payment gateway did not answer
     	at com.example.orders.PaymentClient.charge(PaymentClient.java:118)
     ...
-- x486 2026-10-18T08:00:10.517Z ERROR db: connection to 10.0.4.5:5432 refused (request_id=b05ab8a9) [ref 00c3664f94d8:g10]
+- x486 2026-10-18T08:00:10.517Z ERROR db: connection to 10.0.4.5:5432 refused (request_id=b05ab8a9) [ref d2f86a61aa96:g10]
 ...
 WARNINGS (3 kinds, 3,252 lines):
-- x1952 2026-10-18T08:00:00.074Z WARN  config key "timeout" is deprecated; use "read_timeout" [ref 00c3664f94d8:g2]
+- x1952 2026-10-18T08:00:00.074Z WARN  config key "timeout" is deprecated; use "read_timeout" [ref d2f86a61aa96:g2]
 ...
 OTHER (7 kinds, 55,804 lines):
-- x14860 2026-10-18T08:00:00.037Z DEBUG cache hit key=user:59944 ttl=515s [ref 00c3664f94d8:g1]
+- x14860 2026-10-18T08:00:00.037Z DEBUG cache hit key=user:59944 ttl=515s [ref d2f86a61aa96:g1]
 ...
 ```
 
@@ -118,6 +118,9 @@ OTHER (7 kinds, 55,804 lines):
   by default). If a preserved item doesn't fit, a "not shown" line counts it
   and its reference brings it back. If the budget is too small even for
   that, `reduce` says how much it needs and prints nothing.
+- **References are exact.** A reference's ID covers the input, its format
+  and your `-keep` rules, so it always points into the reduction that printed
+  it.
 - **Small inputs pass through.** When showing the input whole would be no
   longer than reducing it, you get it whole.
 
@@ -181,7 +184,8 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 RATIOS_TABLE
 
 A MEMORY_MB MB generated log streams through with a peak heap of MEMORY_PEAK MB
-([memory.txt](test/results/memory.txt)): memory doesn't grow with the input.
+([memory.txt](test/results/memory.txt)): for logs and test output, memory
+doesn't grow with the input.
 Before-and-after reports for each fixture are in
 [test/results/examples](test/results/examples).
 
@@ -192,8 +196,16 @@ Before-and-after reports for each fixture are in
 - Grouping treats numbers as unimportant. Two errors that differ only in a
   number (a port, a status code) are one group; the first is shown and the
   count says how many.
-- JSON documents and JUnit reports are read whole, up to 256 MB. Logs and test
-  output stream with no size limit.
+- JSON documents are read whole, up to 16 MB, and JUnit reports up to
+  256 MB. A JSON document takes many times its size in memory while it is
+  read. Past those sizes, or when something looked like JSON and wasn't, the
+  input is read as a log. Logs and test output stream with no size limit,
+  and their memory use doesn't grow with the input.
+- In a JSON document with a repeated key, a reference to the second one
+  expands to the first.
+- Lines end at newlines. Progress output that redraws one line with carriage
+  returns (download bars) counts as one long line. Text in UTF-16 is refused
+  as binary.
 - References need the stored original. With `-no-store`, or after pruning,
   they can't be expanded.
 - No run history yet: each reduction stands alone. Comparing a run with the

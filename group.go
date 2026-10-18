@@ -64,11 +64,23 @@ func (g *grouper) matches(r *Record) bool {
 	return false
 }
 
-func (g *grouper) add(r Record) {
+func (g *grouper) add(r Record) { g.addN(r, 1) }
+
+// addN adds n records the same as r. Records counted from a runner's own
+// summary come in this way, with no lines of their own.
+func (g *grouper) addN(r Record, n int64) {
+	if n <= 0 {
+		return
+	}
 	if strings.TrimSpace(r.Head) == "" {
 		r.Head = "(blank line)"
 	}
-	kept := len(g.keep) > 0 && g.matches(&r)
+	// Keep rules match lines of the input; a record with no lines has none.
+	kept := len(g.keep) > 0 && len(r.Lines) > 0 && g.matches(&r)
+	if r.Kind == KindPass && !kept {
+		// A passing test's output only matters to keep rules.
+		r.Detail = nil
+	}
 	key := fingerprint(&r)
 	if kept {
 		key += "\x00k"
@@ -94,18 +106,18 @@ func (g *grouper) add(r Record) {
 			g.distinct[r.Kind]++
 		}
 	}
-	gr.count++
-	var n int64
+	gr.count += n
+	var lines int64
 	for _, rg := range mergeRanges(r.Lines) {
 		gr.ranges.add(rg)
-		n += rg.End - rg.Start + 1
+		lines += rg.End - rg.Start + 1
 	}
 	if g.bytes {
-		n = 0
+		lines = 0
 	}
-	gr.lines += n
-	g.records[r.Kind.String()]++
-	g.lines[r.Kind.String()] += n
+	gr.lines += lines
+	g.records[r.Kind.String()] += n
+	g.lines[r.Kind.String()] += lines
 }
 
 func (g *grouper) finish() []*group {

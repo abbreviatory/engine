@@ -50,6 +50,13 @@ shown" line whose reference covers it; same input, same bytes; every
 reference expands back byte for byte; for line formats every input line is in
 exactly one group. Keep these true.
 
+An independent review before v0.1.0 found 17 bugs (wrong detection of logs
+starting with "[", references that changed meaning with -keep, a pytest
+count that hung, errors filed as info, unbounded detail, JUnit variants, and
+more). All are fixed, each with a test in `review_test.go`. The reference ID
+covers the format, the keep rules and the input (`refID`); auto-detected JSON
+or JUnit that doesn't parse, or is too big (JSON 16 MB), falls back to logs.
+
 The README's "Limits in v0.1.0" section is the honest list of what isn't
 covered; keep it true.
 

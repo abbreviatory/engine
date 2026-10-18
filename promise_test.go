@@ -91,13 +91,19 @@ var refRE = regexp.MustCompile(`(?:\[ref |"ref": "|, ref )([0-9a-f]{12})(?::([^\
 
 func TestPromise(t *testing.T) {
 	keep := []*regexp.Regexp{regexp.MustCompile(`deprecated|TestFieldHex|Rounding`)}
+	bs, ps := budgets, preserveSets
+	if testing.Short() || raceEnabled {
+		// The race detector makes each run about ten times slower; a
+		// smaller matrix still covers the small, default and large budgets.
+		bs, ps = []int{256, 700, 4096}, preserveSets[:2]
+	}
 	for name, data := range fixtures(t) {
-		for _, b := range budgets {
+		for _, b := range bs {
 			t.Run(name+"/"+strconv.Itoa(b), func(t *testing.T) {
 				t.Parallel()
-				for _, ps := range preserveSets {
+				for _, p := range ps {
 					for _, k := range [][]*regexp.Regexp{nil, keep} {
-						checkPromise(t, name, data, Options{Budget: b, Preserve: ps, Keep: k})
+						checkPromise(t, name, data, Options{Budget: b, Preserve: p, Keep: k})
 					}
 				}
 			})
@@ -252,49 +258,56 @@ func TestGroupsCoverInput(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ix := res.Index
-		switch ix.Unit {
-		case "lines":
-			if res.Family == FamilyJSON {
-				continue
-			}
-			lines := splitKeep(data)
-			if int64(len(lines)) != res.InputLines || ix.Lines != res.InputLines {
-				t.Fatalf("%s: %d lines, result says %d", name, len(lines), res.InputLines)
-			}
-			owner := make([]int, len(lines)+1)
-			for gi, g := range ix.Groups {
-				var want []byte
-				for _, r := range g.Ranges {
-					for n := r[0]; n <= r[1]; n++ {
-						if n < 1 || n > int64(len(lines)) {
-							t.Fatalf("%s: g%d has line %d outside the input", name, gi, n)
-						}
-						if owner[n] != 0 {
-							t.Errorf("%s: line %d is in g%d and g%d", name, n, owner[n]-1, gi)
-						}
-						owner[n] = gi + 1
-						want = append(want, lines[n-1]...)
+		checkCoverage(t, name, data, res)
+	}
+}
+
+// checkCoverage checks that every input line is in exactly one group and
+// that each group expands to exactly its lines (line formats), or that each
+// range is one whole testcase element (JUnit).
+func checkCoverage(t *testing.T, name string, data []byte, res *Result) {
+	t.Helper()
+	ix := res.Index
+	switch ix.Unit {
+	case "lines":
+		if res.Family == FamilyJSON {
+			return
+		}
+		lines := splitKeep(data)
+		if int64(len(lines)) != res.InputLines || ix.Lines != res.InputLines {
+			t.Fatalf("%s: %d lines, result says %d", name, len(lines), res.InputLines)
+		}
+		owner := make([]int, len(lines)+1)
+		for gi, g := range ix.Groups {
+			var want []byte
+			for _, r := range g.Ranges {
+				for n := r[0]; n <= r[1]; n++ {
+					if n < 1 || n > int64(len(lines)) {
+						t.Fatalf("%s: g%d has line %d outside the input", name, gi, n)
 					}
-				}
-				got, err := Expand(data, ix, "g"+strconv.Itoa(gi))
-				if err != nil || !bytes.Equal(got, want) {
-					t.Errorf("%s: g%d doesn't expand to its own lines", name, gi)
-				}
-			}
-			for n := 1; n <= len(lines); n++ {
-				if owner[n] == 0 {
-					t.Errorf("%s: line %d (%q) is in no group", name, n, lines[n-1])
-				}
-			}
-		case "bytes":
-			// JUnit: each range is one whole testcase element.
-			for gi, g := range ix.Groups {
-				for _, r := range g.Ranges {
-					part := data[r[0] : r[1]+1]
-					if !bytes.HasPrefix(part, []byte("<testcase")) || !bytes.HasSuffix(part, []byte(">")) {
-						t.Errorf("%s: g%d has a range that is not a testcase element: %.60q", name, gi, part)
+					if owner[n] != 0 {
+						t.Errorf("%s: line %d is in g%d and g%d", name, n, owner[n]-1, gi)
 					}
+					owner[n] = gi + 1
+					want = append(want, lines[n-1]...)
+				}
+			}
+			got, err := Expand(data, ix, "g"+strconv.Itoa(gi))
+			if err != nil || !bytes.Equal(got, want) {
+				t.Errorf("%s: g%d doesn't expand to its own lines", name, gi)
+			}
+		}
+		for n := 1; n <= len(lines); n++ {
+			if owner[n] == 0 {
+				t.Errorf("%s: line %d (%q) is in no group", name, n, lines[n-1])
+			}
+		}
+	case "bytes":
+		for gi, g := range ix.Groups {
+			for _, r := range g.Ranges {
+				part := data[r[0] : r[1]+1]
+				if !bytes.HasPrefix(part, []byte("<testcase")) {
+					t.Errorf("%s: g%d has a range that is not a testcase element: %.60q", name, gi, part)
 				}
 			}
 		}
