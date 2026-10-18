@@ -1,19 +1,23 @@
 # Abbreviatory reference
 
-This is the full reference for version 0.1. The [README](../README.md) has the
+This is the full reference for version 0.2. The [README](../README.md) has the
 overview and the quick start.
 
 ## Commands
 
 ```
 abbreviatory reduce [flags] [file]   reduce a file, or standard input
+abbreviatory run [flags] -- CMD      run a command, reduce what it prints,
+                                     compare with its last run
+abbreviatory history [flags] [KEY]   list run histories, or one history's runs
 abbreviatory expand [flags] REF      print what a reference points to
 abbreviatory prune [flags]           remove old stored originals
 abbreviatory formats                 list the input formats
 abbreviatory version                 print the version
 ```
 
-Exit status: 0 on success, 1 when the work failed (unreadable or binary
+Exit status: `run` exits with the command's status (see below). Otherwise 0
+on success, 1 when the work failed (unreadable or binary
 input, a budget too small for this input, an unknown reference), 2 for a usage
 mistake (unknown command, format or preserve value, a bad flag or regular
 expression, a budget under 512).
@@ -28,7 +32,9 @@ expression, a budget under 512).
 | `-keep REGEX` | | also preserve lines matching the regular expression, a passing test's output included; repeatable |
 | `-json` | off | print a JSON object with counts and the text |
 | `-no-store` | off | don't store the original; the output then has no references |
-| `-store DIR` | see below | where originals are stored |
+| `-key NAME` | | keep a run history under NAME and report what changed since the last run |
+| `-full` | off | with a history, print the whole report even when nothing changed |
+| `-store DIR` | see below | where originals and histories are stored |
 
 With `-json` the object has `version`, `format`, `family`, `ref` (left out with
 `-no-store`), `input_bytes`, `input_lines`, `overflow`, `records` (counts by
@@ -168,9 +174,57 @@ Lines come back byte for byte, newlines included, in their input order. A JUnit
 report is often one long line, so its groups hold byte ranges: each testcase
 element comes back whole, one per line.
 
+## Run history
+
+With a history (`-key`, or `run`), each run is compared with the one before
+it. What is compared are the failures and errors the report preserves (as
+`-preserve` sets them), each known by an identity:
+
+- a failed test by its name (with its package for go test);
+- an error from a test runner that has a name for it, such as a package or a
+  build that failed, by that name;
+- anything else, such as a log error, by its text with numbers, hex runs and
+  spacing aside, its stack trace included, the same identity that groups
+  repeats within a run;
+- a JSON error field by its pointer and its value, with array positions and
+  numbers aside.
+
+Each item has a status in each run: failing; passing (a test that passed, or
+anything that isn't a test and didn't appear); or unknown (a test that was
+skipped or didn't appear). Against the previous run:
+
+| In the report | Meaning |
+|---|---|
+| new | failing now, not failing in the previous run |
+| fixed (logs: gone) | failing in the previous run, passing now |
+| not run | a test failing in the previous run that is skipped or absent now |
+| still failing (logs: recurring) | failing in both; marked with how many runs in a row |
+| flaky (logs: intermittent) | changed between failing and passing at least 3 times in the last 10 runs, unknown runs skipped, and failing now or in the previous run |
+
+Flaky items are listed as flaky and not as new, fixed or not run. The
+summary line under the header counts each kind; then come the new, fixed,
+not run and flaky items, one line each with a reference: into this run for
+items failing now, into the previous run's original for the others. At most a
+third of the budget goes to these lines; past that each list is cut short
+with a count of the rest. In the FAILED and ERRORS sections, new items come
+first, marked `(new)`, then flaky ones, then the rest, marked `(failing for N
+runs)`.
+
+When the same items are failing as in the previous run (or none, as before),
+the report is one line: the header, the run number and "no change since run
+N", or "identical to run N" when the input is byte for byte the same, with
+how many failures there are. `-full` gives the whole report instead, with
+"no change" in its summary line.
+
+A history keeps the last 50 runs of its key. The last 10 keep their failures
+and the names of the tests that passed, which flaky detection needs; older
+ones keep their counts for `history`. The history is a JSON file under
+`history/` in the store, locked while it is written. A history nobody added
+to for 90 days is removed by pruning.
+
 ## The store
 
-Originals are kept gzipped, each next to a small JSON index of which lines
+Originals are kept gzipped under `objects/`, each next to a small JSON index of which lines
 each group came from. If the original can't be stored (a full disk), the
 report is still printed, with a warning that its references won't expand.
 The directory is `-store`, else `$ABBREVIATORY_STORE`,
@@ -196,6 +250,16 @@ fmt.Print(res.Text)
 part, err := abbreviatory.Expand(original, res.Index, "g12")
 ```
 
+With a history:
+
+```go
+h, err := st.History("unit")
+res, err := abbreviatory.Reduce(r, abbreviatory.Options{Track: true, History: h.Runs})
+fmt.Print(res.Text)           // starts with what changed
+fmt.Println(res.Delta.New)    // the new failures
+err = st.Record("unit", res.Run)
+```
+
 The `store` package (`github.com/abbreviatory/engine/store`) is the file store
 the command uses: `Open`, `Begin`/`Commit` around a `Reduce`, `Expand`,
-`Prune`.
+`Prune`, and `History`/`Record`/`Histories` for run histories.

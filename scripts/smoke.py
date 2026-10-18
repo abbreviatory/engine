@@ -12,7 +12,8 @@
 # reduces within the budget, is detected as its format, and gives the same
 # bytes twice; every reference in the output expands, and the whole-input
 # reference gives the fixture back byte for byte; -json, -no-store, -keep and
-# prune work; and bad input fails cleanly.
+# prune work; history (reduce -key, -full, history) and run (keeping the
+# exit status) work; and bad input fails cleanly.
 import json
 import os
 import re
@@ -118,6 +119,30 @@ def main():
     require(r.returncode == 1 and b"JSON" in r.stderr, f"broken JSON: exit {r.returncode}, {r.stderr!r}")
     r = run([exe, "reduce", "-store", store, "-budget", "100"], stdin=b"ERROR x\n", check=False)
     require(r.returncode == 2 and b"at least 512" in r.stderr, f"small budget: exit {r.returncode}, {r.stderr!r}")
+    checks += 1
+
+    # History: the second identical run is one line, -full shows the report,
+    # and a changed run lists what changed.
+    path = FIXTURES / "pytest-verbose.txt"
+    out = run([exe, "reduce", "-store", store, "-key", "smoke", path]).stdout.decode()
+    require("run 1; no earlier runs to compare with" in out, f"first tracked run:\n{out}")
+    out = run([exe, "reduce", "-store", store, "-key", "smoke", path]).stdout.decode()
+    require(out.count("\n") == 1 and "identical to run 1" in out, f"identical run:\n{out}")
+    out = run([exe, "reduce", "-store", store, "-key", "smoke", "-full", path]).stdout.decode()
+    require("since run 2" in out and "FAILED" in out, f"-full run:\n{out}")
+    lines = path.read_bytes().splitlines(keepends=True)
+    fewer = b"".join(l for l in lines if b"test_parse_" not in l)
+    out = run([exe, "reduce", "-store", store, "-key", "smoke"], stdin=fewer).stdout.decode()
+    require("since run 3:" in out and ("fixed:" in out or "not run:" in out), f"changed run:\n{out}")
+    hist = json.loads(run([exe, "history", "-store", store, "-json", "smoke"]).stdout)
+    require([r["run"] for r in hist["runs"]] == [1, 2, 3, 4], f"history runs: {hist}")
+    checks += 1
+
+    # run keeps the command's exit status.
+    r = run([exe, "run", "-store", store, "-key", "smoke-run", "--", exe, "version"])
+    require(b"run 1, exit status 0" in r.stdout and b"abbreviatory " in r.stdout, f"run: {r.stdout!r}")
+    r = run([exe, "run", "-store", store, "-key", "smoke-run2", "--", exe, "no-such-command"], check=False)
+    require(r.returncode == 2 and b"exit status 2" in r.stdout, f"run of a failing command: exit {r.returncode}, {r.stdout!r}")
     checks += 1
 
     out = run([exe, "prune", "-store", store, "-max-size", "0"]).stdout.decode()

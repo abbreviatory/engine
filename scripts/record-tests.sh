@@ -5,7 +5,8 @@
 # Runs every test, the race detector, the release plan's cases, the large
 # input memory test and the smoke check on a release-style binary, and writes
 # the output to test/results/ with a note of the machine they ran on. It also
-# writes the reduction of every fixture to test/results/examples/. The numbers
+# writes the reduction of every fixture to test/results/examples/, and a
+# run-to-run example. The numbers
 # in the README and on abbreviatory.com come from these files.
 #
 #   sh scripts/record-tests.sh
@@ -43,6 +44,9 @@ cmd="go test -race -count=1 ./..."
 cmd="go test -count=1 -v -run TestRatios ."
 { header "Reduction of each fixture at the default budget (4,096 bytes)" "$cmd"; $cmd 2>&1 | sed -n 's/^.*ratio //p'; } > "$out/ratios.txt"
 
+cmd="go test -count=1 -v -run TestSimulatedRuns ."
+{ header "500 simulated CI runs with known changes, each delta checked against the known statuses" "$cmd"; $cmd 2>&1; } > "$out/delta.txt"
+
 big=${ABBREVIATORY_BIG_MB:-1024}
 cmd="ABBREVIATORY_BIG_MB=$big go test -count=1 -v -run TestLargeInputMemory -timeout 30m ."
 { header "A ${big} MB generated log streamed through Reduce: peak heap and speed" "$cmd"; ABBREVIATORY_BIG_MB=$big go test -count=1 -v -run TestLargeInputMemory -timeout 30m . 2>&1; } > "$out/memory.txt"
@@ -64,7 +68,23 @@ for f in test/fixtures/*; do
 	"$work/bin/abbreviatory" reduce -store "$work/store" "$f" > "$out/examples/$name.txt"
 done
 
+# Run to run: the go test -json fixture after a run where one of its
+# failing tests didn't exist yet and another test was failing, then the same
+# run again (one line).
+pkg=example.com/gosample/parse
+legacy() {
+	printf '{"Action":"run","Package":"%s","Test":"TestLegacyFormat"}\n' "$pkg"
+	test "$1" = fail && printf '{"Action":"output","Package":"%s","Test":"TestLegacyFormat","Output":"    parse_test.go:88: legacy format: got 3 fields, want 4\\n"}\n' "$pkg"
+	printf '{"Action":"%s","Package":"%s","Test":"TestLegacyFormat","Elapsed":0}\n' "$1" "$pkg"
+}
+{ grep -v TestFieldSpaces test/fixtures/gotest-json.txt; legacy fail; } > "$work/run1.json"
+{ cat test/fixtures/gotest-json.txt; legacy pass; } > "$work/run2.json"
+"$work/bin/abbreviatory" reduce -store "$work/store" -key example "$work/run1.json" > /dev/null
+"$work/bin/abbreviatory" reduce -store "$work/store" -key example "$work/run2.json" > "$out/examples/run-to-run.txt"
+"$work/bin/abbreviatory" reduce -store "$work/store" -key example "$work/run2.json" > "$out/examples/run-to-run-unchanged.txt"
+
 grep -E '^(ok|FAIL|--- FAIL)' "$out/tests.txt" "$out/race.txt" || true
 grep 'memory:' "$out/memory.txt" || true
+grep -E 'runs: map' "$out/delta.txt" || true
 tail -n 1 "$out/release-plan.txt" "$out/smoke.txt"
 echo "results written to $out/"

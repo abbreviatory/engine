@@ -75,6 +75,13 @@ func render(res *Result, groups []*group, summary []string, rules preserve, budg
 	}
 	byCount(warn)
 	byCount(other)
+	// Compared with earlier runs: new failures first, then flaky ones, then
+	// those failing before too. Without history every rank is 0.
+	byRank := func(gs []*group) {
+		sort.SliceStable(gs, func(i, j int) bool { return gs[i].rank < gs[j].rank })
+	}
+	byRank(fail)
+	byRank(errs)
 
 	failNoun := "failures"
 	if tests {
@@ -244,6 +251,9 @@ func itemLine(s *section, g *group, ref func(string) string) string {
 		b.WriteString(strings.ToUpper(g.kind.String()) + ": ")
 	}
 	b.WriteString(cut(g.ex.Head, maxHead))
+	if g.note != "" {
+		b.WriteString(" (" + g.note + ")")
+	}
 	b.WriteString(ref("g" + strconv.Itoa(g.idx)))
 	return b.String()
 }

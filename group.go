@@ -26,6 +26,11 @@ type group struct {
 	kept   bool // a keep rule matched
 	more   bool // the catch-all group past maxDistinct
 	first  int64
+	fp     string // fingerprint, the identity compared between runs
+	// Set when comparing with earlier runs: a note shown after the item
+	// (new, flaky, failing for 4 runs) and its place in its section.
+	note string
+	rank int
 }
 
 type grouper struct {
@@ -81,7 +86,8 @@ func (g *grouper) addN(r Record, n int64) {
 		// A passing test's output only matters to keep rules.
 		r.Detail = nil
 	}
-	key := fingerprint(&r)
+	fp := fingerprint(&r)
+	key := fp
 	if kept {
 		key += "\x00k"
 	}
@@ -99,7 +105,7 @@ func (g *grouper) addN(r Record, n int64) {
 			if len(r.Detail) > maxDetail {
 				r.Detail = append(r.Detail[:maxDetail:maxDetail], "... ("+group3(int64(len(r.Detail)-maxDetail))+" more lines)")
 			}
-			gr = &group{kind: r.Kind, ex: r, kept: kept, first: firstLine(r.Lines)}
+			gr = &group{kind: r.Kind, ex: r, kept: kept, first: firstLine(r.Lines), fp: fp}
 			gr.ex.Lines = nil
 			g.byKey[key] = gr
 			g.order = append(g.order, gr)

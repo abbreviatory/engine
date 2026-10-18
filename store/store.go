@@ -247,6 +247,7 @@ func (s *Store) Prune(maxAge time.Duration, maxBytes int64) (int, int64, error) 
 		total += size
 	}
 	sort.Slice(objs, func(i, j int) bool { return objs[i].mod.Before(objs[j].mod) })
+	s.pruneHistories(now)
 	removed := 0
 	var freed int64
 	for _, o := range objs {

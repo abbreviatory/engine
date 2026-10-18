@@ -51,7 +51,9 @@ budget, is detected as its format, gives the same bytes twice and the same
 from a file as from standard input; every reference in the output expands, and
 the whole-input reference gives the fixture back byte for byte; `-json`,
 `-no-store`, `-keep` and `prune` work; and binary input, broken JSON and a
-budget too small fail with a message.
+budget too small fail with a message; a history gives "run 1", then one line
+for an identical run, the whole report with `-full`, and the changes for a
+changed run; and `run` keeps the command's exit status.
 
 ## Files that go out
 

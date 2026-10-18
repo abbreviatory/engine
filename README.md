@@ -7,6 +7,10 @@ a short report. It keeps the failures, errors and warnings, folds repeats into
 one line with a count, and fits the result in a byte budget you set. Anything
 it leaves out stays one command away, byte for byte.
 
+Give it a history and it compares each run with the last one: new failures,
+fixed ones, those still failing and for how many runs, and flaky ones. When
+nothing changed, the report is one line.
+
 It works by rules and pattern matching. No language model, no network, no API
 keys. The same input always gives the same output.
 
@@ -85,6 +89,49 @@ abbreviatory expand d2f86a61aa96:L200-260 # a line range
 abbreviatory expand d2f86a61aa96          # the whole input
 ```
 
+## What changed since the last run
+
+Name a history with `-key`, or let `run` name it after the project and the
+command, and each report starts with what changed:
+
+```
+$ go test -json ./... | abbreviatory reduce -key unit
+[abbreviatory] go test -json output, 4,882 lines (808.5 kB), ref 3e35712ad529
+run 2; since run 1: 1 new, 1 fixed, 6 still failing (longest for 2 runs)
+new: TestFieldSpaces (example.com/gosample/parse, 0.00s) [ref 3e35712ad529:g1205]
+fixed: TestLegacyFormat (example.com/gosample/parse, 0.00s) [ref 6f92e70f603c:g1213]
+tests: 1,205 passed, 7 failed, 1 skipped
+FAILED (7):
+- TestFieldSpaces (example.com/gosample/parse, 0.00s) (new) [ref 3e35712ad529:g1205]
+    parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax
+    parse_test.go:36: Field("width = 12") = 0, want 12
+- TestPickPast (example.com/gosample/crash, 0.00s) (failing for 2 runs) [ref 3e35712ad529:g1]
+...
+```
+
+The same run again:
+
+```
+[abbreviatory] go test -json output, 4,882 lines (808.5 kB), ref 3e35712ad529; run 3, identical to run 2: the same 7 failures
+```
+
+- **New** failures come first in the list, marked `(new)`.
+- **Fixed** ones are listed with a reference into the run where they last
+  failed, so the old failure is still one `expand` away. A failing test that
+  doesn't appear at all this time is listed as **not run**, not fixed.
+- **Still failing** ones are marked with how many runs in a row they have
+  failed.
+- **Flaky** ones changed between passing and failing at least 3 times in the
+  last 10 runs. They are listed as flaky instead of new or fixed, so a flaky
+  test doesn't look like news every other run.
+- **No change** (the same failures as last time, timings and IDs aside) is one
+  line. `-full` prints the whole report anyway.
+
+For logs the same works on error kinds: new, gone, recurring and intermittent.
+`run` runs the command, reduces what it prints (standard output and standard
+error together) and exits with the command's exit status, so it can stand in
+for the command in CI. `abbreviatory history` lists the runs.
+
 ## What the report holds
 
 A log of 63,369 lines (5.6 MB) at the default budget:
@@ -131,22 +178,45 @@ OTHER (7 kinds, 55,804 lines):
 -preserve LIST   errors,failures,warnings by default; empty for none
 -keep REGEX      also keep lines matching this (repeatable)
 -format NAME     auto, test-output, logs, json, gotest-json, gotest, pytest, junit
--json            a JSON object with the counts and the text
+-key NAME        keep a run history under NAME and report what changed
+-full            with history, the whole report even when nothing changed
+-json            a JSON object with the counts, the changes and the text
 -no-store        don't keep the original (the report then has no references)
--store DIR       where originals are kept
+-store DIR       where originals and histories are kept
 ```
+
+`run` takes the same flags, names its history after the project (the
+enclosing Git repository, or the directory) and the command unless `-key` is
+given, and has `-no-history`.
 
 Originals are kept gzipped in your cache directory (or `-store`, or
 `$ABBREVIATORY_STORE`) for a week, up to 500 MB, and never leave the machine.
+Histories keep the last 50 runs of each key and go after 90 days unused.
 `abbreviatory prune` cleans up by hand.
 
 ## In CI
 
+CI machines start empty, so the store has to be kept between runs for the
+history to work. On GitHub Actions, with the cache saved whether the tests
+pass or not:
+
+```yaml
+- uses: actions/cache/restore@v4
+  with:
+    path: .abbreviatory
+    key: abbreviatory-${{ github.ref_name }}-${{ github.run_id }}
+    restore-keys: abbreviatory-${{ github.ref_name }}-
+- run: abbreviatory run -store .abbreviatory -key unit -budget 3000 -- go test -json ./... >> "$GITHUB_STEP_SUMMARY"
+- if: always()
+  run: abbreviatory prune -store .abbreviatory -max-size 50MB
+- if: always()
+  uses: actions/cache/save@v4
+  with:
+    path: .abbreviatory
+    key: abbreviatory-${{ github.ref_name }}-${{ github.run_id }}
 ```
-go test -json ./... > test.json || status=$?
-abbreviatory reduce -budget 3000 test.json >> "$GITHUB_STEP_SUMMARY"
-exit ${status:-0}
-```
+
+The step fails when the tests fail, because `run` exits with their status.
 
 ## As a Go library
 
@@ -198,9 +268,19 @@ A generated log of 1,107 MB (12.5 million lines) streamed through in 32.7 second
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in
-[test/results/examples](test/results/examples).
+[test/results/examples](test/results/examples), with a run-to-run example.
 
-## Limits in v0.1.0
+The history was checked on 500 simulated CI runs of a 40-test suite and 500
+of a log with 25 error kinds, with tests breaking, getting fixed, flaking,
+being skipped and going missing at random, and some runs changing nothing
+([delta_test.go](delta_test.go)). Each run went through the whole command
+path, its history written to the store and read back for the next run, at a
+random budget. For every run the reported new, fixed, not run, still
+failing and flaky items, the streaks, the "no change" line and the notes in
+the report matched what was worked out separately from the known statuses
+([delta.txt](test/results/delta.txt)).
+
+## Limits in v0.2.0
 
 - It reads formats it knows. Free prose, or a log format it doesn't
   recognise, is reduced only by folding repeats and finding level words.
@@ -219,9 +299,18 @@ Before-and-after reports for each fixture are in
   as binary.
 - References need the stored original. With `-no-store`, or after pruning,
   they can't be expanded.
-- No run history yet: each reduction stands alone. Comparing a run with the
-  last one (new, fixed, recurring and flaky failures) is planned for 0.2, an
-  HTTP service and an MCP server for 0.3.
+- History compares failures and errors only: warnings and keep-rule matches
+  aren't tracked. A test is known by its name, anything else by its text
+  with numbers and IDs aside, so a log error whose wording changes counts as
+  a new one, and the same error with a different stack trace too.
+- In a JSON document, error fields are compared by their path and value with
+  array positions aside, so the same error at two positions counts once.
+- Two runs of the same key at the same moment both compare with the run
+  before them; the history file is locked while it is written, so neither
+  run is lost.
+- Flaky detection needs the last 10 runs; a history trimmed or started fresh
+  sees nothing as flaky at first.
+- No HTTP service or MCP server yet; they are planned for 0.3.
 
 ## License
 

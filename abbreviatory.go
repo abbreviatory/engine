@@ -21,7 +21,7 @@ import (
 )
 
 // Version is the release version. Raising it on main releases it.
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // DefaultBudget is the output size in bytes when none is given.
 const DefaultBudget = 4096
@@ -59,6 +59,20 @@ type Options struct {
 	// Sink, if set, receives the input bytes exactly as read, so the caller
 	// can store the original for expansion.
 	Sink io.Writer
+
+	// Track compares this run with History, the earlier runs of the same
+	// command (oldest first; empty for the first run). The report then says
+	// what is new, fixed, still failing and flaky, and Result.Run is the
+	// record to append to the history.
+	Track   bool
+	History []Run
+	// Full keeps the whole report when nothing changed since the last run;
+	// otherwise that report is one line.
+	Full bool
+	// Command and Exit describe the command that printed the input, when
+	// known; they are kept in the run record and Exit is shown.
+	Command string
+	Exit    *int
 }
 
 // Result is a finished reduction.
@@ -85,6 +99,10 @@ type Result struct {
 	// Index maps references to original lines. Store it with the original
 	// so references can be expanded.
 	Index *Index
+	// With Options.Track: the record of this run, to append to the
+	// history, and what changed since the previous run.
+	Run   *Run
+	Delta *Delta
 }
 
 // Index records which original lines each group came from.
@@ -229,36 +247,103 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	res.ID = refID(fi.name, opt.Keep, h.Sum(nil))
 	refs := !opt.NoRefs
 
+	var groups []*group
 	if doc != nil {
-		text, overflow, err := renderJSON(res, doc, budget, refs)
-		if err != nil {
-			return nil, err
-		}
-		res.Text, res.Overflow = text, overflow
 		res.Records = map[string]int64{"error": int64(len(doc.errors))}
 		res.Lines = map[string]int64{}
 		res.Index = &Index{ID: res.ID, Format: fi.name, Lines: res.InputLines, Unit: "lines", Groups: []IndexGroup{}}
-		return res, nil
+	} else {
+		groups = g.finish()
+		res.Records, res.Lines = g.records, g.lines
+		res.Index = buildIndex(res, groups)
 	}
 
-	groups := g.finish()
-	res.Records, res.Lines = g.records, g.lines
-	res.Index = buildIndex(res, groups)
-	text, overflow, err := render(res, groups, summary, rules, budget, refs)
-	if int64(len(small)) == res.InputLines && res.InputLines > 0 {
-		// The input is small: when showing it whole is no longer than the
-		// reduction, show it whole.
-		whole := headerLine(res, refs) + ", shown whole\n" + strings.Join(small, "\n") + "\n"
-		if len(whole) <= budget && (err != nil || len(whole) <= len(text)) {
-			res.Text, res.Whole = whole, true
-			return res, nil
+	// renderAt renders the report within b bytes.
+	renderAt := func(b int) (text string, overflow, whole bool, err error) {
+		if doc != nil {
+			text, overflow, err = renderJSON(res, doc, b, refs)
+			return text, overflow, false, err
 		}
+		text, overflow, err = render(res, groups, summary, rules, b, refs)
+		if int64(len(small)) == res.InputLines && res.InputLines > 0 {
+			// The input is small: when showing it whole is no longer than
+			// the reduction, show it whole.
+			w := headerLine(res, refs) + ", shown whole\n" + strings.Join(small, "\n") + "\n"
+			if len(w) <= b && (err != nil || len(w) <= len(text)) {
+				return w, false, true, nil
+			}
+		}
+		return text, overflow, false, err
 	}
-	if err != nil {
+
+	if !opt.Track {
+		text, overflow, whole, err := renderAt(budget)
+		if err != nil {
+			return nil, err
+		}
+		res.Text, res.Overflow, res.Whole = text, overflow, whole
+		return res, nil
+	}
+	if err := trackRun(res, opt, groups, doc, rules, budget, refs, renderAt); err != nil {
 		return nil, err
 	}
-	res.Text, res.Overflow = text, overflow
 	return res, nil
+}
+
+// trackRun compares the reduction with the earlier runs and renders the
+// report with what changed: one line when nothing did, otherwise the changes
+// under the header and notes on the items.
+func trackRun(res *Result, opt Options, groups []*group, doc *jsonDoc, rules preserve, budget int, refs bool,
+	renderAt func(int) (string, bool, bool, error)) error {
+	tests := res.Family == FamilyTests
+	bad, good := runItems(res, groups, doc, rules)
+	cur := &Run{ID: res.ID, Format: res.Format, Command: opt.Command, Exit: opt.Exit, Records: res.Records, Bad: map[string]RunItem{}, Full: true}
+	cur.N = 1
+	if n := len(opt.History); n > 0 {
+		cur.N = opt.History[n-1].N + 1
+	}
+	if tests {
+		cur.Good = packGood(good)
+	}
+	d := computeDelta(opt.History, cur, bad, good, tests)
+	res.Run, res.Delta = cur, d
+
+	if d.Unchanged && !opt.Full {
+		if line := unchangedLine(res, d, refs); len(line) <= budget {
+			res.Text, res.Overflow = line, d.Failing > 0
+			return nil
+		}
+	}
+	noteGroups(d, cur, groups, tests)
+	// The changes take at most a third of the budget; past that each list
+	// is cut short, and in the end only the summary line is left.
+	for _, capN := range []int{1 << 30, 10, 5, 3, 1, 0} {
+		block := blockLines(d, capN, refs)
+		cost := 0
+		for _, l := range block {
+			cost += len(l) + 1
+		}
+		if capN > 0 && cost > budget/3 {
+			continue
+		}
+		text, overflow, whole, err := renderAt(budget - cost)
+		var be *BudgetError
+		if errors.As(err, &be) {
+			if capN == 0 {
+				return &BudgetError{Budget: budget, Need: be.Need + cost}
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		nl := strings.IndexByte(text, '\n') + 1
+		res.Text = text[:nl] + strings.Join(block, "\n") + "\n" + text[nl:]
+		res.Overflow = overflow
+		res.Whole = whole
+		return nil
+	}
+	return &BudgetError{Budget: budget, Need: budget + 1}
 }
 
 // refID names a stored input. It covers everything that decides how lines

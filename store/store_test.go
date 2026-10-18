@@ -143,3 +143,67 @@ func TestPruneNowOncePerHour(t *testing.T) {
 		t.Error("pruned twice within the hour")
 	}
 }
+
+func TestHistoryRecord(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := s.History("k")
+	if err != nil || len(h.Runs) != 0 || h.Key != "k" {
+		t.Fatalf("new history: %v %+v", err, h)
+	}
+	for i := 1; i <= 15; i++ {
+		run := &abbreviatory.Run{N: i, ID: "x", Bad: map[string]abbreviatory.RunItem{"a": {Head: "boom", Streak: i}}, Full: true}
+		if err := s.Record("k", run); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A run numbered behind the history (another run got in first) goes
+	// after it.
+	late := &abbreviatory.Run{N: 3, Full: true}
+	if err := s.Record("k", late); err != nil || late.N != 16 {
+		t.Fatalf("late run numbered %d: %v", late.N, err)
+	}
+	h, _ = s.History("k")
+	if len(h.Runs) != 16 {
+		t.Fatalf("%d runs", len(h.Runs))
+	}
+	for i, r := range h.Runs {
+		full := i >= len(h.Runs)-abbreviatory.FlakyWindow
+		if r.Full != full || (!full && r.Bad != nil) {
+			t.Fatalf("run %d: full %v, bad %v", r.N, r.Full, r.Bad)
+		}
+	}
+	s.Record("other", &abbreviatory.Run{N: 1})
+	all, err := s.Histories()
+	if err != nil || len(all) != 2 {
+		t.Fatalf("%d histories: %v", len(all), err)
+	}
+}
+
+func TestHistoryLock(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	os.MkdirAll(s.historyDir(), 0o700)
+	lock := s.historyPath("k") + ".lock"
+	os.WriteFile(lock, nil, 0o600)
+	old := time.Now().Add(-2 * time.Minute)
+	os.Chtimes(lock, old, old)
+	if err := s.Record("k", &abbreviatory.Run{N: 1}); err != nil {
+		t.Fatalf("a stale lock should be taken over: %v", err)
+	}
+	if _, err := os.Stat(lock); err == nil {
+		t.Fatal("lock left behind")
+	}
+}
+
+func TestPruneOldHistory(t *testing.T) {
+	s, _ := Open(t.TempDir())
+	s.Record("k", &abbreviatory.Run{N: 1})
+	old := time.Now().Add(-HistoryMaxAge - time.Hour)
+	os.Chtimes(s.historyPath("k"), old, old)
+	s.Prune(DefaultMaxAge, DefaultMaxBytes)
+	if _, err := os.Stat(s.historyPath("k")); err == nil {
+		t.Fatal("an unused history should be pruned")
+	}
+}

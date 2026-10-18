@@ -12,8 +12,8 @@ has the procedure and the checks to run afterwards.
 
 ## Where things stand
 
-v0.1.0 (October 2026) is the first release: Apache 2.0, CI on Linux and macOS
-plus a Windows smoke check, and automated releases with smoke-tested binaries
+v0.2.0 (October 2026) adds run history (below). v0.1.0 was the first
+release: Apache 2.0, CI on Linux and macOS plus a Windows smoke check, and automated releases with smoke-tested binaries
 for Linux, macOS and Windows. Pure Go, standard library only, no cgo.
 
 The idea: a deterministic context reduction engine. No language model, no
@@ -36,12 +36,29 @@ v0.1.0 has the core, the command line and three adapter families:
   (offset-keeping parser, error fields, outline levels).
 - `expand.go`: `ParseRef`, `Expand` and its selectors.
 - `store/`: gzipped originals with a JSON index, `Expand`, `Prune`.
-- `cmd/abbreviatory/`: reduce, expand, prune, formats, version.
+- `cmd/abbreviatory/`: reduce, run, history, expand, prune, formats, version.
+
+v0.2.0 adds the run-to-run delta:
+- `history.go`: `Run` (what history keeps of a run), items (a failed test by
+  name, anything else by its grouping fingerprint or runner ID, JSON error
+  fields by pointer and value), `computeDelta` (new, fixed, not run, still
+  failing with streaks, flaky: 3+ status changes in the last 10 runs), the
+  lines under the header, notes on items, the one-line "no change" report.
+  `Reduce` takes `Track`, `History`, `Full`, `Command`, `Exit`; `trackRun`
+  fits the changes into the budget (at most a third, lists cut short, then
+  only the summary line).
+- `store/history.go`: one JSON file per key under `history/`, 50 runs (the
+  last 10 full), a lock file, pruned after 90 days unused.
+- `cmd`: `reduce -key`, `-full`; `run -- cmd` (spools the output, keeps the
+  exit status, default key = project dir + command); `history [KEY]`.
+- `delta_test.go`: 500 simulated runs each of a test suite and a log,
+  through Reduce and the store, checked against an independent oracle.
 
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't
 download Go modules, so v0.1.0 uses a plain file store instead (the same
-behaviour for references; no dependencies). Run history for 0.2 can stay in
-files too; revisit SQLite only if 0.2 needs queries files can't do.
+behaviour for references; no dependencies). Run history in 0.2 stays in
+files too (one JSON file per key); revisit SQLite only if 0.3's service needs
+queries files can't do.
 
 The promise, held by `promise_test.go` on every fixture at every budget: the
 output never exceeds the budget (or `Reduce` refuses with the size it needs);
@@ -74,7 +91,7 @@ front end, not the headline.
    4 runs") and flaky ones (flipped 3+ times in the last 10 runs). Unchanged
    output reduces to one line. Commands `run -- <command>` (keeps the exit
    code) and `history <key>`. Done when 500 simulated CI runs with known
-   changes give an exact delta every time.
+   changes give an exact delta every time (done in v0.2.0).
 3. 0.3: HTTP service (`POST /reduce`, `GET /expand/{ref}`, `GET /runs/{key}`,
    `GET /healthz`; localhost by default, optional bearer token) and an MCP
    server (stdio; tools reduce, run, expand, history). Done when CLI, HTTP and
@@ -87,7 +104,9 @@ pipelines, a hosted service. The browser demo is skipped; revisit after 0.2 as
 demo.abbreviatory.com built from this repo by the release workflow, linked
 from the site menu only.
 
-Next session starts at 0.2, when the owner says go.
+Next session starts at 0.3, when the owner says go. The browser demo
+question (demo.abbreviatory.com) comes up again now that 0.2 is out; ask the
+owner before building it.
 
 ## Test results
 
@@ -109,5 +128,5 @@ Abbreviatory.com is in `photozeitgeist/abbreviatory.com`: the Hugo Launch
 template copied unchanged, with content and config values only. Pages: about,
 contact (info@abbreviatory.com), quick start, download, reference. Posts: the
 launch, a plain-language explainer of context reduction, how it was tested
-(before and after examples from `test/results/examples/`), the name. Images
-are drawn into static/images. Every number comes from `test/results/`.
+(before and after examples from `test/results/examples/`), the name, and the
+0.2 release (run history). Images are drawn into static/images. Every number comes from `test/results/`.
