@@ -1,0 +1,126 @@
+[abbreviatory] JSON document, 37,527 lines (719.4 kB), ref 6d9640b55a21
+json: object with 6 keys, 30,020 values, 3 error fields
+{
+  "request_id": "4f9c2b1e-8d7a-4e21-9b3c-5a6d7e8f9012",
+  "status": "partial",
+  "page": {
+    "number": 1,
+    "size": 2500,
+    "total": 9812
+  },
+  "items": {
+    "_abbreviated": "array of 2,500 objects",
+    "keys": ["id", "sku", "name", "price", "tags", "stock", "updated_at"],
+    "first": [
+      {
+        "id": 100000,
+        "sku": "SKU-27828",
+        "name": "USB-C cable",
+        "price": {
+          "amount": 182.99,
+          "currency": "EUR"
+        },
+        "tags": [
+          "eco",
+          "sale"
+        ],
+        "stock": 485,
+        "updated_at": "2026-10-18T08:00:00.000Z"
+      },
+      {
+        "id": 100001,
+        "sku": "SKU-07463",
+        "name": "Notebook",
+        "price": {
+          "amount": 192.37,
+          "currency": "EUR"
+        },
+        "tags": [
+          "bundle",
+          "office"
+        ],
+        "stock": 335,
+        "updated_at": "2026-10-18T08:00:03.481Z"
+      },
+      {
+        "id": 100002,
+        "sku": "SKU-45773",
+        "name": "Desk lamp",
+        "price": {
+          "amount": 43.0,
+          "currency": "EUR"
+        },
+        "tags": [
+          "eco",
+          "office"
+        ],
+        "stock": 478,
+        "updated_at": "2026-10-18T08:00:06.962Z"
+      }
+    ],
+    "with_errors": [
+      {"index": 311, "value": {
+        "id": 100311,
+        "sku": "SKU-36051",
+        "name": "Desk lamp",
+        "price": {
+          "amount": 45.82,
+          "currency": "EUR"
+        },
+        "tags": [
+          "new",
+          "sale"
+        ],
+        "stock": 469,
+        "updated_at": "2026-10-18T08:16:50.591Z",
+        "error": {
+          "code": "PRICE_STALE",
+          "message": "price feed for SKU-36051 is older than 24h"
+        }
+      }},
+      {"index": 1407, "value": {
+        "id": 101407,
+        "sku": "SKU-91210",
+        "name": "Pen set",
+        "price": {
+          "amount": 45.71,
+          "currency": "EUR"
+        },
+        "tags": [
+          "eco",
+          "bundle"
+        ],
+        "stock": 229,
+        "updated_at": "2026-10-18T09:16:12.767Z",
+        "error": {
+          "code": "PRICE_STALE",
+          "message": "price feed for SKU-91210 is older than 24h"
+        }
+      }},
+      {"index": 2210, "value": {
+        "id": 102210,
+        "sku": "SKU-77694",
+        "name": "Pen set",
+        "price": {
+          "amount": 170.9,
+          "currency": "EUR"
+        },
+        "tags": [
+          "office",
+          "bundle"
+        ],
+        "stock": 0,
+        "updated_at": "2026-10-18T09:59:42.010Z",
+        "error": {
+          "code": "PRICE_STALE",
+          "message": "price feed for SKU-77694 is older than 24h"
+        }
+      }}
+    ],
+    "ref": "6d9640b55a21:/items"
+  },
+  "warnings": [
+    "3 items have stale prices"
+  ],
+  "description": "Catalogue export for the spring range. Catalogue export for the spring range. Catalogue export for the spring range. Catalogue export for the spring range. Catalogue export for the spring range. Catal... (+268 chars, ref 6d9640b55a21:/description)"
+}

@@ -1,0 +1,36 @@
+[abbreviatory] go test output, 35 lines (1.7 kB), ref a305a324470c, shown whole
+--- FAIL: TestPickPast (0.00s)
+panic: runtime error: index out of range [2] with length 2 [recovered]
+	panic: runtime error: index out of range [2] with length 2
+
+goroutine 19 [running]:
+testing.tRunner.func1.2({0x567de0, 0xc00015c000})
+	/usr/local/go1.24.7/src/testing/testing.go:1734 +0x21c
+testing.tRunner.func1()
+	/usr/local/go1.24.7/src/testing/testing.go:1737 +0x35e
+panic({0x567de0?, 0xc00015c000?})
+	/usr/local/go1.24.7/src/runtime/panic.go:792 +0x132
+example.com/gosample/crash.Pick(...)
+	/home/claude/engine/test/fixtures/src/gosample/crash/crash.go:5
+example.com/gosample/crash.TestPickPast(0xc000124700?)
+	/home/claude/engine/test/fixtures/src/gosample/crash/crash_test.go:13 +0x16
+testing.tRunner(0xc000124700, 0x5843a8)
+	/usr/local/go1.24.7/src/testing/testing.go:1792 +0xf4
+created by testing.(*T).Run in goroutine 1
+	/usr/local/go1.24.7/src/testing/testing.go:1851 +0x413
+FAIL	example.com/gosample/crash	0.006s
+--- FAIL: TestFieldSpaces (0.00s)
+    parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax
+    parse_test.go:36: Field("width = 12") = 0, want 12
+--- FAIL: TestFieldHex (0.00s)
+    parse_test.go:43: Field("mask=0xff"): strconv.Atoi: parsing "0xff": invalid syntax
+--- FAIL: TestFieldUnits (0.00s)
+    --- FAIL: TestFieldUnits/timeout=30s (0.00s)
+        parse_test.go:52: Field("timeout=30s"): strconv.Atoi: parsing "30s": invalid syntax
+    --- FAIL: TestFieldUnits/size=4KB (0.00s)
+        parse_test.go:52: Field("size=4KB"): strconv.Atoi: parsing "4KB": invalid syntax
+    --- FAIL: TestFieldUnits/rate=12/s (0.00s)
+        parse_test.go:52: Field("rate=12/s"): strconv.Atoi: parsing "12/s": invalid syntax
+FAIL
+FAIL	example.com/gosample/parse	0.013s
+FAIL

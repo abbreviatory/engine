@@ -1,0 +1,42 @@
+[abbreviatory] log, 63,369 lines (5.6 MB), ref d2f86a61aa96
+lines: 4,313 error, 3,252 warn, 55,804 other; 14 distinct messages
+ERRORS (4 kinds, 4,313 lines):
+- x264 2026-10-18T08:00:07.073Z ERROR checkout failed for order 75504 [ref d2f86a61aa96:g9]
+    java.lang.IllegalStateException: payment gateway did not answer
+    	at com.example.orders.PaymentClient.charge(PaymentClient.java:118)
+    	at com.example.orders.CheckoutService.complete(CheckoutService.java:64)
+    	at com.example.orders.CheckoutController.post(CheckoutController.java:88)
+    	at java.base/java.lang.Thread.run(Thread.java:1583)
+    Caused by: java.net.SocketTimeoutException: Read timed out
+    	at java.base/sun.nio.ch.NioSocketImpl.timedRead(NioSocketImpl.java:278)
+    	... 4 more
+- x486 2026-10-18T08:00:10.517Z ERROR db: connection to 10.0.4.5:5432 refused (request_id=b05ab8a9) [ref d2f86a61aa96:g10]
+- x163 2026-10-18T08:00:15.331Z ERROR thumbnail worker crashed [ref d2f86a61aa96:g11]
+    Traceback (most recent call last):
+      File "/srv/app/workers/thumbs.py", line 41, in run
+        img = load(path)
+      File "/srv/app/workers/thumbs.py", line 17, in load
+        return Image.open(path)
+    FileNotFoundError: [Errno 2] No such file or directory: '/data/uploads/3334.jpg'
+- x31 panic: runtime error: invalid memory address or nil pointer dereference [ref d2f86a61aa96:g13]
+    [signal SIGSEGV: segmentation violation code=0x1 addr=0x18 pc=0x6b4c2e]
+    
+    goroutine 412 [running]:
+    example.com/ingest/queue.(*Batch).Flush(0x0)
+    	/src/ingest/queue/batch.go:88 +0x2e
+    example.com/ingest/queue.(*Worker).loop(0xc0001a2000)
+    	/src/ingest/queue/worker.go:131 +0x1c5
+    created by example.com/ingest/queue.Start in goroutine 1
+    	/src/ingest/queue/worker.go:52 +0x9d
+WARNINGS (3 kinds, 3,252 lines):
+- x1952 2026-10-18T08:00:00.074Z WARN  config key "timeout" is deprecated; use "read_timeout" [ref d2f86a61aa96:g2]
+- x963 2026-10-18T08:00:20.960Z WARN  slow query took 2983ms: SELECT * FROM orders WHERE user_id = 57383 [ref d2f86a61aa96:g12]
+- x337 2026-10-18T08:00:03.444Z WARN  retrying payment request_id=1d7bac5b attempt=2 [ref d2f86a61aa96:g5]
+OTHER (7 kinds, 55,804 lines):
+- x14860 2026-10-18T08:00:00.037Z DEBUG cache hit key=user:59944 ttl=515s [ref d2f86a61aa96:g1]
+- x7816 2026-10-18T08:00:00.000Z INFO  queue depth=21 workers=8 [ref d2f86a61aa96:g0]
+- x6734 2026-10-18T08:00:05.814Z INFO  http request_id=9c9095ed method=GET path=/api/orders status=200 duration_ms=177 [ref d2f86a61aa96:g8]
+- x6634 2026-10-18T08:00:01.185Z INFO  http request_id=0c91c843 method=GET path=/api/orders/16555 status=200 duration_ms=165 [ref d2f86a61aa96:g4]
+- x6618 2026-10-18T08:00:04.666Z INFO  http request_id=1e375f9d method=GET path=/api/cart status=200 duration_ms=53 [ref d2f86a61aa96:g7]
+- x6596 2026-10-18T08:00:03.518Z INFO  http request_id=e78a9bc3 method=GET path=/api/users/64367 status=200 duration_ms=133 [ref d2f86a61aa96:g6]
+- x6546 2026-10-18T08:00:00.111Z INFO  http request_id=0e56ecf8 method=GET path=/health status=200 duration_ms=67 [ref d2f86a61aa96:g3]

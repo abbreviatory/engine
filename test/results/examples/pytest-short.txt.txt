@@ -1,0 +1,87 @@
+[abbreviatory] pytest output, 169 lines (7.5 kB), ref dc4b69316eab
+tests: 903 passed, 5 failed, 1 skipped; 1 error
+runner: pytest: 5 failed, 903 passed, 1 skipped, 1 warning, 1 error in 0.42s
+FAILED (5):
+- test_sample.py::test_parse_price_comma - ValueError: could not convert... [ref dc4b69316eab:g15]
+        def test_parse_price_comma():
+            # Deliberate failure: a decimal comma.
+    >       assert parse_price("12,50 EUR") == (12.5, "EUR")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+    
+    test_sample.py:20:
+    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    
+    s = '12,50 EUR'
+    
+        def parse_price(s):
+            amount, currency = s.split(" ")
+    >       return round(float(amount), 2), currency
+                         ^^^^^^^^^^^^^
+    E       ValueError: could not convert string to float: '12,50'
+    
+    test_sample.py:10: ValueError
+- test_sample.py::test_parse_price_no_currency - ValueError: not enough ... [ref dc4b69316eab:g16]
+        def test_parse_price_no_currency():
+            # Deliberate failure: no currency.
+    >       assert parse_price("12.50") == (12.5, "")
+                   ^^^^^^^^^^^^^^^^^^^^
+    
+    test_sample.py:25:
+    _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    
+    s = '12.50'
+    
+        def parse_price(s):
+    >       amount, currency = s.split(" ")
+            ^^^^^^^^^^^^^^^^
+    E       ValueError: not enough values to unpack (expected 2, got 1)
+    
+    test_sample.py:9: ValueError
+- test_sample.py::TestRounding::test_half_up - AssertionError: assert (2... [ref dc4b69316eab:g17]
+    self = <test_sample.TestRounding object at 0x7f763035a0d0>
+    
+        def test_half_up(self):
+            # Deliberate failure: float rounding.
+    >       assert parse_price("2.675 USD") == (2.68, "USD")
+    E       AssertionError: assert (2.67, 'USD') == (2.68, 'USD')
+    E
+    E         At index 0 diff: 2.67 != 2.68
+    E         Use -v to get more diff
+    
+    test_sample.py:31: AssertionError
+- test_sample.py::test_json_inputs[{"a": 2,}] - json.decoder.JSONDecodeE... [ref dc4b69316eab:g18]
+    raw = '{"a": 2,}'
+    
+        @pytest.mark.parametrize("raw", ['{"a": 1}', '{"a": 2,}', "{'a': 3}"])
+        def test_json_inputs(raw):
+            # Two of the three fail on purpose.
+    >       assert json.loads(raw)["a"] > 0
+    ... (24 lines left out)
+            try:
+    >           obj, end = self.scan_once(s, idx)
+                           ^^^^^^^^^^^^^^^^^^^^^^
+    E           json.decoder.JSONDecodeError: Illegal trailing comma before end of object: line 1 column 8 (char 7)
+    
+    /usr/lib/python3.13/json/decoder.py:361: JSONDecodeError
+- test_sample.py::test_json_inputs[{'a': 3}] - json.decoder.JSONDecodeEr... [ref dc4b69316eab:g19]
+    raw = "{'a': 3}"
+    
+        @pytest.mark.parametrize("raw", ['{"a": 1}', '{"a": 2,}', "{'a': 3}"])
+    ... (30 lines left out)
+    E           json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+    
+    /usr/lib/python3.13/json/decoder.py:361: JSONDecodeError
+ERRORS (1):
+- test_sample.py::test_needs_db - ConnectionError: database at 10.0.0.12:... [ref dc4b69316eab:g20]
+        @pytest.fixture
+        def broken_db():
+    >       raise ConnectionError("database at 10.0.0.12:5432 refused the connection")
+    E       ConnectionError: database at 10.0.0.12:5432 refused the connection
+    
+    test_sample.py:45: ConnectionError
+WARNINGS (1):
+- test_sample.py::test_deprecated_api: /home/claude/engine/test/fixtures/src/pysample/test_sample.py:58: DeprecationWarning: parse_price will require a locale in 2.0 [ref dc4b69316eab:g11]
+    warnings.warn("parse_price will require a locale in 2.0", DeprecationWarning)
+not shown: 26 info lines (14 kinds) [ref dc4b69316eab:info]
+not shown: 903 passed tests
+not shown: 1 skipped test

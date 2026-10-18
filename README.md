@@ -177,13 +177,24 @@ generated application log and API response. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks.
+Seeded random logs go through the same checks, and every finding of an independent review before the release has its own test in [review_test.go](review_test.go). In all, 52 Go tests pass (with 56 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
-RATIOS_TABLE
+| Fixture | What it is | Input bytes | Input lines | Report bytes | Share |
+|---|---|---|---|---|---|
+| app.log | generated application log | 5,630,070 | 63,369 | 3,075 | 0.05% |
+| gotest-json.txt | go test -json | 808,325 | 4,880 | 2,383 | 0.29% |
+| api-response.json | generated API response | 719,368 | 37,527 | 3,185 | 0.44% |
+| gotest-verbose.txt | go test -v | 100,652 | 2,453 | 2,256 | 2.2% |
+| junit-pytest.xml | pytest's JUnit report | 82,024 | 117 | 3,961 | 4.8% |
+| pytest-verbose.txt | pytest -v | 79,443 | 1,072 | 3,893 | 4.9% |
+| pytest-short.txt | pytest | 7,479 | 169 | 3,898 | 52% |
+| gotest-short.txt | go test | 1,735 | 35 | 1,815 | shown whole |
 
-A MEMORY_MB MB generated log streams through with a peak heap of MEMORY_PEAK MB
+The last one is small enough that the whole input fits the budget, so it is shown whole with a one-line header.
+
+A generated log of 1,107 MB (12.5 million lines) streamed through in 32.7 seconds with a peak heap of 15.1 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in
