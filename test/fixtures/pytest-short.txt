@@ -1,0 +1,169 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.16, pytest-9.1.1, pluggy-1.6.0
+rootdir: /home/claude/engine/test/fixtures/src/pysample
+collected 910 items
+
+test_sample.py ......................................................... [  6%]
+........................................................................ [ 14%]
+........................................................................ [ 22%]
+........................................................................ [ 30%]
+........................................................................ [ 37%]
+........................................................................ [ 45%]
+........................................................................ [ 53%]
+........................................................................ [ 61%]
+........................................................................ [ 69%]
+........................................................................ [ 77%]
+........................................................................ [ 85%]
+........................................................................ [ 93%]
+...................................................FFF..FFEs.            [100%]
+
+==================================== ERRORS ====================================
+_______________________ ERROR at setup of test_needs_db ________________________
+
+    @pytest.fixture
+    def broken_db():
+>       raise ConnectionError("database at 10.0.0.12:5432 refused the connection")
+E       ConnectionError: database at 10.0.0.12:5432 refused the connection
+
+test_sample.py:45: ConnectionError
+=================================== FAILURES ===================================
+____________________________ test_parse_price_comma ____________________________
+
+    def test_parse_price_comma():
+        # Deliberate failure: a decimal comma.
+>       assert parse_price("12,50 EUR") == (12.5, "EUR")
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+
+test_sample.py:20: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = '12,50 EUR'
+
+    def parse_price(s):
+        amount, currency = s.split(" ")
+>       return round(float(amount), 2), currency
+                     ^^^^^^^^^^^^^
+E       ValueError: could not convert string to float: '12,50'
+
+test_sample.py:10: ValueError
+_________________________ test_parse_price_no_currency _________________________
+
+    def test_parse_price_no_currency():
+        # Deliberate failure: no currency.
+>       assert parse_price("12.50") == (12.5, "")
+               ^^^^^^^^^^^^^^^^^^^^
+
+test_sample.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+s = '12.50'
+
+    def parse_price(s):
+>       amount, currency = s.split(" ")
+        ^^^^^^^^^^^^^^^^
+E       ValueError: not enough values to unpack (expected 2, got 1)
+
+test_sample.py:9: ValueError
+__________________________ TestRounding.test_half_up ___________________________
+
+self = <test_sample.TestRounding object at 0x7f763035a0d0>
+
+    def test_half_up(self):
+        # Deliberate failure: float rounding.
+>       assert parse_price("2.675 USD") == (2.68, "USD")
+E       AssertionError: assert (2.67, 'USD') == (2.68, 'USD')
+E         
+E         At index 0 diff: 2.67 != 2.68
+E         Use -v to get more diff
+
+test_sample.py:31: AssertionError
+_________________________ test_json_inputs[{"a": 2,}] __________________________
+
+raw = '{"a": 2,}'
+
+    @pytest.mark.parametrize("raw", ['{"a": 1}', '{"a": 2,}', "{'a': 3}"])
+    def test_json_inputs(raw):
+        # Two of the three fail on purpose.
+>       assert json.loads(raw)["a"] > 0
+               ^^^^^^^^^^^^^^^
+
+test_sample.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.13/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.13/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x7f7630ac8590>, s = '{"a": 2,}'
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+>           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           json.decoder.JSONDecodeError: Illegal trailing comma before end of object: line 1 column 8 (char 7)
+
+/usr/lib/python3.13/json/decoder.py:361: JSONDecodeError
+__________________________ test_json_inputs[{'a': 3}] __________________________
+
+raw = "{'a': 3}"
+
+    @pytest.mark.parametrize("raw", ['{"a": 1}', '{"a": 2,}', "{'a': 3}"])
+    def test_json_inputs(raw):
+        # Two of the three fail on purpose.
+>       assert json.loads(raw)["a"] > 0
+               ^^^^^^^^^^^^^^^
+
+test_sample.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+/usr/lib/python3.13/json/__init__.py:352: in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/lib/python3.13/json/decoder.py:345: in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <json.decoder.JSONDecoder object at 0x7f7630ac8590>, s = "{'a': 3}"
+idx = 0
+
+    def raw_decode(self, s, idx=0):
+        """Decode a JSON document from ``s`` (a ``str`` beginning with
+        a JSON document) and return a 2-tuple of the Python
+        representation and the index in ``s`` where the document ended.
+    
+        This can be used to decode a JSON document from a string that may
+        have extraneous data at the end.
+    
+        """
+        try:
+>           obj, end = self.scan_once(s, idx)
+                       ^^^^^^^^^^^^^^^^^^^^^^
+E           json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+
+/usr/lib/python3.13/json/decoder.py:361: JSONDecodeError
+=============================== warnings summary ===============================
+test_sample.py::test_deprecated_api
+  /home/claude/engine/test/fixtures/src/pysample/test_sample.py:58: DeprecationWarning: parse_price will require a locale in 2.0
+    warnings.warn("parse_price will require a locale in 2.0", DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED test_sample.py::test_parse_price_comma - ValueError: could not convert...
+FAILED test_sample.py::test_parse_price_no_currency - ValueError: not enough ...
+FAILED test_sample.py::TestRounding::test_half_up - AssertionError: assert (2...
+FAILED test_sample.py::test_json_inputs[{"a": 2,}] - json.decoder.JSONDecodeE...
+FAILED test_sample.py::test_json_inputs[{'a': 3}] - json.decoder.JSONDecodeEr...
+ERROR test_sample.py::test_needs_db - ConnectionError: database at 10.0.0.12:...
+========= 5 failed, 903 passed, 1 skipped, 1 warning, 1 error in 0.42s =========
