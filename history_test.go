@@ -238,3 +238,34 @@ func TestCutShortRunMatches(t *testing.T) {
 		t.Fatalf("cut short after a full run:\n%s", c.Text)
 	}
 }
+
+// Review of 0.2, third pass: in plain go test output, a missing test of a
+// package that failed to build didn't pass.
+func TestBuildFailedPackageNotFixed(t *testing.T) {
+	run1 := "ok  \texample.com/a\t0.01s\n--- FAIL: TestX (0.00s)\n    x_test.go:1: bad\nFAIL\nFAIL\texample.com/b\t0.01s\n--- FAIL: TestY (0.00s)\n    y_test.go:1: bad\nFAIL\nFAIL\texample.com/c\t0.01s\n"
+	run2 := "ok  \texample.com/a\t0.01s\n# example.com/b\nb.go:3:1: syntax error\nFAIL\texample.com/b [build failed]\n--- FAIL: TestY (0.00s)\n    y_test.go:1: bad\nFAIL\nFAIL\texample.com/c\t0.01s\n"
+	a, _ := Reduce(strings.NewReader(run1), Options{Track: true})
+	b, err := Reduce(strings.NewReader(run2), Options{Track: true, History: []Run{*a.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(b.Text, "fixed") || !strings.Contains(b.Text, "not run: TestX (example.com/b, 0.00s)") {
+		t.Fatalf("got:\n%s", b.Text)
+	}
+}
+
+// A run cut short pairs a failing name shared by two packages with one of
+// them, instead of calling it new.
+func TestCutShortSharedName(t *testing.T) {
+	full := "=== RUN   TestB\n--- FAIL: TestB (0.00s)\nFAIL\nFAIL\texample.com/a\t0.01s\n=== RUN   TestB\n--- FAIL: TestB (0.00s)\nFAIL\nFAIL\texample.com/b\t0.01s\n"
+	cut := "=== RUN   TestB\n--- FAIL: TestB (0.00s)\n"
+	a, _ := Reduce(strings.NewReader(full), Options{Track: true})
+	b, _ := Reduce(strings.NewReader(cut), Options{Track: true, History: []Run{*a.Run}})
+	if strings.Contains(b.Text, "new") || !strings.Contains(b.Text, "1 not run, 1 still failing") {
+		t.Fatalf("cut short:\n%s", b.Text)
+	}
+	c, _ := Reduce(strings.NewReader(full), Options{Track: true, History: []Run{*a.Run, *b.Run}})
+	if !strings.Contains(c.Text, "1 new, 1 still failing") && !strings.Contains(c.Text, "2 still failing") {
+		t.Fatalf("full again:\n%s", c.Text)
+	}
+}

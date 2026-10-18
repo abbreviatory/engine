@@ -227,6 +227,7 @@ type goTestText struct {
 	onPass func(id, name string)
 	sawRun bool // verbose output: tests are named as they start
 	sawPkg bool
+	ran    map[string]bool // packages whose tests ran ("ok", or "FAIL" with a time)
 }
 
 func newGoTestText() *goTestText { return &goTestText{tests: map[string]*pending{}} }
@@ -252,6 +253,18 @@ func (g *goTestText) flushResult(emit func(Record)) {
 // unnamedPasses reports output that doesn't name passing tests (go test
 // without -v): a test missing from it passed, if its package ran.
 func (g *goTestText) unnamedPasses() bool { return g.sawPkg && !g.sawRun }
+
+// ranPackages lists the packages whose tests ran: not those that failed to
+// build. In output that doesn't name passing tests, only a missing test of
+// one of these passed.
+func (g *goTestText) ranPackages() []string {
+	out := make([]string, 0, len(g.ran))
+	for p := range g.ran {
+		out = append(out, p)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // flushDone emits the waiting failures, qualified with pkg when it is known,
 // and reports the passing tests.
@@ -376,6 +389,12 @@ func (g *goTestText) line(n int64, text string, emit func(Record)) {
 	case isGoPackageLine(t):
 		if pkg := packageOf(t); pkg != "" {
 			g.sawPkg = true
+			if !strings.Contains(t, "[build failed]") && !strings.Contains(t, "[setup failed]") {
+				if g.ran == nil {
+					g.ran = map[string]bool{}
+				}
+				g.ran[pkg] = true
+			}
 			g.flushDone(pkg, emit)
 		}
 		k := KindInfo

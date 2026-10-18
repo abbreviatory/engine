@@ -213,6 +213,10 @@ func (s *Store) lock(path string, cancel <-chan struct{}) (func(), error) {
 	for {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
+			// A token of our own, so releasing never removes another run's
+			// lock.
+			token := strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+			f.WriteString(token)
 			f.Close()
 			stop := make(chan struct{})
 			done := make(chan struct{})
@@ -232,7 +236,9 @@ func (s *Store) lock(path string, cancel <-chan struct{}) (func(), error) {
 			return func() {
 				close(stop)
 				<-done
-				os.Remove(path)
+				if b, err := os.ReadFile(path); err == nil && string(b) == token {
+					os.Remove(path)
+				}
 			}, nil
 		}
 		if !errors.Is(err, fs.ErrExist) {

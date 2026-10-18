@@ -229,8 +229,9 @@ anything that isn't a test and didn't appear); or unknown (a test that was
 skipped or didn't appear). When the output shows tests passed without naming
 them (go test without `-v`, whose package lines say the package ran, and
 pytest without `-v`, whose summary counts them), a test that doesn't appear is
-taken to have passed. A run that names no passing test because none passed
-(a broken build) leaves missing tests unknown. A go test failure printed
+taken to have passed; for go test only if its own package ran, so a test of
+a package that failed to build stays unknown. A run that names no passing
+test because none passed (a broken build) leaves missing tests unknown. A go test failure printed
 without its package (the run was cut short before the package's result line)
 is matched by its name with the same test in the other run. Against the previous run:
 

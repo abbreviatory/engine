@@ -46,6 +46,9 @@ type Run struct {
 	// Anon is true when the output named no passing test (go test without
 	// -v, pytest without -v): a test missing from it most likely passed.
 	Anon bool `json:"anon,omitempty"`
+	// Ran lists, for such output from go test, the packages whose tests
+	// ran: a missing test of a package that failed to build didn't pass.
+	Ran []string `json:"ran,omitempty"`
 	// Full is false once Bad and Good have been dropped from an old run.
 	Full bool `json:"full,omitempty"`
 }
@@ -66,6 +69,7 @@ type RunItem struct {
 	// matched by Name with the same test in the other run.
 	Name string `json:"name,omitempty"`
 	Bare bool   `json:"bare,omitempty"`
+	Pkg  string `json:"pkg,omitempty"` // a go test's package
 }
 
 // Trim drops what only the last FlakyWindow runs need from a run older than
@@ -116,6 +120,7 @@ type item struct {
 	sel  string
 	name string // a go test's own name
 	bare bool   // its package wasn't printed
+	pkg  string // its package
 }
 
 func hashKey(s string) string {
@@ -161,6 +166,9 @@ func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDo
 			it := item{key: k, test: test, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)}
 			if test && g.ex.Name != "" {
 				it.name, it.bare = g.ex.Name, g.ex.Name == g.ex.ID
+				if !it.bare && strings.HasSuffix(g.ex.ID, "."+g.ex.Name) {
+					it.pkg = strings.TrimSuffix(g.ex.ID, "."+g.ex.Name)
+				}
 			}
 			bad = append(bad, it)
 		}
@@ -218,12 +226,24 @@ func unpackGood(s string) map[string]bool {
 
 // statusIn is an item's status in a run: 'F' failing, 'P' passing (or, for
 // what isn't a test, absent), '-' unknown.
-func statusIn(r *Run, good map[string]bool, key string, test bool) byte {
+func statusIn(r *Run, good map[string]bool, key string, test bool, pkg string) byte {
 	if _, ok := r.Bad[key]; ok {
 		return 'F'
 	}
-	if !test || good[key] || r.Anon {
+	if !test || good[key] {
 		return 'P'
+	}
+	if r.Anon {
+		// Passing tests went unnamed; a missing test passed if its package
+		// ran (when the output says which did).
+		if len(r.Ran) == 0 || pkg == "" {
+			return 'P'
+		}
+		for _, p := range r.Ran {
+			if p == pkg {
+				return 'P'
+			}
+		}
 	}
 	return '-'
 }
@@ -257,7 +277,7 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 	if prev == nil || !prev.Full {
 		// Nothing to compare with: every failure starts a streak.
 		for _, it := range bad {
-			cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: 1, Sel: it.sel, Name: it.name, Bare: it.bare}
+			cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: 1, Sel: it.sel, Name: it.name, Bare: it.bare, Pkg: it.pkg}
 		}
 		if prev != nil {
 			d.Since = 0
@@ -292,10 +312,10 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 		goods[i] = unpackGood(r.Good)
 	}
 	window := len(win) + 1
-	statuses := func(key string, test bool, now byte) []byte {
+	statuses := func(key string, test bool, pkg string, now byte) []byte {
 		st := make([]byte, 0, window)
 		for i, r := range win {
-			st = append(st, statusIn(r, goods[i], key, test))
+			st = append(st, statusIn(r, goods[i], key, test, pkg))
 		}
 		return append(st, now)
 	}
@@ -314,9 +334,9 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 		if wasBad {
 			streak = p.Streak + 1
 		}
-		cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: streak, Sel: it.sel, Name: it.name, Bare: it.bare}
+		cur.Bad[it.key] = RunItem{Head: it.head, Test: it.test, Streak: streak, Sel: it.sel, Name: it.name, Bare: it.bare, Pkg: it.pkg}
 		di := DeltaItem{Key: it.key, Head: it.head, Ref: ref(cur.ID, it.sel), Streak: streak, Window: window}
-		if f := flips(statuses(it.key, it.test, 'F')); f >= FlakyFlips {
+		if f := flips(statuses(it.key, it.test, it.pkg, 'F')); f >= FlakyFlips {
 			di.Flips, di.Now = f, "failing"
 			d.Flaky = append(d.Flaky, di)
 			continue
@@ -353,14 +373,14 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 		return was[i].key < was[j].key
 	})
 	for _, w := range was {
-		now := statusIn(cur, good, w.key, w.it.Test)
+		now := statusIn(cur, good, w.key, w.it.Test, w.it.Pkg)
 		if now == '-' && w.it.Bare && passNames[w.it.Name] {
 			// Failing in a run cut short before its package was printed,
 			// passing now under its package.
 			now = 'P'
 		}
 		di := DeltaItem{Key: w.key, Head: w.it.Head, Ref: ref(prev.ID, w.it.Sel), Window: window}
-		if f := flips(statuses(w.key, w.it.Test, now)); f >= FlakyFlips {
+		if f := flips(statuses(w.key, w.it.Test, w.it.Pkg, now)); f >= FlakyFlips {
 			di.Flips, di.Now = f, "passing"
 			if now == '-' {
 				di.Now = "not run"
@@ -432,10 +452,19 @@ func matchBare(prevBad map[string]RunItem, bad []item) map[string]RunItem {
 		if !it.bare {
 			continue
 		}
-		if ks := prevByName[it.name]; len(ks) == 1 && !taken[ks[0]] {
-			delete(taken, it.key)
-			bad[i].key = ks[0]
-			taken[ks[0]] = true
+		// With the name in several packages, take the first free one in a
+		// fixed order: some pairing beats calling it new and the others
+		// not run.
+		ks := prevByName[it.name]
+		sort.Strings(ks)
+		for _, k := range ks {
+			if !taken[k] {
+				delete(taken, it.key)
+				bad[i].key = k
+				bad[i].pkg = prevBad[k].Pkg
+				taken[k] = true
+				break
+			}
 		}
 	}
 	curByName := map[string][]string{}
@@ -451,10 +480,18 @@ func matchBare(prevBad map[string]RunItem, bad []item) map[string]RunItem {
 			continue
 		}
 		ks := curByName[it.Name]
-		if len(ks) != 1 || ks[0] == k {
-			continue
+		sort.Strings(ks)
+		target := ""
+		for _, c := range ks {
+			if c == k {
+				target = ""
+				break
+			}
+			if _, clash := out[c]; !clash && target == "" {
+				target = c
+			}
 		}
-		if _, clash := prevBad[ks[0]]; clash {
+		if target == "" {
 			continue
 		}
 		if !copied {
@@ -466,7 +503,7 @@ func matchBare(prevBad map[string]RunItem, bad []item) map[string]RunItem {
 			copied = true
 		}
 		delete(out, k)
-		out[ks[0]] = it
+		out[target] = it
 	}
 	return out
 }

@@ -1,10 +1,9 @@
 # A 1024 MB generated log streamed through Reduce: peak heap and speed
-# recorded 2026-10-18 21:29 UTC at 9464859, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+# recorded 2026-10-18 21:46 UTC at ea534a7, Abbreviatory 0.2.0, go1.24.7 linux/amd64
 # Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
 # command: ABBREVIATORY_BIG_MB=1024 go test -count=1 -v -run TestLargeInputMemory -timeout 30m .
 
-=== RUN   TestLargeInputMemory
-    robust_test.go:440: memory: 1107 MB input, 12485370 lines, peak heap in use 12.1 MB, output 539 bytes, 32.3 s (34 MB/s)
---- PASS: TestLargeInputMemory (32.33s)
-PASS
-ok  	github.com/abbreviatory/engine	32.336s
+# github.com/abbreviatory/engine [github.com/abbreviatory/engine.test]
+./abbreviatory.go:331:8: cur.Ran undefined (type *Run has no field or method Ran)
+FAIL	github.com/abbreviatory/engine [build failed]
+FAIL

@@ -65,7 +65,11 @@ v0.2.0 adds the run-to-run delta:
   the lock while reading a pipe; memory of buffered go test results). All
   fixed: Anon only when the adapter shows unnamed passes, matchBare by test
   name, cancellable lock wait, stdin spooled, only failures buffered,
-  MaxGood cap. `run` doesn't use process groups on purpose: a signal goes to
+  MaxGood cap. A third pass found the unnamed-pass rule needed to be per
+  package (Run.Ran: go packages that ran, not "[build failed]") and shared
+  names in cut-short runs; both fixed. Known and documented: pytest without
+  -v has no per-module check; a three-waiter stale-lock race (lock files
+  carry a token so a run only removes its own). `run` doesn't use process groups on purpose: a signal goes to
   the command, as it would without abbreviatory in front.
 
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't

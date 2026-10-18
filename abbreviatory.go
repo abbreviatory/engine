@@ -178,6 +178,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	var inputLines int64
 	var lineSrc io.Reader = in
 	unnamed := false // the output doesn't name the tests that passed
+	var ranPkgs []string
 
 	if fi.whole {
 		limit := maxWhole
@@ -251,6 +252,9 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 		if u, ok := ad.(interface{ unnamedPasses() bool }); ok {
 			unnamed = u.unnamedPasses()
 		}
+		if u, ok := ad.(interface{ ranPackages() []string }); ok {
+			ranPkgs = u.ranPackages()
+		}
 	}
 	// Drain anything a whole-format parser didn't read, so the hash, the
 	// count and the sink cover the entire input.
@@ -303,7 +307,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	// Passing tests went unnamed when the adapter says so, or when some were
 	// counted (from pytest's summary) but none named.
 	unnamed = unnamed || (res.Records["pass"] > 0 && len(g.passIDs) == 0)
-	if err := trackRun(res, opt, groups, g.passIDs, g.passNames, unnamed, doc, rules, budget, refs, renderAt); err != nil {
+	if err := trackRun(res, opt, groups, g.passIDs, g.passNames, unnamed, ranPkgs, doc, rules, budget, refs, renderAt); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -312,7 +316,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 // trackRun compares the reduction with the earlier runs and renders the
 // report with what changed: one line when nothing did, otherwise the changes
 // under the header and notes on the items.
-func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[string]bool, unnamed bool, doc *jsonDoc, rules preserve, budget int, refs bool,
+func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[string]bool, unnamed bool, ranPkgs []string, doc *jsonDoc, rules preserve, budget int, refs bool,
 	renderAt func(int) (string, bool, bool, error)) error {
 	tests := res.Family == FamilyTests
 	bad, good := runItems(res, groups, passIDs, doc, rules)
@@ -323,6 +327,9 @@ func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[
 	}
 	if tests {
 		cur.Anon = unnamed && len(good) == 0
+		if cur.Anon {
+			cur.Ran = ranPkgs
+		}
 	}
 	d := computeDelta(opt.History, cur, bad, good, passNames, tests)
 	res.Run, res.Delta = cur, d

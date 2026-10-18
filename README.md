@@ -311,7 +311,10 @@ the report matched what was worked out separately from the known statuses
   array positions aside, so the same error at two positions counts once.
 - When the output doesn't name passing tests (go test or pytest without
   `-v`), a failing test that disappears counts as fixed, even if it was
-  deleted or not run. With `-v` or `-json` it counts as not run.
+  deleted or not run. With `-v` or `-json` it counts as not run. For go
+  test this applies per package: a package that failed to build leaves its
+  tests not run. pytest without `-v` has no such per-module check, so a
+  test in a module that failed to import counts as fixed.
 - `run` signals the command, not the processes it started. With a history,
   a test suite of a million tests takes a few hundred MB while it is
   compared (about 225 MB for 750,000 tests in one package).
