@@ -2,8 +2,8 @@
 
 Less output. Same essential information.
 
-Abbreviatory turns large tool output (a test run, a log, a JSON document) into
-a short report. It keeps the failures, errors and warnings, folds repeats into
+Abbreviatory turns large tool output (a test run, a log, a JSON document, a
+diff, an HTTP response, a directory listing) into a short report. It keeps the failures, errors and warnings, folds repeats into
 one line with a count, and fits the result in a byte budget you set. Anything
 it leaves out stays one command away, byte for byte.
 
@@ -43,7 +43,7 @@ A summary written by a model can drop the one line that mattered, and you
 can't check it. Abbreviatory works the other way. It only removes what its
 rules say is safe to remove, it says what it removed, and every removed part
 has a reference you can expand. It can't judge free prose; it reads formats it
-knows (test runners, logs, JSON) and says so when it falls back to reading
+knows (test runners, logs, JSON, diffs, HTTP responses, listings) and says so when it falls back to reading
 plain lines.
 
 ## Install
@@ -177,13 +177,33 @@ OTHER (7 kinds, 55,804 lines):
 - **Small inputs pass through.** When showing the input whole would be no
   longer than reducing it, you get it whole.
 
+## Diffs, HTTP responses and listings
+
+- **Diffs** (`git diff`, `git show`, `git log -p`, `diff -u`): the commits,
+  every file with its added and removed lines and a reference to its part of
+  the diff, then the changes themselves, shared out in rounds. The same change
+  in several places is shown once with a count. Lock files, minified and
+  generated code and vendored directories are listed but their changes aren't
+  spelled out. Conflict markers are errors; added lines with trailing
+  whitespace are warnings.
+- **HTTP responses** (`curl -i`, `curl -v`, redirect chains): each status
+  line (4xx and 5xx are errors), the headers that matter (content type and
+  length, location, retry and auth hints) with the rest folded, curl's own
+  errors, and the body. A JSON body is outlined, with its error fields kept
+  as errors; any other body is read like a log.
+- **Directory listings** (`find`, `fd`, `ls -l`, `ls -R`, `tree`, `du`):
+  files grouped by directory and extension (`net/http/*.go`), with counts,
+  total size, the most common extensions and the largest files. "Permission
+  denied" and "No such file" lines are errors.
+
 ## Options
 
 ```
 -budget N        most bytes of output (default 4096, at least 512)
 -preserve LIST   errors,failures,warnings by default; empty for none
 -keep REGEX      also keep lines matching this (repeatable)
--format NAME     auto, test-output, logs, json, gotest-json, gotest, pytest, junit
+-format NAME     auto, test-output, logs, json, or one of gotest-json, gotest,
+                 pytest, junit, diff, http, listing
 -key NAME        keep a run history under NAME and report what changed
 -full            with history, the whole report even when nothing changed
 -json            a JSON object with the counts, the changes and the text
@@ -352,7 +372,7 @@ references in them expanded through each, and run histories built through
 each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
 [tests.txt](test/results/tests.txt)).
 
-## Limits in v0.3.0
+## Limits in v0.4.0
 
 - It reads formats it knows. Free prose, or a log format it doesn't
   recognise, is reduced only by folding repeats and finding level words.
@@ -390,6 +410,15 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   sees nothing as flaky at first.
 - The HTTP service has no TLS of its own; put it behind a proxy that has,
   if it's reachable beyond the machine. It has one token, and no rate limit.
+- An HTTP body is split from the next response by a status line at the
+  start of a line; a body without a final newline followed directly by the
+  next response (curl `-L` with `-i`) runs into it. A JSON body is outlined
+  when it parses; one longer than 64 kB on a single line, or bigger than
+  16 MB, is read like a log, and its references are by line, not by JSON
+  pointer.
+- Listings: `du -a` can't tell a file without an extension from a
+  directory, and counts it as one. In `tree` output a directory is known by
+  the deeper line after it, so an empty directory counts as a file.
 - The MCP `run` tool runs whatever command the agent asks for, as the user
   the server runs as, the same as an agent's own shell tool would.
 

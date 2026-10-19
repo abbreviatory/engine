@@ -1,6 +1,6 @@
 # Abbreviatory reference
 
-This is the full reference for version 0.3. The [README](../README.md) has the
+This is the full reference for version 0.4. The [README](../README.md) has the
 overview and the quick start.
 
 ## Commands
@@ -164,6 +164,9 @@ defaults at most once an hour.
 | `gotest` | test-output | `=== RUN`, `--- FAIL:` or `--- PASS:` lines |
 | `pytest` | test-output | "test session starts" or a "short test summary info" banner |
 | `junit` | test-output | an XML file with `<testsuite>` or `<testcase>` |
+| `http` | http | a status line first (`HTTP/1.1 200 OK`), or curl `-v`'s `*` and `>` lines before one |
+| `diff` | diff | a `diff --git` line, or `---`, `+++` and `@@ -` lines in a row, in the first 400 lines |
+| `listing` | listing | nearly every line a path, an `ls -l` row, a `tree` line or a `du` row |
 | `logs` | logs | anything else that is text |
 | `json` | json | a single JSON object or array (not JSON lines) |
 
@@ -203,6 +206,37 @@ What each format becomes:
   `failure`, `stacktrace` with a non-empty value, and `level`, `severity`,
   `status`, `state` or `outcome` set to `error`, `fatal`, `failed`, `failure`
   or `critical`. A document that fits the budget is shown whole.
+- **Diffs.** Commits (`commit sha: subject`), one record per file header and
+  one per hunk. A hunk's detail is its added and removed lines; hunks with
+  exactly the same changed lines group, so a change made in several places is
+  shown once with a count. The report lists every file as `- M path (+a -d)`
+  (`A` added, `D` deleted, `R old -> new` renamed, `(binary)`, `(generated)`)
+  with a line reference to its part of the diff. Generated files are lock
+  files (`go.sum`, `package-lock.json`, `yarn.lock`, `Cargo.lock` and
+  others), `.min.js`, `.pb.go`, and anything under `vendor/`,
+  `node_modules/`, `dist/` or `__snapshots__/`; their changes are counted,
+  not shown. A hunk that adds conflict markers is an error, one that adds a
+  line with trailing whitespace a warning.
+- **HTTP responses.** One record per status line (4xx and 5xx are errors),
+  the request line under curl `-v`, and one per header among
+  `Content-Type`, `Content-Length`, `Location`, `Retry-After`,
+  `WWW-Authenticate`, `Proxy-Authenticate`, `Transfer-Encoding`,
+  `X-Request-Id`, `X-RateLimit-Remaining` and `Warning` (a warning). Other
+  headers, request headers and curl's connection notes fold into one group
+  each, and curl's errors (`curl: (7) ...`, `* Failed to connect ...`) are
+  errors. A body whose content type says JSON is parsed: each error field
+  (as for JSON documents) is an error record, fields on the same lines one
+  record, and the rest of the body one record whose detail is an outline.
+  Other bodies are read like a log. The report keeps the response's order and
+  starts with the chain of statuses and the last body's size and type.
+- **Listings.** One record per entry, grouped by directory and extension
+  (`net/http/*.go`), and subdirectories by their parent. `ls -R` sections set
+  the directory for the rows below them; `ls -l` sizes and `du` sizes are
+  summed into the total (for `du`, the largest row). Headings, `total` lines
+  and blank lines fold into one group. Errors from `ls`, `find`, `du` and
+  `tree` (permission denied, no such file) are errors. The report starts with
+  the number of files and directories, the total size, the most common
+  extensions and the three largest files.
 
 ## Grouping
 
