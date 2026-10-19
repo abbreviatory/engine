@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
 	"time"
@@ -50,6 +51,17 @@ func cmdMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 2
 	}
 	s := &mcpServer{c: core{*dir}, out: stdout, running: map[string]chan struct{}{}}
+	// Stopped by a signal (a client shutting the server down): stop the
+	// commands still running, with what they started, before going.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, stopSignals...)
+	defer signal.Stop(sigs)
+	go func() {
+		if _, ok := <-sigs; ok {
+			s.shutdown()
+			os.Exit(0)
+		}
+	}()
 	if err := s.serve(stdin); err != nil {
 		fmt.Fprintln(stderr, "abbreviatory:", err)
 		return 1
@@ -78,10 +90,11 @@ type rpcError struct {
 }
 
 // serve reads messages until the input ends. Each request is answered in its
-// own goroutine, so a long run doesn't hold up a ping or a cancellation.
+// own goroutine, so a long run doesn't hold up a ping or a cancellation. When
+// the input ends the client is gone: running commands are stopped.
 func (s *mcpServer) serve(in io.Reader) error {
 	r := bufio.NewReaderSize(in, 1<<20)
-	defer s.wg.Wait()
+	defer s.shutdown()
 	for {
 		line, err := readMessage(r)
 		if len(bytes.TrimSpace(line)) > 0 {
@@ -93,6 +106,26 @@ func (s *mcpServer) serve(in io.Reader) error {
 		if err != nil {
 			return err
 		}
+	}
+}
+
+// shutdown stops every running command (SIGTERM to its process group, then
+// SIGKILL after 5 seconds) and waits for them, at most 8 seconds.
+func (s *mcpServer) shutdown() {
+	s.mu.Lock()
+	for id, c := range s.running {
+		close(c)
+		delete(s.running, id)
+	}
+	s.mu.Unlock()
+	done := make(chan struct{})
+	go func() {
+		s.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(8 * time.Second):
 	}
 }
 
@@ -136,9 +169,24 @@ func (s *mcpServer) fail(id json.RawMessage, code int, msg string) {
 }
 
 func (s *mcpServer) handle(line []byte) {
+	if !json.Valid(line) {
+		s.fail(nil, -32700, "parse error: not JSON")
+		return
+	}
+	if t := bytes.TrimSpace(line); t[0] != '{' {
+		// Batches went out of the protocol in 2025-06-18; anything but an
+		// object isn't a request.
+		s.fail(nil, -32600, "invalid request: expected one JSON-RPC object")
+		return
+	}
 	var m rpcMessage
 	if err := json.Unmarshal(line, &m); err != nil {
-		s.fail(nil, -32700, "parse error: "+err.Error())
+		s.fail(nil, -32600, "invalid request: "+err.Error())
+		return
+	}
+	if m.Method == "" {
+		// A response from the client (the server sends no requests), or
+		// nonsense: nothing to answer.
 		return
 	}
 	if m.Method == "(too large)" {
@@ -366,14 +414,14 @@ func (s *mcpServer) toolExpand(a toolArgs) map[string]any {
 	if a.MaxBytes > 0 {
 		limit = min(a.MaxBytes, mcpMaxExpand)
 	}
-	data, err := s.c.expand(a.Ref)
-	if err != nil {
+	lw := &limitWriter{n: limit}
+	if err := s.c.expand(lw, a.Ref); err != nil {
+		if errors.Is(err, errTooLarge) {
+			return toolError(fmt.Sprintf("%s is more than the %d bytes this returns; expand a part of it, such as a group (:g12), a kind (:error) or a line range (:L1-500), or raise max_bytes (up to %d)", a.Ref, limit, mcpMaxExpand))
+		}
 		return toolError(err.Error())
 	}
-	if len(data) > limit {
-		return toolError(fmt.Sprintf("%s is %d bytes, more than the %d this returns; expand a part of it, such as a group (:g12), a kind (:error) or a line range (:L1-500), or raise max_bytes (up to %d)", a.Ref, len(data), limit, mcpMaxExpand))
-	}
-	return toolText(string(data), nil)
+	return toolText(string(lw.buf), nil)
 }
 
 func (s *mcpServer) toolHistory(a toolArgs) map[string]any {

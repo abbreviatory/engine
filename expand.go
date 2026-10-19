@@ -1,7 +1,9 @@
 package abbreviatory
 
 import (
+	"bufio"
 	"bytes"
+	"io"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -90,6 +92,117 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 		return extractBytes(original, rs), nil
 	}
 	return extractLines(original, rs), nil
+}
+
+// ExpandTo writes the part of an original that a selector names to w, as
+// Expand returns it, reading the original as a stream: memory doesn't grow
+// with the original, except for a JSON pointer or the errors of a JSON
+// document, which need the document whole. A bad selector is reported
+// before anything is written.
+func ExpandTo(w io.Writer, original io.Reader, ix *Index, sel string) error {
+	if sel == "" {
+		_, err := io.Copy(w, original)
+		return err
+	}
+	if !lineSel.MatchString(sel) && ix.Format == "json" && (sel == "errors" || strings.HasPrefix(sel, "/")) {
+		data, err := io.ReadAll(original)
+		if err != nil {
+			return err
+		}
+		part, err := Expand(data, ix, sel)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(part)
+		return err
+	}
+	rs, unit, err := selectRanges(ix, sel)
+	if err != nil {
+		return err
+	}
+	bw := bufio.NewWriterSize(w, 64<<10)
+	br := bufio.NewReaderSize(original, 64<<10)
+	if unit == "bytes" {
+		var pos int64
+		for _, r := range rs {
+			if r.Start < pos || r.End < r.Start {
+				continue
+			}
+			if _, err := io.CopyN(io.Discard, br, r.Start-pos); err != nil {
+				break
+			}
+			n, err := io.CopyN(bw, br, r.End-r.Start+1)
+			pos = r.Start + n
+			if err != nil {
+				break
+			}
+			bw.WriteByte('\n')
+		}
+		return bw.Flush()
+	}
+	line := int64(1)
+	ri := 0
+	for ri < len(rs) {
+		chunk, err := br.ReadSlice('\n')
+		if len(chunk) > 0 {
+			if line >= rs[ri].Start {
+				if _, werr := bw.Write(chunk); werr != nil {
+					return werr
+				}
+			}
+			if err == nil {
+				if line >= rs[ri].End {
+					ri++
+				}
+				line++
+			}
+		}
+		if err == bufio.ErrBufferFull {
+			continue // a long line: the rest of it comes next
+		}
+		if err != nil {
+			break
+		}
+	}
+	return bw.Flush()
+}
+
+// selectRanges resolves a line, group or kind selector to sorted, merged
+// ranges and their unit.
+func selectRanges(ix *Index, sel string) ([]Range, string, error) {
+	if m := lineSel.FindStringSubmatch(sel); m != nil {
+		a, _ := strconv.ParseInt(m[1], 10, 64)
+		b := a
+		if m[2] != "" {
+			b, _ = strconv.ParseInt(m[2], 10, 64)
+		}
+		if a < 1 || b < a || b > ix.Lines {
+			return nil, "", inputError("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
+		}
+		return []Range{{a, b}}, "lines", nil
+	}
+	var rs []Range
+	if m := groupSel.FindStringSubmatch(sel); m != nil {
+		i, _ := strconv.Atoi(m[1])
+		if i < 0 || i >= len(ix.Groups) {
+			return nil, "", inputError("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
+		}
+		rs = mergeRanges(groupRanges(ix.Groups[i]))
+	} else if _, ok := ParseKind(sel); ok || sel == "keep" {
+		for _, g := range ix.Groups {
+			if (sel == "keep" && g.Kept) || g.Kind == sel {
+				rs = append(rs, groupRanges(g)...)
+			}
+		}
+		rs = mergeRanges(rs)
+	} else {
+		return nil, "", inputError("unknown selector " + quote(sel) + "; use " + selectors)
+	}
+	unit := "lines"
+	if ix.Unit == "bytes" {
+		unit = "bytes"
+	}
+	return rs, unit, nil
 }
 
 // extractBytes copies byte ranges (inclusive) out of data, one per line.

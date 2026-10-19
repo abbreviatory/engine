@@ -272,9 +272,11 @@ curl -s localhost:7878/runs/unit
 
 It listens on this machine only unless it has a token (`-token` or
 `$ABBREVIATORY_TOKEN`), and with one it asks every request for it as
-`Authorization: Bearer TOKEN`. Errors come back as JSON with a status: 400
-for a bad option or reference, 401 without the token, 404 for a reference or
-history not in the store, 413 past `-max-body` (1 GB), 422 for input it
+`Authorization: Bearer TOKEN`. Without a token it also refuses requests a web
+page in your browser could send it (other host names, foreign origins), so a
+site you visit can't read your stored logs through it. Errors come back as JSON with a status: 400
+for a bad option or reference, 401 without the token, 403 for a request from
+a web page, 404 for a reference or history not in the store, 413 past `-max-body` (1 GB), 422 for input it
 can't read (binary data, broken JSON with `format=json`).
 
 The command line, the MCP server and the HTTP service share one core, and a

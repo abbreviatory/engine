@@ -38,7 +38,8 @@ type request struct {
 }
 
 // usageError is a mistake in the request itself: the command line exits 2,
-// the HTTP service answers 400, the MCP server reports invalid params.
+// the HTTP service answers 400, the MCP server returns a tool result marked
+// as an error.
 type usageError struct{ msg string }
 
 func (e *usageError) Error() string { return e.msg }
@@ -283,13 +284,30 @@ func spoolInput(in io.Reader) (*os.File, error) {
 	return sp, nil
 }
 
-// expand returns what a reference points to.
-func (c core) expand(ref string) ([]byte, error) {
+// expand writes what a reference points to, streamed from the store.
+func (c core) expand(w io.Writer, ref string) error {
 	st, err := c.store()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return st.Expand(ref)
+	return st.ExpandTo(w, ref)
+}
+
+// errTooLarge is returned by a limitWriter past its limit.
+var errTooLarge = errors.New("too large")
+
+// limitWriter buffers at most n bytes.
+type limitWriter struct {
+	buf []byte
+	n   int
+}
+
+func (l *limitWriter) Write(p []byte) (int, error) {
+	if len(l.buf)+len(p) > l.n {
+		return 0, errTooLarge
+	}
+	l.buf = append(l.buf, p...)
+	return len(p), nil
 }
 
 // errNoHistory is returned when no history matches a key.

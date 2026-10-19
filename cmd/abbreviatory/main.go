@@ -350,12 +350,8 @@ func cmdExpand(args []string, stdout, stderr io.Writer) int {
 		fs.Usage()
 		return 2
 	}
-	data, err := core{*dir}.expand(fs.Arg(0))
-	if err != nil {
+	if err := (core{*dir}).expand(stdout, fs.Arg(0)); err != nil {
 		fmt.Fprintln(stderr, "abbreviatory:", err)
-		return 1
-	}
-	if _, err := stdout.Write(data); err != nil {
 		return 1
 	}
 	return 0

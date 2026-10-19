@@ -12,8 +12,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -68,7 +70,13 @@ func cmdServe(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "abbreviatory:", err)
 		return 1
 	}
-	srv := &http.Server{Handler: newHandler(c, *token, limit), ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{
+		Handler:           newHandler(c, *token, limit),
+		ReadHeaderTimeout: 10 * time.Second,
+		// A body may be a large log on a slow link, but not forever.
+		ReadTimeout: 30 * time.Minute,
+		IdleTimeout: 2 * time.Minute,
+	}
 	fmt.Fprintf(stderr, "abbreviatory %s: serving on http://%s\n", abbreviatory.Version, ln.Addr())
 
 	stop := make(chan os.Signal, 1)
@@ -102,13 +110,28 @@ func isLoopback(addr string) bool {
 }
 
 // newHandler is the HTTP API over c. With a token, every request but the
-// health check must carry it as "Authorization: Bearer TOKEN".
+// health check must carry it as "Authorization: Bearer TOKEN". Without one
+// the service is for this machine only, and it also turns away what a web
+// page in the user's browser could send it: a request for another host name
+// (DNS rebinding) or with a foreign Origin (a cross-site form or fetch).
 func newHandler(c core, token string, maxBody int64) http.Handler {
+	// Reductions and expansions take memory and CPU; a few at a time.
+	heavy := make(chan struct{}, max(2, runtime.NumCPU()))
+	limited := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case heavy <- struct{}{}:
+				defer func() { <-heavy }()
+				h(w, r)
+			case <-r.Context().Done():
+			}
+		}
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		replyJSON(w, http.StatusOK, map[string]any{"status": "ok", "version": abbreviatory.Version})
 	})
-	mux.HandleFunc("POST /reduce", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /reduce", limited(func(w http.ResponseWriter, r *http.Request) {
 		q, err := requestFromQuery(r)
 		if err != nil {
 			replyError(w, err)
@@ -129,32 +152,34 @@ func newHandler(c core, token string, maxBody int64) http.Handler {
 			return
 		}
 		replyJSON(w, http.StatusOK, o.JSON())
-	})
-	mux.HandleFunc("GET /expand/{ref}", func(w http.ResponseWriter, r *http.Request) {
-		data, err := c.expand(r.PathValue("ref"))
-		if err != nil {
+	}))
+	mux.HandleFunc("GET /expand/{ref}", limited(func(w http.ResponseWriter, r *http.Request) {
+		lw := &lazyWriter{w: w}
+		if err := c.expand(lw, r.PathValue("ref")); err != nil && !lw.started {
 			replyError(w, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/octet-stream")
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-		w.Write(data)
-	})
-	mux.HandleFunc("GET /runs", func(w http.ResponseWriter, r *http.Request) {
-		all, err := c.histories()
-		if err != nil {
-			replyError(w, err)
+		if !lw.started {
+			lw.start() // an empty part
+		}
+	}))
+	runs := func(w http.ResponseWriter, r *http.Request) {
+		key := r.PathValue("key")
+		if key == "" {
+			all, err := c.histories()
+			if err != nil {
+				replyError(w, err)
+				return
+			}
+			if wantsText(r) {
+				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+				io.WriteString(w, historiesText(all))
+				return
+			}
+			replyJSON(w, http.StatusOK, historiesJSON(all))
 			return
 		}
-		if wantsText(r) {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-			io.WriteString(w, historiesText(all))
-			return
-		}
-		replyJSON(w, http.StatusOK, historiesJSON(all))
-	})
-	mux.HandleFunc("GET /runs/{key...}", func(w http.ResponseWriter, r *http.Request) {
-		h, err := c.history(r.PathValue("key"))
+		h, err := c.history(key)
 		if err != nil {
 			replyError(w, err)
 			return
@@ -165,19 +190,102 @@ func newHandler(c core, token string, maxBody int64) http.Handler {
 			return
 		}
 		replyJSON(w, http.StatusOK, historyJSON(h))
-	})
-	if token == "" {
-		return mux
 	}
-	want := []byte("Bearer " + token)
+	mux.HandleFunc("GET /runs", runs)
+	mux.HandleFunc("GET /runs/{key...}", runs)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
+		if token == "" {
+			if !loopbackHost(r.Host) {
+				replyJSON(w, http.StatusForbidden, map[string]any{"error": "this service answers for localhost only; set a token to serve other host names"})
+				return
+			}
+			if o := r.Header.Get("Origin"); o != "" && !loopbackOrigin(o) {
+				replyJSON(w, http.StatusForbidden, map[string]any{"error": "requests from web pages aren't accepted"})
+				return
+			}
+		} else if r.URL.Path != "/healthz" && !validBearer(r.Header.Get("Authorization"), token) {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="abbreviatory"`)
 			replyJSON(w, http.StatusUnauthorized, map[string]any{"error": "a bearer token is required"})
 			return
 		}
-		mux.ServeHTTP(w, r)
+		mux.ServeHTTP(&jsonErrors{ResponseWriter: w}, r)
 	})
+}
+
+// validBearer checks an Authorization header; the scheme is case-insensitive.
+func validBearer(header, token string) bool {
+	scheme, got, ok := strings.Cut(strings.TrimSpace(header), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(got)), []byte(token)) == 1
+}
+
+// loopbackHost reports whether a Host header names this machine.
+func loopbackHost(host string) bool {
+	h := host
+	if hh, _, err := net.SplitHostPort(host); err == nil {
+		h = hh
+	}
+	h = strings.TrimSuffix(strings.TrimPrefix(h, "["), "]")
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
+// loopbackOrigin reports whether an Origin header is a page on this machine.
+func loopbackOrigin(origin string) bool {
+	u, err := url.Parse(origin)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && loopbackHost(u.Host)
+}
+
+// lazyWriter sets the headers for raw bytes on the first write, so an error
+// found before anything is written can still get its own status.
+type lazyWriter struct {
+	w       http.ResponseWriter
+	started bool
+}
+
+func (l *lazyWriter) start() {
+	l.started = true
+	l.w.Header().Set("Content-Type", "application/octet-stream")
+	l.w.WriteHeader(http.StatusOK)
+}
+
+func (l *lazyWriter) Write(p []byte) (int, error) {
+	if !l.started {
+		l.start()
+	}
+	return l.w.Write(p)
+}
+
+// jsonErrors turns the mux's own plain-text 404 and 405 answers into JSON,
+// as every other error is.
+type jsonErrors struct {
+	http.ResponseWriter
+	swallow bool
+}
+
+func (j *jsonErrors) WriteHeader(code int) {
+	if (code == http.StatusNotFound || code == http.StatusMethodNotAllowed) && strings.HasPrefix(j.Header().Get("Content-Type"), "text/plain") {
+		j.Header().Set("Content-Type", "application/json")
+		j.Header().Del("X-Content-Type-Options")
+		j.ResponseWriter.WriteHeader(code)
+		writeJSON(j.ResponseWriter, map[string]any{"error": http.StatusText(code)})
+		j.swallow = true
+		return
+	}
+	j.ResponseWriter.WriteHeader(code)
+}
+
+func (j *jsonErrors) Write(p []byte) (int, error) {
+	if j.swallow {
+		return len(p), nil
+	}
+	return j.ResponseWriter.Write(p)
 }
 
 // requestFromQuery reads a reduction's options from the query string:

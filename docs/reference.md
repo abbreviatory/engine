@@ -78,7 +78,14 @@ still the command's.
 serves the same work over HTTP. It listens on this machine only unless it has
 a token (`-token`, else `$ABBREVIATORY_TOKEN`); an address reachable from
 other machines without one is refused. With a token, every request but the
-health check needs `Authorization: Bearer T`.
+health check needs `Authorization: Bearer T` (the word Bearer in any case).
+
+Without a token it also turns away what a web page open in the user's
+browser could send it, with 403: a request whose `Host` isn't `localhost`,
+`127.0.0.1` or `[::1]` (a page using DNS rebinding to reach the service), and
+a request with an `Origin` that isn't a page on this machine (a cross-site
+form or fetch that could read stored originals or write runs into a
+history).
 
 | Request | Answer |
 |---|---|
@@ -89,12 +96,17 @@ health check needs `Authorization: Bearer T`.
 | `GET /healthz` | `{"status": "ok", "version": "..."}` |
 
 Errors are `{"error": "..."}` with 400 (a bad option, reference or line
-range), 401 (no or a wrong token), 404 (a reference not in the store, or no
-history matching), 405, 413 (a body past `-max-body`), 422 (input it can't
-read: binary data, a JSON document that doesn't parse, a budget too small for
-this input) or 500. A reduction with a key reads the body to a temporary file
-first, so the history's lock isn't held while it uploads. A SIGINT or SIGTERM
-stops the service, letting requests in progress finish for up to 30 seconds.
+range), 401 (no or a wrong token), 403 (see above), 404 (a reference not in
+the store, no history matching, or no such endpoint), 405, 413 (a body past
+`-max-body`), 422 (input it can't read: binary data, a JSON document that
+doesn't parse, a budget too small for this input) or 500. Expansions stream
+from the store, so memory doesn't grow with the original (a JSON pointer
+reads its document whole). At most as many reductions and expansions as the
+machine has CPUs (at least 2) run at once; others wait their turn. A request
+may take 30 minutes to send its body, and an idle connection is closed after
+2 minutes. A reduction with a key reads the body to a temporary file first,
+so the history's lock isn't held while it uploads. A SIGINT or SIGTERM stops
+the service, letting requests in progress finish for up to 30 seconds.
 
 ### mcp
 
@@ -113,12 +125,15 @@ JSON of the command line's `-json` as structured content.
 
 The options are `format`, `budget`, `preserve`, `keep` (an array), `full` and
 `no_store`, as the flags. `run` starts the command in a process group of its
-own; at the time limit, or when the client cancels the request
-(`notifications/cancelled`), the group gets SIGTERM and, 5 seconds later,
-SIGKILL. A problem with the work (a command not found, binary output, a bad
-option) comes back as a result with `isError` set; an unknown tool or method
-is a protocol error. Requests are answered as they finish, so a long `run`
-doesn't hold up others.
+own; at the time limit, when the client cancels the request
+(`notifications/cancelled`), or when the server stops (its input ends, or it
+gets SIGINT or SIGTERM), the group gets SIGTERM and, 5 seconds later,
+SIGKILL. On Windows the command's process tree is ended with `taskkill /T`.
+A problem with the work (a command not found, binary output, a bad option)
+comes back as a result with `isError` set; an unknown tool or method is a
+protocol error, a batch or anything but a JSON object an invalid request,
+and a response from the client is ignored. Requests are answered as they
+finish, so a long `run` doesn't hold up others.
 
 ### history
 

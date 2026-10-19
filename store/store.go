@@ -193,6 +193,43 @@ func (s *Store) Load(id string) ([]byte, *abbreviatory.Index, error) {
 	return data, &ix, nil
 }
 
+// ExpandTo writes the part of a stored original that a reference names to
+// w, streaming it from the store: memory stays small however large the
+// original is (a JSON pointer still reads its document whole). A bad
+// reference is reported before anything is written.
+func (s *Store) ExpandTo(w io.Writer, ref string) error {
+	id, sel, err := abbreviatory.ParseRef(ref)
+	if err != nil {
+		return err
+	}
+	ixData, err := os.ReadFile(s.path(id, ".idx.json"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return err
+	}
+	var ix abbreviatory.Index
+	if err := json.Unmarshal(ixData, &ix); err != nil {
+		return errors.New("store: damaged index for " + id + ": " + err.Error())
+	}
+	f, err := os.Open(s.path(id, ".gz"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("%s: %w", id, ErrNotFound)
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return errors.New("store: damaged original for " + id + ": " + err.Error())
+	}
+	now := time.Now()
+	os.Chtimes(s.path(id, ".gz"), now, now)
+	return abbreviatory.ExpandTo(w, gz, &ix, sel)
+}
+
 // Expand loads a reference's original and returns the part it names.
 func (s *Store) Expand(ref string) ([]byte, error) {
 	id, sel, err := abbreviatory.ParseRef(ref)

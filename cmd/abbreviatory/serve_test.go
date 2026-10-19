@@ -154,3 +154,94 @@ func TestServeProcess(t *testing.T) {
 		t.Fatal("serve didn't stop on a signal")
 	}
 }
+
+// Review of 0.3: without a token the service answers this machine only,
+// and not web pages: no other host names (DNS rebinding), no foreign
+// Origin (cross-site requests).
+func TestHTTPLocalOnly(t *testing.T) {
+	h := newHandler(core{t.TempDir()}, "", 1<<20)
+	do := func(method, target, host, origin string) (int, string) {
+		req := httptest.NewRequest(method, target, strings.NewReader("x ERROR secret password=hunter2\n"))
+		req.Host = host
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec.Code, rec.Body.String()
+	}
+	for _, c := range []struct {
+		method, target, host, origin string
+		want                         int
+	}{
+		{"POST", "/reduce?key=proj", "localhost:7878", "", 200},
+		{"POST", "/reduce", "127.0.0.1:7878", "", 200},
+		{"POST", "/reduce", "[::1]:7878", "", 200},
+		{"POST", "/reduce", "localhost:7878", "http://localhost:3000", 200},
+		{"GET", "/runs", "attacker.example:7878", "", 403},
+		{"GET", "/runs", "attacker.example", "", 403},
+		{"POST", "/reduce?key=proj", "localhost:7878", "http://evil.example", 403},
+		{"POST", "/reduce?key=proj", "localhost:7878", "null", 403},
+		{"GET", "/healthz", "evil.example", "", 403},
+	} {
+		if code, body := do(c.method, c.target, c.host, c.origin); code != c.want {
+			t.Errorf("%s %s Host %s Origin %q: %d, want %d: %s", c.method, c.target, c.host, c.origin, code, c.want, body)
+		}
+	}
+}
+
+func TestHTTPDetails(t *testing.T) {
+	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "tok", 1<<30))
+	defer srv.Close()
+	get := func(method, path, auth string, body io.Reader) (int, string, string) {
+		req, _ := http.NewRequest(method, srv.URL+path, body)
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		data, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, resp.Header.Get("Content-Type"), string(data)
+	}
+	for _, auth := range []string{"Bearer tok", "bearer tok", "BEARER  tok"} {
+		if code, _, _ := get("GET", "/runs", auth, nil); code != 200 {
+			t.Errorf("%q: %d", auth, code)
+		}
+	}
+	for _, auth := range []string{"Bearer", "Basic tok", "Bearer tokx", "tok"} {
+		if code, _, _ := get("GET", "/runs", auth, nil); code != 401 {
+			t.Errorf("%q: %d, want 401", auth, code)
+		}
+	}
+	for _, c := range []struct {
+		method, path string
+		want         int
+	}{{"GET", "/nothing", 404}, {"GET", "/reduce", 405}, {"DELETE", "/runs", 405}} {
+		code, ct, body := get(c.method, c.path, "Bearer tok", nil)
+		if code != c.want || !strings.HasPrefix(ct, "application/json") || !strings.Contains(body, `"error"`) {
+			t.Errorf("%s %s: %d %s %s", c.method, c.path, code, ct, body)
+		}
+	}
+	// /runs/ with nothing after it is the list.
+	if code, _, body := get("GET", "/runs/", "Bearer tok", nil); code != 200 || !strings.HasPrefix(strings.TrimSpace(body), "[") {
+		t.Errorf("/runs/: %d %s", code, body)
+	}
+	// A large original expands, streamed.
+	big := strings.Repeat("2026-10-18T08:00:00Z INFO tick 12345\n", 200000) + "x ERROR end\n"
+	code, _, body := get("POST", "/reduce", "Bearer tok", strings.NewReader(big))
+	var v map[string]any
+	if code != 200 || json.Unmarshal([]byte(body), &v) != nil {
+		t.Fatalf("reduce: %d", code)
+	}
+	code, ct, whole := get("GET", "/expand/"+v["ref"].(string), "Bearer tok", nil)
+	if code != 200 || ct != "application/octet-stream" || whole != big {
+		t.Fatalf("whole expand: %d %s, %d bytes of %d", code, ct, len(whole), len(big))
+	}
+	code, _, part := get("GET", "/expand/"+v["ref"].(string)+":L200001", "Bearer tok", nil)
+	if code != 200 || part != "x ERROR end\n" {
+		t.Fatalf("last line: %d %q", code, part)
+	}
+}

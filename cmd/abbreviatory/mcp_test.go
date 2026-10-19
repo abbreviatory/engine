@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -212,3 +213,56 @@ func buildBinary(t *testing.T) string {
 }
 
 func execCommand(name string, args ...string) *exec.Cmd { return exec.Command(name, args...) }
+
+// Review of 0.3: batches and non-objects are invalid requests; a response
+// from the client gets no answer; the end of input stops running commands.
+func TestMCPMessagesAndShutdown(t *testing.T) {
+	s := startMCP(t, t.TempDir())
+	for _, msg := range []string{`[{"jsonrpc":"2.0","id":1,"method":"ping"}]`, `42`, `"ping"`} {
+		s.send(msg)
+		if e, ok := s.recv()["error"].(map[string]any); !ok || e["code"] != float64(-32600) {
+			t.Fatalf("%s: not an invalid request", msg)
+		}
+	}
+	s.send(`{"jsonrpc":"2.0","id":99,"result":{}}`)
+	s.send(`{"jsonrpc":"2.0","id":2,"method":"ping"}`)
+	if m := s.recv(); m["id"] != float64(2) {
+		t.Fatalf("a client response was answered: %v", m)
+	}
+	if runtime.GOOS == "windows" {
+		return
+	}
+	marker := filepath.Join(t.TempDir(), "still-running")
+	s.send(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"command":["sh","-c","sleep 30 & echo $! > ` + marker + `; wait"],"no_history":true}}}`)
+	time.Sleep(500 * time.Millisecond)
+	start := time.Now()
+	s.in.Close()
+	select {
+	case <-s.done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the server waited for the running command")
+	}
+	if d := time.Since(start); d > 7*time.Second {
+		t.Fatalf("stopping took %s", d)
+	}
+	pid, _ := os.ReadFile(marker)
+	if p := strings.TrimSpace(string(pid)); p != "" {
+		// The signal lands a moment later; a zombie left for init counts
+		// as gone.
+		alive := func() bool {
+			st, err := os.ReadFile("/proc/" + p + "/stat")
+			if err != nil {
+				return exec.Command("kill", "-0", p).Run() == nil
+			}
+			f := strings.Fields(string(st))
+			return len(f) > 2 && f[2] != "Z"
+		}
+		for i := 0; i < 30 && alive(); i++ {
+			time.Sleep(100 * time.Millisecond)
+		}
+		if alive() {
+			exec.Command("kill", "-9", p).Run()
+			t.Fatalf("what the command started (pid %s) is still running", p)
+		}
+	}
+}
