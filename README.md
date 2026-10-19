@@ -11,6 +11,9 @@ Give it a history and it compares each run with the last one: new failures,
 fixed ones, those still failing and for how many runs, and flaky ones. When
 nothing changed, the report is one line.
 
+Coding agents and CI systems can call it directly: `abbreviatory mcp` is an
+MCP server for agents, and `abbreviatory serve` an HTTP service.
+
 It works by rules and pattern matching. No language model, no network, no API
 keys. The same input always gives the same output.
 
@@ -221,6 +224,63 @@ pass or not:
 
 The step fails when the tests fail, because `run` exits with their status.
 
+## For coding agents (MCP)
+
+`abbreviatory mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server on standard input and output. Add it to the agent's MCP settings, for
+Claude Code with `claude mcp add abbreviatory -- abbreviatory mcp`, or in the
+JSON most agents read:
+
+```json
+{"mcpServers": {"abbreviatory": {"command": "abbreviatory", "args": ["mcp"]}}}
+```
+
+It offers four tools:
+
+| Tool | What it does |
+|---|---|
+| `run` | Runs a command (`["go", "test", "./..."]`), reduces what it prints and compares with the last run: the agent sees new failures and one line when nothing changed, not the whole output |
+| `reduce` | Reduces output the agent already has, as `text` or a file `path` |
+| `expand` | Returns the original lines behind a reference in a report |
+| `history` | Lists the runs of a history |
+
+`run` takes `cwd`, `timeout_seconds` (10 minutes by default; the command and
+what it started are stopped after that), `stdin`, `key` and `no_history`, and
+every tool takes the options of `reduce` (`budget`, `format`, `preserve`,
+`keep`, `full`, `no_store`). The structured result has the counts, the
+changes and the exit status.
+
+## As an HTTP service
+
+```
+abbreviatory serve                       # http://127.0.0.1:7878, this machine only
+abbreviatory serve -addr :7878 -token T  # reachable from others, with a token
+```
+
+```
+curl -s --data-binary @test.json 'localhost:7878/reduce?budget=3000&key=unit'
+curl -s localhost:7878/expand/8923c60bd06d:g1205
+curl -s localhost:7878/runs/unit
+```
+
+| Endpoint | What it does |
+|---|---|
+| `POST /reduce` | The body is the input; the options are query parameters named as the flags (`budget`, `format`, `preserve`, `keep`, `key`, `full`, `no_store`). Returns the JSON of `reduce -json`, or the report alone with `Accept: text/plain` |
+| `GET /expand/{ref}` | What a reference points to |
+| `GET /runs`, `GET /runs/{key}` | The histories, or one history's runs |
+| `GET /healthz` | `{"status": "ok", "version": ...}`, without the token |
+
+It listens on this machine only unless it has a token (`-token` or
+`$ABBREVIATORY_TOKEN`), and with one it asks every request for it as
+`Authorization: Bearer TOKEN`. Errors come back as JSON with a status: 400
+for a bad option or reference, 401 without the token, 404 for a reference or
+history not in the store, 413 past `-max-body` (1 GB), 422 for input it
+can't read (binary data, broken JSON with `format=json`).
+
+The command line, the MCP server and the HTTP service share one core, and a
+test checks that they give the same reports, expansions and histories on
+every fixture.
+
 ## As a Go library
 
 ```go
@@ -284,7 +344,7 @@ failing and flaky items, the streaks, the "no change" line and the notes in
 the report matched what was worked out separately from the known statuses
 ([delta.txt](test/results/delta.txt)).
 
-## Limits in v0.2.0
+## Limits in v0.3.0
 
 - It reads formats it knows. Free prose, or a log format it doesn't
   recognise, is reduced only by folding repeats and finding level words.
@@ -320,7 +380,10 @@ the report matched what was worked out separately from the known statuses
   is compared.
 - Flaky detection needs the last 10 runs; a history trimmed or started fresh
   sees nothing as flaky at first.
-- No HTTP service or MCP server yet; they are planned for 0.3.
+- The HTTP service has no TLS of its own; put it behind a proxy that has,
+  if it's reachable beyond the machine. It has one token, and no rate limit.
+- The MCP `run` tool runs whatever command the agent asks for, as the user
+  the server runs as, the same as an agent's own shell tool would.
 
 ## License
 

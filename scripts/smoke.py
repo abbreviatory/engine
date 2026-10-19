@@ -13,8 +13,10 @@
 # bytes twice; every reference in the output expands, and the whole-input
 # reference gives the fixture back byte for byte; -json, -no-store, -keep and
 # prune work; history (reduce -key, -full, history) and run (keeping the
-# exit status) work; and bad input fails cleanly.
+# exit status) work; serve and mcp give the same report as reduce; and bad
+# input fails cleanly.
 import json
+import urllib.error
 import os
 import re
 import subprocess
@@ -143,6 +145,54 @@ def main():
     require(b"run 1, exit status 0" in r.stdout and b"abbreviatory " in r.stdout, f"run: {r.stdout!r}")
     r = run([exe, "run", "-store", store, "-key", "smoke-run2", "--", exe, "no-such-command"], check=False)
     require(r.returncode == 2 and b"exit status 2" in r.stdout, f"run of a failing command: exit {r.returncode}, {r.stdout!r}")
+    checks += 1
+
+    # serve: the HTTP service gives the same report as the command line.
+    path = FIXTURES / "gotest-json.txt"
+    want = run([exe, "reduce", "-store", store, path]).stdout.decode().replace("\r\n", "\n")
+    proc = subprocess.Popen([str(exe), "serve", "-addr", "127.0.0.1:0", "-store", store, "-token", "smoke"],
+                            stderr=subprocess.PIPE, text=True)
+    try:
+        line = proc.stderr.readline()
+        found = re.search(r"http://\S+", line)
+        require(found, f"serve printed {line!r}")
+        base = found.group(0)
+        import urllib.request
+        def call(method, url, body=None, accept=None):
+            req = urllib.request.Request(base + url, data=body, method=method, headers={"Authorization": "Bearer smoke"})
+            if accept:
+                req.add_header("Accept", accept)
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return resp.read()
+        health = json.loads(call("GET", "/healthz"))
+        require(health["version"] == source_version(), f"healthz: {health}")
+        got = call("POST", "/reduce", path.read_bytes(), "text/plain").decode()
+        require(got == want, "serve and reduce give different reports")
+        res = json.loads(call("POST", "/reduce?budget=1024", path.read_bytes()))
+        whole = call("GET", "/expand/" + res["ref"])
+        require(whole == path.read_bytes(), "serve's whole-input reference doesn't give the file back")
+        try:
+            urllib.request.urlopen(base + "/reduce", data=b"x", timeout=60)
+            require(False, "serve answered without the token")
+        except urllib.error.HTTPError as e:
+            require(e.code == 401, f"without the token: {e.code}")
+    finally:
+        proc.terminate()
+        proc.wait(timeout=30)
+    checks += 1
+
+    # mcp: an agent's session over standard input and output.
+    msgs = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "1"}}},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "reduce", "arguments": {"path": str(path)}}},
+    ]
+    r = run([exe, "mcp", "-store", store], stdin="".join(json.dumps(m) + "\n" for m in msgs).encode())
+    answers = {m["id"]: m for m in (json.loads(l) for l in r.stdout.decode().splitlines() if l.strip())}
+    require(answers[1]["result"]["serverInfo"]["version"] == source_version(), f"mcp initialize: {answers.get(1)}")
+    require([t["name"] for t in answers[2]["result"]["tools"]] == ["reduce", "run", "expand", "history"], f"mcp tools: {answers.get(2)}")
+    require(answers[3]["result"]["content"][0]["text"].replace("\r\n", "\n") == want, "mcp and reduce give different reports")
     checks += 1
 
     out = run([exe, "prune", "-store", store, "-max-size", "0"]).stdout.decode()

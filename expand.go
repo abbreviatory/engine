@@ -2,7 +2,6 @@ package abbreviatory
 
 import (
 	"bytes"
-	"errors"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -20,7 +19,7 @@ func ParseRef(s string) (id, sel string, err error) {
 	s = strings.TrimSpace(s)
 	id, sel, _ = strings.Cut(s, ":")
 	if !refIDPattern.MatchString(id) {
-		return "", "", errors.New("not a reference: " + quote(s) + " (expected something like 3f2a9c1b7e04:g12)")
+		return "", "", inputError("not a reference: " + quote(s) + " (expected something like 3f2a9c1b7e04:g12)")
 	}
 	return id, sel, nil
 }
@@ -46,7 +45,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 			b, _ = strconv.ParseInt(m[2], 10, 64)
 		}
 		if a < 1 || b < a || b > ix.Lines {
-			return nil, errors.New("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
+			return nil, inputError("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
 		}
 		return extractLines(original, []Range{{a, b}}), nil
 	}
@@ -61,7 +60,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 		if strings.HasPrefix(sel, "/") {
 			ptr, err := url.PathUnescape(sel)
 			if err != nil {
-				return nil, errors.New("bad JSON pointer " + quote(sel) + ": " + err.Error())
+				return nil, inputError("bad JSON pointer " + quote(sel) + ": " + err.Error())
 			}
 			n, err := doc.lookup(ptr)
 			if err != nil {
@@ -74,7 +73,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 	if m := groupSel.FindStringSubmatch(sel); m != nil {
 		i, _ := strconv.Atoi(m[1])
 		if i < 0 || i >= len(ix.Groups) {
-			return nil, errors.New("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
+			return nil, inputError("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
 		}
 		rs = groupRanges(ix.Groups[i])
 	} else if _, ok := ParseKind(sel); ok || sel == "keep" {
@@ -85,7 +84,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
 		}
 		rs = mergeRanges(rs)
 	} else {
-		return nil, errors.New("unknown selector " + quote(sel) + "; use " + selectors)
+		return nil, inputError("unknown selector " + quote(sel) + "; use " + selectors)
 	}
 	if ix.Unit == "bytes" {
 		return extractBytes(original, rs), nil

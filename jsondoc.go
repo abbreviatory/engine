@@ -3,7 +3,6 @@ package abbreviatory
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"net/url"
 	"strconv"
 	"strings"
@@ -61,7 +60,7 @@ func (p *jparser) skipBOM() {
 
 func (p *jparser) fail(msg string) error {
 	line := 1 + bytes.Count(p.data[:p.i], []byte{'\n'})
-	return errors.New("JSON: " + msg + " on line " + strconv.Itoa(line))
+	return inputError("JSON: " + msg + " on line " + strconv.Itoa(line))
 }
 
 func (p *jparser) ws() {
@@ -304,7 +303,7 @@ func (d *jsonDoc) lookup(ptr string) (*jnode, error) {
 		return d.root, nil
 	}
 	if !strings.HasPrefix(ptr, "/") {
-		return nil, errors.New("a JSON pointer starts with /")
+		return nil, inputError("a JSON pointer starts with /")
 	}
 	n := d.root
 	for _, part := range strings.Split(ptr[1:], "/") {
@@ -320,16 +319,16 @@ func (d *jsonDoc) lookup(ptr string) (*jnode, error) {
 				}
 			}
 			if !found {
-				return nil, errors.New("no member " + quote(part) + " at " + ptr)
+				return nil, inputError("no member " + quote(part) + " at " + ptr)
 			}
 		case 'a':
 			i, err := strconv.Atoi(part)
 			if err != nil || i < 0 || i >= len(n.vals) {
-				return nil, errors.New("no element " + quote(part) + " at " + ptr)
+				return nil, inputError("no element " + quote(part) + " at " + ptr)
 			}
 			n = n.vals[i]
 		default:
-			return nil, errors.New(ptr + " goes inside a value that is not an object or array")
+			return nil, inputError(ptr + " goes inside a value that is not an object or array")
 		}
 	}
 	return n, nil

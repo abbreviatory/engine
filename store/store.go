@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -200,7 +201,7 @@ func (s *Store) Expand(ref string) ([]byte, error) {
 	}
 	data, ix, err := s.Load(id)
 	if err != nil {
-		return nil, errors.New(id + ": " + err.Error())
+		return nil, fmt.Errorf("%s: %w", id, err)
 	}
 	return abbreviatory.Expand(data, ix, sel)
 }

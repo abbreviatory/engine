@@ -21,7 +21,7 @@ import (
 )
 
 // Version is the release version. Raising it on main releases it.
-const Version = "0.2.0"
+const Version = "0.3.0"
 
 // DefaultBudget is the output size in bytes when none is given.
 const DefaultBudget = 4096
@@ -124,6 +124,15 @@ type IndexGroup struct {
 	Kept   bool       `json:"kept,omitempty"`
 	Ranges [][2]int64 `json:"ranges"`
 }
+
+// InputError is a problem with the input or a reference rather than with
+// the machine: a JSON document that doesn't parse, a malformed reference, a
+// line range outside the input.
+type InputError struct{ Msg string }
+
+func (e *InputError) Error() string { return e.Msg }
+
+func inputError(msg string) error { return &InputError{msg} }
 
 // ErrBinary is returned for input that isn't text.
 var ErrBinary = errors.New("input looks like binary data, not text")

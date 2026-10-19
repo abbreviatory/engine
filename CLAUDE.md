@@ -12,7 +12,8 @@ has the procedure and the checks to run afterwards.
 
 ## Where things stand
 
-v0.2.0 (October 2026) adds run history (below). v0.1.0 was the first
+v0.3.0 (October 2026) adds the HTTP service and the MCP server, v0.2.0 run
+history (both below). v0.1.0 was the first
 release: Apache 2.0, CI on Linux and macOS plus a Windows smoke check, and automated releases with smoke-tested binaries
 for Linux, macOS and Windows. Pure Go, standard library only, no cgo.
 
@@ -36,7 +37,8 @@ v0.1.0 has the core, the command line and three adapter families:
   (offset-keeping parser, error fields, outline levels).
 - `expand.go`: `ParseRef`, `Expand` and its selectors.
 - `store/`: gzipped originals with a JSON index, `Expand`, `Prune`.
-- `cmd/abbreviatory/`: reduce, run, history, expand, prune, formats, version.
+- `cmd/abbreviatory/`: reduce, run, history, expand, serve, mcp, prune,
+  formats, version.
 
 v0.2.0 adds the run-to-run delta:
 - `history.go`: `Run` (what history keeps of a run), items (a failed test by
@@ -71,6 +73,22 @@ v0.2.0 adds the run-to-run delta:
   -v has no per-module check; a three-waiter stale-lock race (lock files
   carry a token so a run only removes its own). `run` doesn't use process groups on purpose: a signal goes to
   the command, as it would without abbreviatory in front.
+
+v0.3.0 adds the front ends:
+- `cmd/abbreviatory/core.go`: the one core all three use: `request` (the
+  options, checked; `usageError`), `core.reduce` (store, history under the
+  lock, spooling streamed input when there's a key), `outcome.JSON`,
+  `expand`, `histories`/`history` and their text and JSON, `execute` (runs
+  a command into a spool; signal forwarding for the CLI, process group,
+  timeout and cancel for MCP).
+- `serve.go`: HTTP API (Go 1.22 ServeMux patterns), loopback unless a
+  token, errors mapped to statuses (`abbreviatory.InputError` is new for
+  bad references and unreadable input).
+- `mcp.go`: JSON-RPC over stdio, tools reduce, run, expand, history; each
+  tools/call in its own goroutine; notifications/cancelled stops a run.
+- `parity_test.go`: the 0.3 bar, every fixture through the CLI, HTTP and
+  MCP with five option sets, every reference expanded, histories built
+  through each; all the same. Smaller matrix under -short and -race.
 
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't
 download Go modules, so v0.1.0 uses a plain file store instead (the same
@@ -113,18 +131,19 @@ front end, not the headline.
 3. 0.3: HTTP service (`POST /reduce`, `GET /expand/{ref}`, `GET /runs/{key}`,
    `GET /healthz`; localhost by default, optional bearer token) and an MCP
    server (stdio; tools reduce, run, expand, history). Done when CLI, HTTP and
-   MCP give the same results on the whole corpus.
+   MCP give the same results on the whole corpus (done in v0.3.0).
 4. 0.4: adapters for Git diffs, HTTP responses and directory listings, each
    passing the same promise tests.
 
 Out of scope: language models, embeddings, summarising prose, log shipping
-pipelines, a hosted service. The browser demo is skipped; revisit after 0.2 as
-demo.abbreviatory.com built from this repo by the release workflow, linked
-from the site menu only.
+pipelines, a hosted service.
 
-Next session starts at 0.3, when the owner says go. The browser demo
-question (demo.abbreviatory.com) comes up again now that 0.2 is out; ask the
-owner before building it.
+The browser demo is at abbreviatory.com/demo/ (the owner wants no
+subdomain): the engine compiled to WebAssembly (`cmd/abbreviatory-wasm`),
+built by `scripts/build-demo.sh` into the site repo's `static/demo/`. Rebuild
+and push it to the site after each release.
+
+Next session starts at 0.4, when the owner says go.
 
 ## Test results
 

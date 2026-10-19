@@ -1,6 +1,6 @@
 # Abbreviatory reference
 
-This is the full reference for version 0.2. The [README](../README.md) has the
+This is the full reference for version 0.3. The [README](../README.md) has the
 overview and the quick start.
 
 ## Commands
@@ -11,6 +11,8 @@ abbreviatory run [flags] -- CMD      run a command, reduce what it prints,
                                      compare with its last run
 abbreviatory history [flags] [KEY]   list run histories, or one history's runs
 abbreviatory expand [flags] REF      print what a reference points to
+abbreviatory serve [flags]           serve reduce, expand and histories over HTTP
+abbreviatory mcp [flags]             serve them to coding agents over MCP (stdio)
 abbreviatory prune [flags]           remove old stored originals
 abbreviatory formats                 list the input formats
 abbreviatory version                 print the version
@@ -43,7 +45,8 @@ budget). With a history it also has `run` (this run's number) and `delta`:
 `since`, `identical`, `unchanged`, `failing`, `new`, `fixed`, `not_run` and
 `flaky` (lists of `{head, ref}`, flaky ones with `now`, `changes` and
 `window`), `still` and `longest`. From `run` it also has `exit`, the
-command's exit status.
+command's exit status, and `warnings` lists any warnings (an original that
+couldn't be stored, a history that couldn't be read).
 
 ### run
 
@@ -68,6 +71,54 @@ command started in the background keeps the output open after the command
 exits, reading stops 5 seconds later, with a warning. If the output can't be
 reduced (it is binary, say), the error is printed and the exit status is
 still the command's.
+
+### serve
+
+`abbreviatory serve [-addr 127.0.0.1:7878] [-token T] [-store DIR] [-max-body 1GB]`
+serves the same work over HTTP. It listens on this machine only unless it has
+a token (`-token`, else `$ABBREVIATORY_TOKEN`); an address reachable from
+other machines without one is refused. With a token, every request but the
+health check needs `Authorization: Bearer T`.
+
+| Request | Answer |
+|---|---|
+| `POST /reduce` | The body is the input. Query parameters: `format`, `budget`, `preserve` (present and empty for nothing), `keep` (repeatable), `key`, `full`, `no_store`, and `command` and `exit` to record with the run. The answer is the JSON of `reduce -json`; with `Accept: text/plain` the report alone, warnings in `Abbreviatory-Warning` headers |
+| `GET /expand/{ref}` | The original bytes, as `application/octet-stream` |
+| `GET /runs` | The histories, as `history -json` lists them (or as text with `Accept: text/plain`) |
+| `GET /runs/{key}` | One history's runs; the key percent-encoded, a part of it matching one key works |
+| `GET /healthz` | `{"status": "ok", "version": "..."}` |
+
+Errors are `{"error": "..."}` with 400 (a bad option, reference or line
+range), 401 (no or a wrong token), 404 (a reference not in the store, or no
+history matching), 405, 413 (a body past `-max-body`), 422 (input it can't
+read: binary data, a JSON document that doesn't parse, a budget too small for
+this input) or 500. A reduction with a key reads the body to a temporary file
+first, so the history's lock isn't held while it uploads. A SIGINT or SIGTERM
+stops the service, letting requests in progress finish for up to 30 seconds.
+
+### mcp
+
+`abbreviatory mcp [-store DIR]` is a Model Context Protocol server over
+standard input and output: JSON-RPC 2.0, one message per line, protocol
+versions 2025-06-18, 2025-03-26 and 2024-11-05. It offers four tools; their
+results have the report (or the expansion, or the history) as text, and the
+JSON of the command line's `-json` as structured content.
+
+| Tool | Arguments |
+|---|---|
+| `reduce` | `text` or `path`; `key`; the options below |
+| `run` | `command` (an array, not run through a shell); `cwd`; `timeout_seconds` (default 600); `stdin`; `key` (default: the project directory and the command); `no_history`; the options below |
+| `expand` | `ref`; `max_bytes` (default 4 MB, up to 64 MB; a larger part is refused with a hint to expand a smaller one) |
+| `history` | `key`, or none for the list |
+
+The options are `format`, `budget`, `preserve`, `keep` (an array), `full` and
+`no_store`, as the flags. `run` starts the command in a process group of its
+own; at the time limit, or when the client cancels the request
+(`notifications/cancelled`), the group gets SIGTERM and, 5 seconds later,
+SIGKILL. A problem with the work (a command not found, binary output, a bad
+option) comes back as a result with `isError` set; an unknown tool or method
+is a protocol error. Requests are answered as they finish, so a long `run`
+doesn't hold up others.
 
 ### history
 
