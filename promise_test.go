@@ -58,14 +58,20 @@ func fixtures(t *testing.T) map[string][]byte {
 
 // wantFormat is the format each fixture must be detected as.
 var wantFormat = map[string]string{
-	"gotest-json.txt":    "gotest-json",
-	"gotest-verbose.txt": "gotest",
-	"gotest-short.txt":   "gotest",
-	"pytest-verbose.txt": "pytest",
-	"pytest-short.txt":   "pytest",
-	"junit-pytest.xml":   "junit",
-	"app.log":            "logs",
-	"api-response.json":  "json",
+	"gotest-json.txt":      "gotest-json",
+	"gotest-verbose.txt":   "gotest",
+	"gotest-short.txt":     "gotest",
+	"pytest-verbose.txt":   "pytest",
+	"pytest-short.txt":     "pytest",
+	"junit-pytest.xml":     "junit",
+	"app.log":              "logs",
+	"api-response.json":    "json",
+	"git-diff.txt":         "diff",
+	"http-json.txt":        "http",
+	"http-redirect.txt":    "http",
+	"http-verbose-404.txt": "http",
+	"find-listing.txt":     "listing",
+	"ls-recursive.txt":     "listing",
 }
 
 func TestDetection(t *testing.T) {

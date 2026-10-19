@@ -1,0 +1,5286 @@
+diff --git a/.github/workflows/test.yml b/.github/workflows/test.yml
+index ca3af47..8c443c8 100644
+--- a/.github/workflows/test.yml
++++ b/.github/workflows/test.yml
+@@ -2,7 +2,8 @@ name: test
+ 
+ # Every push to main and every pull request: formatting, vet, the full test
+ # suite (the promise tests on every fixture at every budget, robustness,
+-# the store and the command) on Linux and macOS, the race detector on Linux,
++# the store and the command) on Linux and macOS, the race detector and the
++# browser demo's WebAssembly build on Linux,
+ # the release plan's cases, and the smoke check on a Windows binary on a
+ # Windows runner. A passing run on main starts the release workflow, which
+ # releases a raised version.
+@@ -33,6 +34,12 @@ jobs:
+       - if: runner.os == 'Linux'
+         run: go test -race -count=1 ./...
+       - run: go build ./...
++      - name: The browser demo's WebAssembly build
++        if: runner.os == 'Linux'
++        env:
++          GOOS: js
++          GOARCH: wasm
++        run: go vet ./cmd/abbreviatory-wasm && go build -o /dev/null ./cmd/abbreviatory-wasm
+       - run: python3 -B -m unittest discover -s scripts -p '*_test.py'
+       - name: Smoke check
+         run: |
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 92a6d71..bc00b24 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -12,7 +12,8 @@ has the procedure and the checks to run afterwards.
+ 
+ ## Where things stand
+ 
+-v0.2.0 (October 2026) adds run history (below). v0.1.0 was the first
++v0.3.0 (October 2026) adds the HTTP service and the MCP server, v0.2.0 run
++history (both below). v0.1.0 was the first
+ release: Apache 2.0, CI on Linux and macOS plus a Windows smoke check, and automated releases with smoke-tested binaries
+ for Linux, macOS and Windows. Pure Go, standard library only, no cgo.
+ 
+@@ -36,7 +37,8 @@ v0.1.0 has the core, the command line and three adapter families:
+   (offset-keeping parser, error fields, outline levels).
+ - `expand.go`: `ParseRef`, `Expand` and its selectors.
+ - `store/`: gzipped originals with a JSON index, `Expand`, `Prune`.
+-- `cmd/abbreviatory/`: reduce, run, history, expand, prune, formats, version.
++- `cmd/abbreviatory/`: reduce, run, history, expand, serve, mcp, prune,
++  formats, version.
+ 
+ v0.2.0 adds the run-to-run delta:
+ - `history.go`: `Run` (what history keeps of a run), items (a failed test by
+@@ -72,6 +74,35 @@ v0.2.0 adds the run-to-run delta:
+   carry a token so a run only removes its own). `run` doesn't use process groups on purpose: a signal goes to
+   the command, as it would without abbreviatory in front.
+ 
++v0.3.0 adds the front ends:
++- `cmd/abbreviatory/core.go`: the one core all three use: `request` (the
++  options, checked; `usageError`), `core.reduce` (store, history under the
++  lock, spooling streamed input when there's a key), `outcome.JSON`,
++  `expand`, `histories`/`history` and their text and JSON, `execute` (runs
++  a command into a spool; signal forwarding for the CLI, process group,
++  timeout and cancel for MCP).
++- `serve.go`: HTTP API (Go 1.22 ServeMux patterns), loopback unless a
++  token, errors mapped to statuses (`abbreviatory.InputError` is new for
++  bad references and unreadable input).
++- `mcp.go`: JSON-RPC over stdio, tools reduce, run, expand, history; each
++  tools/call in its own goroutine; notifications/cancelled stops a run.
++- An independent review of 0.3 found: no Host/Origin check without a token
++  (DNS rebinding and cross-site requests could read originals and write
++  runs), MCP leaving running commands behind on shutdown, expand loading
++  whole originals (now `ExpandTo`/`Store.ExpandTo` stream), Windows run
++  stopping only the direct process (now taskkill /T), plain-text 404/405,
++  case-sensitive Bearer, `/runs/` with an empty key, JSON-RPC batches. All
++  fixed with tests; serve also limits concurrent reductions (a slot is taken
++  only after the body is spooled, so slow uploads block nobody) and has read
++  and idle timeouts. A second pass also fixed the forced kill 5 s after a
++  stop hitting a reused PID (single process and Windows), and JSON pointer
++  refs with raw slashes (/expand/{ref...}). On MCP shutdown, running commands are stopped but
++  every request is still answered; only a client's own cancel drops the
++  answer (`mcpCall`).
++- `parity_test.go`: the 0.3 bar, every fixture through the CLI, HTTP and
++  MCP with five option sets, every reference expanded, histories built
++  through each; all the same. Smaller matrix under -short and -race.
++
+ The approved plan named a pure-Go SQLite for the store. Cloud sessions can't
+ download Go modules, so v0.1.0 uses a plain file store instead (the same
+ behaviour for references; no dependencies). Run history in 0.2 stays in
+@@ -113,18 +144,19 @@ front end, not the headline.
+ 3. 0.3: HTTP service (`POST /reduce`, `GET /expand/{ref}`, `GET /runs/{key}`,
+    `GET /healthz`; localhost by default, optional bearer token) and an MCP
+    server (stdio; tools reduce, run, expand, history). Done when CLI, HTTP and
+-   MCP give the same results on the whole corpus.
++   MCP give the same results on the whole corpus (done in v0.3.0).
+ 4. 0.4: adapters for Git diffs, HTTP responses and directory listings, each
+    passing the same promise tests.
+ 
+ Out of scope: language models, embeddings, summarising prose, log shipping
+-pipelines, a hosted service. The browser demo is skipped; revisit after 0.2 as
+-demo.abbreviatory.com built from this repo by the release workflow, linked
+-from the site menu only.
++pipelines, a hosted service.
++
++The browser demo is at abbreviatory.com/demo/ (the owner wants no
++subdomain): the engine compiled to WebAssembly (`cmd/abbreviatory-wasm`),
++built by `scripts/build-demo.sh` into the site repo's `static/demo/`. Rebuild
++and push it to the site after each release.
+ 
+-Next session starts at 0.3, when the owner says go. The browser demo
+-question (demo.abbreviatory.com) comes up again now that 0.2 is out; ask the
+-owner before building it.
++Next session starts at 0.4, when the owner says go.
+ 
+ ## Test results
+ 
+diff --git a/README.md b/README.md
+index 5b414c7..69c456e 100644
+--- a/README.md
++++ b/README.md
+@@ -11,6 +11,9 @@ Give it a history and it compares each run with the last one: new failures,
+ fixed ones, those still failing and for how many runs, and flaky ones. When
+ nothing changed, the report is one line.
+ 
++Coding agents and CI systems can call it directly: `abbreviatory mcp` is an
++MCP server for agents, and `abbreviatory serve` an HTTP service.
++
+ It works by rules and pattern matching. No language model, no network, no API
+ keys. The same input always gives the same output.
+ 
+@@ -221,6 +224,65 @@ pass or not:
+ 
+ The step fails when the tests fail, because `run` exits with their status.
+ 
++## For coding agents (MCP)
++
++`abbreviatory mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
++server on standard input and output. Add it to the agent's MCP settings, for
++Claude Code with `claude mcp add abbreviatory -- abbreviatory mcp`, or in the
++JSON most agents read:
++
++```json
++{"mcpServers": {"abbreviatory": {"command": "abbreviatory", "args": ["mcp"]}}}
++```
++
++It offers four tools:
++
++| Tool | What it does |
++|---|---|
++| `run` | Runs a command (`["go", "test", "./..."]`), reduces what it prints and compares with the last run: the agent sees new failures and one line when nothing changed, not the whole output |
++| `reduce` | Reduces output the agent already has, as `text` or a file `path` |
++| `expand` | Returns the original lines behind a reference in a report |
++| `history` | Lists the runs of a history |
++
++`run` takes `cwd`, `timeout_seconds` (10 minutes by default; the command and
++what it started are stopped after that), `stdin`, `key` and `no_history`, and
++every tool takes the options of `reduce` (`budget`, `format`, `preserve`,
++`keep`, `full`, `no_store`). The structured result has the counts, the
++changes and the exit status.
++
++## As an HTTP service
++
++```
++abbreviatory serve                       # http://127.0.0.1:7878, this machine only
++abbreviatory serve -addr :7878 -token T  # reachable from others, with a token
++```
++
++```
++curl -s --data-binary @test.json 'localhost:7878/reduce?budget=3000&key=unit'
++curl -s localhost:7878/expand/8923c60bd06d:g1205
++curl -s localhost:7878/runs/unit
++```
++
++| Endpoint | What it does |
++|---|---|
++| `POST /reduce` | The body is the input; the options are query parameters named as the flags (`budget`, `format`, `preserve`, `keep`, `key`, `full`, `no_store`). Returns the JSON of `reduce -json`, or the report alone with `Accept: text/plain` |
++| `GET /expand/{ref}` | What a reference points to |
++| `GET /runs`, `GET /runs/{key}` | The histories, or one history's runs |
++| `GET /healthz` | `{"status": "ok", "version": ...}`, without the token |
++
++It listens on this machine only unless it has a token (`-token` or
++`$ABBREVIATORY_TOKEN`), and with one it asks every request for it as
++`Authorization: Bearer TOKEN`. Without a token it also refuses requests a web
++page in your browser could send it (other host names, foreign origins), so a
++site you visit can't read your stored logs through it. Errors come back as JSON with a status: 400
++for a bad option or reference, 401 without the token, 403 for a request from
++a web page, 404 for a reference or history not in the store, 413 past `-max-body` (1 GB), 422 for input it
++can't read (binary data, broken JSON with `format=json`).
++
++The command line, the MCP server and the HTTP service share one core, and a
++test checks that they give the same reports, expansions and histories on
++every fixture.
++
+ ## As a Go library
+ 
+ ```go
+@@ -250,7 +312,7 @@ generated application log and API response. On every fixture, at budgets from
+ - every reference expands back to exactly the original bytes, and for line
+   formats every input line belongs to exactly one group.
+ 
+-Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 and v0.2.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 74 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
++Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0, v0.2.0 and v0.3.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 87 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+ 
+ At the default budget ([ratios.txt](test/results/ratios.txt)):
+ 
+@@ -267,7 +329,7 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
+ 
+ The last one is small enough that the whole input fits the budget, so it is shown whole with a one-line header.
+ 
+-A generated log of 1,107 MB (12.5 million lines) streamed through in 31.3 seconds with a peak heap of 14.1 MB
++A generated log of 1,107 MB (12.5 million lines) streamed through in 39.8 seconds with a peak heap of 16.7 MB
+ ([memory.txt](test/results/memory.txt)): for logs and test output, memory
+ doesn't grow with the input.
+ Before-and-after reports for each fixture are in
+@@ -284,7 +346,13 @@ failing and flaky items, the streaks, the "no change" line and the notes in
+ the report matched what was worked out separately from the known statuses
+ ([delta.txt](test/results/delta.txt)).
+ 
+-## Limits in v0.2.0
++The command line, the MCP server and the HTTP service were checked against each
++other on every fixture with five sets of options: 40 reports, all 424
++references in them expanded through each, and run histories built through
++each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
++[tests.txt](test/results/tests.txt)).
++
++## Limits in v0.3.0
+ 
+ - It reads formats it knows. Free prose, or a log format it doesn't
+   recognise, is reduced only by folding repeats and finding level words.
+@@ -320,7 +388,10 @@ the report matched what was worked out separately from the known statuses
+   is compared.
+ - Flaky detection needs the last 10 runs; a history trimmed or started fresh
+   sees nothing as flaky at first.
+-- No HTTP service or MCP server yet; they are planned for 0.3.
++- The HTTP service has no TLS of its own; put it behind a proxy that has,
++  if it's reachable beyond the machine. It has one token, and no rate limit.
++- The MCP `run` tool runs whatever command the agent asks for, as the user
++  the server runs as, the same as an agent's own shell tool would.
+ 
+ ## License
+ 
+diff --git a/RELEASING.md b/RELEASING.md
+index c9a03fa..45570a0 100644
+--- a/RELEASING.md
++++ b/RELEASING.md
+@@ -53,7 +53,9 @@ the whole-input reference gives the fixture back byte for byte; `-json`,
+ `-no-store`, `-keep` and `prune` work; and binary input, broken JSON and a
+ budget too small fail with a message; a history gives "run 1", then one line
+ for an identical run, the whole report with `-full`, and the changes for a
+-changed run; and `run` keeps the command's exit status.
++changed run; `run` keeps the command's exit status; and `serve` (over HTTP,
++with a token) and `mcp` (an agent's session) give the same report as
++`reduce`.
+ 
+ ## Files that go out
+ 
+diff --git a/abbreviatory.go b/abbreviatory.go
+index c1c5d0d..fec4b31 100644
+--- a/abbreviatory.go
++++ b/abbreviatory.go
+@@ -21,7 +21,7 @@ import (
+ )
+ 
+ // Version is the release version. Raising it on main releases it.
+-const Version = "0.2.0"
++const Version = "0.3.0"
+ 
+ // DefaultBudget is the output size in bytes when none is given.
+ const DefaultBudget = 4096
+@@ -125,6 +125,15 @@ type IndexGroup struct {
+ 	Ranges [][2]int64 `json:"ranges"`
+ }
+ 
++// InputError is a problem with the input or a reference rather than with
++// the machine: a JSON document that doesn't parse, a malformed reference, a
++// line range outside the input.
++type InputError struct{ Msg string }
++
++func (e *InputError) Error() string { return e.Msg }
++
++func inputError(msg string) error { return &InputError{msg} }
++
+ // ErrBinary is returned for input that isn't text.
+ var ErrBinary = errors.New("input looks like binary data, not text")
+ 
+diff --git a/cmd/abbreviatory-wasm/main.go b/cmd/abbreviatory-wasm/main.go
+new file mode 100644
+index 0000000..e46051c
+--- /dev/null
++++ b/cmd/abbreviatory-wasm/main.go
+@@ -0,0 +1,186 @@
++//go:build js && wasm
++
++// Command abbreviatory-wasm is the engine compiled to WebAssembly for the
++// demo at abbreviatory.com/demo/. It runs in the visitor's browser: inputs
++// are reduced there, kept there for expanding references, and compared with
++// earlier runs there. Nothing is sent anywhere.
++//
++// It sets a global object, abbreviatory, with:
++//
++//	reduce(text, options) -> JSON string: the result as reduce -json gives it
++//	expand(ref)           -> the original text, or throws
++//	forget()              -> drops kept inputs and histories
++//	version               -> the engine version
++//
++// options is a JSON string with format, budget, preserve, keep (an array),
++// key and full, as the command line's flags.
++package main
++
++import (
++	"encoding/json"
++	"errors"
++	"regexp"
++	"strings"
++	"syscall/js"
++	"time"
++
++	abbreviatory "github.com/abbreviatory/engine"
++)
++
++type kept struct {
++	data  []byte
++	index *abbreviatory.Index
++}
++
++var (
++	originals = map[string]kept{}
++	histories = map[string][]abbreviatory.Run{}
++)
++
++// maxKept is how many inputs are kept for expanding; the oldest go first.
++const maxKept = 20
++
++var order []string
++
++type options struct {
++	Format   string   `json:"format"`
++	Budget   int      `json:"budget"`
++	Preserve *string  `json:"preserve"`
++	Keep     []string `json:"keep"`
++	Key      string   `json:"key"`
++	Full     bool     `json:"full"`
++}
++
++func reduce(text string, raw string) (map[string]any, error) {
++	var o options
++	if raw != "" {
++		if err := json.Unmarshal([]byte(raw), &o); err != nil {
++			return nil, err
++		}
++	}
++	opt := abbreviatory.Options{Format: o.Format, Budget: o.Budget, Full: o.Full}
++	if opt.Format == "" {
++		opt.Format = "auto"
++	}
++	if err := abbreviatory.CheckFormat(opt.Format); err != nil {
++		return nil, err
++	}
++	if o.Preserve != nil {
++		opt.Preserve = []string{}
++		for _, p := range strings.Split(*o.Preserve, ",") {
++			if p = strings.TrimSpace(p); p != "" {
++				opt.Preserve = append(opt.Preserve, p)
++			}
++		}
++	}
++	for _, k := range o.Keep {
++		if k == "" {
++			continue
++		}
++		re, err := regexp.Compile(k)
++		if err != nil {
++			return nil, errors.New("keep: " + err.Error())
++		}
++		opt.Keep = append(opt.Keep, re)
++	}
++	if o.Key != "" {
++		opt.Track = true
++		opt.History = histories[o.Key]
++	}
++	data := []byte(text)
++	start := time.Now()
++	res, err := abbreviatory.Reduce(strings.NewReader(text), opt)
++	if err != nil {
++		return nil, err
++	}
++	took := time.Since(start)
++	if _, ok := originals[res.ID]; !ok {
++		order = append(order, res.ID)
++		if len(order) > maxKept {
++			delete(originals, order[0])
++			order = order[1:]
++		}
++	}
++	originals[res.ID] = kept{data, res.Index}
++	out := map[string]any{
++		"version":     abbreviatory.Version,
++		"format":      res.Format,
++		"family":      res.Family,
++		"ref":         res.ID,
++		"input_bytes": res.InputBytes,
++		"input_lines": res.InputLines,
++		"overflow":    res.Overflow,
++		"records":     res.Records,
++		"lines":       res.Lines,
++		"text":        res.Text,
++		"ms":          float64(took.Microseconds()) / 1000,
++	}
++	if res.Run != nil {
++		res.Run.Time = time.Now().UTC().Format(time.RFC3339)
++		h := append(histories[o.Key], *res.Run)
++		if len(h) > abbreviatory.FlakyWindow {
++			h[len(h)-abbreviatory.FlakyWindow-1].Trim()
++		}
++		histories[o.Key] = h
++		out["run"] = res.Run.N
++		out["unchanged"] = res.Delta.Unchanged
++		out["new"] = len(res.Delta.New)
++		out["fixed"] = len(res.Delta.Fixed)
++	}
++	return out, nil
++}
++
++func expand(ref string) ([]byte, error) {
++	id, sel, err := abbreviatory.ParseRef(ref)
++	if err != nil {
++		return nil, err
++	}
++	k, ok := originals[id]
++	if !ok {
++		return nil, errors.New(id + " is no longer kept in this page; reduce the input again")
++	}
++	return abbreviatory.Expand(k.data, k.index, sel)
++}
++
++func throw(err error) any {
++	return js.Global().Get("Error").New(err.Error())
++}
++
++func main() {
++	api := js.Global().Get("Object").New()
++	api.Set("version", abbreviatory.Version)
++	api.Set("reduce", js.FuncOf(func(this js.Value, args []js.Value) any {
++		if len(args) < 1 {
++			return throw(errors.New("reduce(text, options)"))
++		}
++		opts := ""
++		if len(args) > 1 && args[1].Type() == js.TypeString {
++			opts = args[1].String()
++		}
++		out, err := reduce(args[0].String(), opts)
++		if err != nil {
++			return map[string]any{"error": err.Error()}
++		}
++		b, _ := json.Marshal(out)
++		return string(b)
++	}))
++	api.Set("expand", js.FuncOf(func(this js.Value, args []js.Value) any {
++		if len(args) < 1 {
++			return map[string]any{"error": "expand(ref)"}
++		}
++		data, err := expand(args[0].String())
++		if err != nil {
++			return map[string]any{"error": err.Error()}
++		}
++		return string(data)
++	}))
++	api.Set("forget", js.FuncOf(func(this js.Value, args []js.Value) any {
++		originals, histories, order = map[string]kept{}, map[string][]abbreviatory.Run{}, nil
++		return nil
++	}))
++	js.Global().Set("abbreviatory", api)
++	if cb := js.Global().Get("abbreviatoryReady"); cb.Type() == js.TypeFunction {
++		cb.Invoke()
++	}
++	select {}
++}
+diff --git a/cmd/abbreviatory/core.go b/cmd/abbreviatory/core.go
+new file mode 100644
+index 0000000..c2dedb7
+--- /dev/null
++++ b/cmd/abbreviatory/core.go
+@@ -0,0 +1,694 @@
++package main
++
++// The core every front end shares: the command line, the HTTP service and
++// the MCP server all reduce, expand, list histories and run commands through
++// these functions, so they give the same results.
++
++import (
++	"errors"
++	"fmt"
++	"io"
++	"io/fs"
++	"os"
++	"os/exec"
++	"os/signal"
++	"path/filepath"
++	"regexp"
++	"runtime"
++	"strconv"
++	"strings"
++	"sync/atomic"
++	"syscall"
++	"time"
++
++	abbreviatory "github.com/abbreviatory/engine"
++	"github.com/abbreviatory/engine/store"
++)
++
++// request is one reduction, however it was asked for.
++type request struct {
++	Format   string
++	Budget   int
++	Preserve *string // nil means "errors,failures,warnings"; "" means nothing
++	Keep     []string
++	NoStore  bool
++	Full     bool
++	Key      string // a history to compare with and record in
++	Command  string // the command that printed the input, when known
++	Exit     *int   // its exit status
++}
++
++// usageError is a mistake in the request itself: the command line exits 2,
++// the HTTP service answers 400, the MCP server returns a tool result marked
++// as an error.
++type usageError struct{ msg string }
++
++func (e *usageError) Error() string { return e.msg }
++
++func usagef(format string, a ...any) error { return &usageError{fmt.Sprintf(format, a...)} }
++
++// options checks the request and turns it into reduce options.
++func (q request) options() (abbreviatory.Options, error) {
++	if q.Format == "" {
++		q.Format = "auto"
++	}
++	if q.Budget == 0 {
++		q.Budget = abbreviatory.DefaultBudget
++	}
++	if q.Budget < abbreviatory.MinBudget {
++		return abbreviatory.Options{}, usagef("budget must be at least %d bytes", abbreviatory.MinBudget)
++	}
++	if err := abbreviatory.CheckFormat(q.Format); err != nil {
++		return abbreviatory.Options{}, &usageError{err.Error()}
++	}
++	opt := abbreviatory.Options{Format: q.Format, Budget: q.Budget, NoRefs: q.NoStore, Full: q.Full, Command: q.Command, Exit: q.Exit}
++	preserve := "errors,failures,warnings"
++	if q.Preserve != nil {
++		preserve = *q.Preserve
++	}
++	opt.Preserve = []string{}
++	for _, p := range strings.Split(preserve, ",") {
++		if p = strings.TrimSpace(p); p != "" {
++			opt.Preserve = append(opt.Preserve, p)
++		}
++	}
++	if err := abbreviatory.CheckPreserve(opt.Preserve); err != nil {
++		return opt, &usageError{err.Error()}
++	}
++	for _, k := range q.Keep {
++		re, err := regexp.Compile(k)
++		if err != nil {
++			return opt, usagef("keep: %v", err)
++		}
++		opt.Keep = append(opt.Keep, re)
++	}
++	return opt, nil
++}
++
++// outcome is a finished reduction with what went wrong on the side.
++type outcome struct {
++	Res      *abbreviatory.Result
++	NoStore  bool
++	Exit     *int
++	Warnings []string
++}
++
++// JSON is the reduction as every front end reports it in JSON.
++func (o *outcome) JSON() map[string]any {
++	res := o.Res
++	out := map[string]any{
++		"version":     abbreviatory.Version,
++		"format":      res.Format,
++		"family":      res.Family,
++		"input_bytes": res.InputBytes,
++		"input_lines": res.InputLines,
++		"overflow":    res.Overflow,
++		"records":     res.Records,
++		"lines":       res.Lines,
++		"text":        res.Text,
++	}
++	if !o.NoStore {
++		out["ref"] = res.ID
++	}
++	if res.Delta != nil {
++		out["run"] = res.Run.N
++		out["delta"] = deltaJSON(res.Delta)
++	}
++	if o.Exit != nil {
++		out["exit"] = *o.Exit
++	}
++	if len(o.Warnings) > 0 {
++		out["warnings"] = o.Warnings
++	}
++	return out
++}
++
++func deltaJSON(d *abbreviatory.Delta) map[string]any {
++	items := func(list []abbreviatory.DeltaItem) []map[string]any {
++		out := []map[string]any{}
++		for _, it := range list {
++			m := map[string]any{"head": it.Head, "ref": it.Ref}
++			if it.Flips > 0 {
++				m["now"], m["changes"], m["window"] = it.Now, it.Flips, it.Window
++			}
++			out = append(out, m)
++		}
++		return out
++	}
++	return map[string]any{
++		"since":     d.Since,
++		"identical": d.Identical,
++		"unchanged": d.Unchanged,
++		"failing":   d.Failing,
++		"new":       items(d.New),
++		"fixed":     items(d.Fixed),
++		"not_run":   items(d.NotRun),
++		"flaky":     items(d.Flaky),
++		"still":     d.Still,
++		"longest":   d.Longest,
++	}
++}
++
++// core holds where the store is.
++type core struct {
++	dir string // the store directory; empty for the default
++}
++
++func (c core) store() (*store.Store, error) {
++	dir := c.dir
++	if dir == "" {
++		d, err := store.DefaultDir()
++		if err != nil {
++			return nil, err
++		}
++		dir = d
++	}
++	return store.Open(dir)
++}
++
++// reduce reduces in, storing the original and recording the run in the
++// history when asked. Closing cancel stops a wait for the history's lock;
++// the report is then made without a comparison.
++func (c core) reduce(in io.Reader, q request, cancel <-chan struct{}) (*outcome, error) {
++	opt, err := q.options()
++	if err != nil {
++		return nil, err
++	}
++	o := &outcome{NoStore: q.NoStore, Exit: q.Exit}
++	var st *store.Store
++	if !q.NoStore || q.Key != "" {
++		if st, err = c.store(); err != nil {
++			return nil, err
++		}
++	}
++	if q.Key != "" && !isRegularFile(in) {
++		// With a history the lock is held from reading the history to
++		// writing this run. Read streamed input to a file first, so the
++		// lock isn't held while whatever writes the stream still runs.
++		sp, err := spoolInput(in)
++		if err != nil {
++			return nil, err
++		}
++		defer os.Remove(sp.Name())
++		defer sp.Close()
++		in = sp
++	}
++	var pend *store.Pending
++	if !q.NoStore {
++		if pend, err = st.Begin(); err != nil {
++			return nil, err
++		}
++		opt.Sink = pend
++	}
++	reduce := func() error {
++		res, err := abbreviatory.Reduce(in, opt)
++		if err != nil {
++			if pend != nil {
++				pend.Abort()
++			}
++			return err
++		}
++		o.Res = res
++		if pend != nil {
++			if err := pend.Commit(res.Index); err != nil {
++				// The report is still worth having; say its references
++				// won't expand.
++				o.Warnings = append(o.Warnings, "the original could not be stored, so the references in this report can't be expanded: "+err.Error())
++			}
++		}
++		return nil
++	}
++	if q.Key == "" {
++		if err := reduce(); err != nil {
++			return nil, err
++		}
++	} else {
++		// Compare and record under the history's lock, so a run of the
++		// same key at the same time waits and then compares with this one.
++		var reduceErr error
++		err := st.UpdateCancel(q.Key, cancel, func(h *store.History) (*abbreviatory.Run, error) {
++			opt.Track = true
++			opt.History = h.Runs
++			if reduceErr = reduce(); reduceErr != nil {
++				return nil, nil
++			}
++			o.Res.Run.Time = time.Now().UTC().Format(time.RFC3339)
++			return o.Res.Run, nil
++		})
++		if reduceErr != nil {
++			return nil, reduceErr
++		}
++		if err != nil {
++			if o.Res == nil {
++				// The history couldn't be locked or read: report without it.
++				o.Warnings = append(o.Warnings, "no comparison with the last run: "+err.Error())
++				opt.Track, opt.History = false, nil
++				if err := reduce(); err != nil {
++					return nil, err
++				}
++			} else {
++				o.Warnings = append(o.Warnings, "this run could not be added to the history: "+err.Error())
++			}
++		}
++	}
++	if st != nil {
++		st.PruneNow()
++	}
++	return o, nil
++}
++
++func isRegularFile(r io.Reader) bool {
++	f, ok := r.(*os.File)
++	if !ok {
++		return false
++	}
++	info, err := f.Stat()
++	return err == nil && info.Mode().IsRegular()
++}
++
++// spoolInput copies in to a temporary file and returns it, rewound.
++func spoolInput(in io.Reader) (*os.File, error) {
++	sp, err := os.CreateTemp("", "abbreviatory-in-*")
++	if err != nil {
++		return nil, err
++	}
++	if _, err := io.Copy(sp, in); err != nil {
++		sp.Close()
++		os.Remove(sp.Name())
++		return nil, err
++	}
++	if _, err := sp.Seek(0, io.SeekStart); err != nil {
++		sp.Close()
++		os.Remove(sp.Name())
++		return nil, err
++	}
++	return sp, nil
++}
++
++// expand writes what a reference points to, streamed from the store.
++func (c core) expand(w io.Writer, ref string) error {
++	st, err := c.store()
++	if err != nil {
++		return err
++	}
++	return st.ExpandTo(w, ref)
++}
++
++// errTooLarge is returned by a limitWriter past its limit.
++var errTooLarge = errors.New("too large")
++
++// limitWriter buffers at most n bytes.
++type limitWriter struct {
++	buf []byte
++	n   int
++}
++
++func (l *limitWriter) Write(p []byte) (int, error) {
++	if len(l.buf)+len(p) > l.n {
++		return 0, errTooLarge
++	}
++	l.buf = append(l.buf, p...)
++	return len(p), nil
++}
++
++// errNoHistory is returned when no history matches a key.
++var errNoHistory = errors.New("no history matches")
++
++// histories lists every history, most recently run first.
++func (c core) histories() ([]*store.History, error) {
++	st, err := c.store()
++	if err != nil {
++		return nil, err
++	}
++	return st.Histories()
++}
++
++// history finds the history whose key is key or, failing that, the one key
++// that contains key.
++func (c core) history(key string) (*store.History, error) {
++	all, err := c.histories()
++	if err != nil {
++		return nil, err
++	}
++	var match *store.History
++	var matches []string
++	for _, h := range all {
++		if h.Key == key {
++			return h, nil
++		}
++		if strings.Contains(h.Key, key) {
++			match = h
++			matches = append(matches, h.Key)
++		}
++	}
++	if len(matches) > 1 {
++		return nil, usagef("%q matches %d histories:\n  %s", key, len(matches), strings.Join(matches, "\n  "))
++	}
++	if match == nil {
++		return nil, fmt.Errorf("%w %q", errNoHistory, key)
++	}
++	return match, nil
++}
++
++func historiesJSON(all []*store.History) []map[string]any {
++	list := []map[string]any{}
++	for _, h := range all {
++		m := map[string]any{"key": h.Key, "runs": len(h.Runs)}
++		if l := h.Last(); l != nil {
++			m["last"], m["time"], m["failing"] = l.N, l.Time, l.Failing
++		}
++		list = append(list, m)
++	}
++	return list
++}
++
++func historiesText(all []*store.History) string {
++	if len(all) == 0 {
++		return "no histories yet; use reduce -key NAME or run -- COMMAND\n"
++	}
++	var b strings.Builder
++	for _, h := range all {
++		if l := h.Last(); l != nil {
++			fmt.Fprintf(&b, "%s\n    run %d, %s, %s\n", h.Key, l.N, showTime(l.Time), failingWord(l.Failing))
++		}
++	}
++	return b.String()
++}
++
++func historyJSON(h *store.History) map[string]any {
++	runs := []map[string]any{}
++	for _, r := range h.Runs {
++		m := map[string]any{"run": r.N, "time": r.Time, "ref": r.ID, "format": r.Format, "failing": r.Failing, "new": r.New, "fixed": r.Fixed, "records": r.Records}
++		if r.Exit != nil {
++			m["exit"] = *r.Exit
++		}
++		runs = append(runs, m)
++	}
++	return map[string]any{"key": h.Key, "runs": runs}
++}
++
++func historyText(h *store.History) string {
++	var b strings.Builder
++	b.WriteString(h.Key + "\n")
++	for i := len(h.Runs) - 1; i >= 0; i-- {
++		r := h.Runs[i]
++		line := fmt.Sprintf("run %d  %s  %s", r.N, showTime(r.Time), failingWord(r.Failing))
++		var changes []string
++		if r.New > 0 {
++			changes = append(changes, fmt.Sprintf("%d new", r.New))
++		}
++		if r.Fixed > 0 {
++			changes = append(changes, fmt.Sprintf("%d fixed", r.Fixed))
++		}
++		if len(changes) > 0 {
++			line += " (" + strings.Join(changes, ", ") + ")"
++		}
++		if r.Exit != nil {
++			line += fmt.Sprintf("  exit %d", *r.Exit)
++		}
++		b.WriteString(line + "  ref " + r.ID + "\n")
++	}
++	return b.String()
++}
++
++func failingWord(n int) string {
++	switch n {
++	case 0:
++		return "nothing failing"
++	case 1:
++		return "1 failing"
++	}
++	return strconv.Itoa(n) + " failing"
++}
++
++func showTime(s string) string {
++	t, err := time.Parse(time.RFC3339, s)
++	if err != nil {
++		return "(no time)"
++	}
++	return t.UTC().Format("2006-01-02 15:04 UTC")
++}
++
++// execOpts say how to run a command.
++type execOpts struct {
++	Dir     string
++	Stdin   io.Reader
++	Timeout time.Duration // 0 for none
++	// Forward passes stop signals sent to this process on to the command
++	// (the command line); the MCP server leaves them alone.
++	Forward bool
++	// Cancel, when closed, stops the command (an MCP client cancelled).
++	Cancel <-chan struct{}
++	// Group starts the command in a process group of its own, and a
++	// timeout or a cancel stops the whole group (the MCP server, where no
++	// terminal is involved).
++	Group bool
++}
++
++// executed is a command that ran: its status and its output, spooled.
++type executed struct {
++	Status   int
++	Output   io.Reader
++	Warnings []string
++	spool    *os.File
++	extra    io.Closer
++}
++
++// Close removes the spooled output.
++func (e *executed) Close() {
++	if e.extra != nil {
++		e.extra.Close()
++	}
++	if e.spool != nil {
++		e.spool.Close()
++		os.Remove(e.spool.Name())
++	}
++}
++
++// startError is a command that couldn't be started; Status is 127 when it
++// wasn't found, else 126.
++type startError struct {
++	Status int
++	Err    error
++	Name   string
++}
++
++func (e *startError) Error() string { return "cannot run " + e.Name + ": " + e.Err.Error() }
++
++// execute runs argv with standard output and standard error going into one
++// pipe, spools what it prints to disk (memory stays flat; the exit status is
++// only known at the end) and returns it with the exit status.
++func execute(argv []string, x execOpts) (*executed, error) {
++	r, w, err := os.Pipe()
++	if err != nil {
++		return nil, err
++	}
++	cmd := exec.Command(argv[0], argv[1:]...)
++	cmd.Dir = x.Dir
++	cmd.Stdin = x.Stdin
++	cmd.Stdout = w
++	cmd.Stderr = w
++	if x.Group {
++		ownGroup(cmd)
++	}
++	if err := cmd.Start(); err != nil {
++		w.Close()
++		r.Close()
++		status := 126
++		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
++			status = 127
++		}
++		return nil, &startError{Status: status, Err: err, Name: argv[0]}
++	}
++	w.Close()
++
++	var forwarded chan struct{}
++	var sigs chan os.Signal
++	if x.Forward {
++		// A signal meant to stop the job (a CI timeout or cancel, Ctrl-C)
++		// is passed on to the command; the report is still made from what
++		// it printed. A second one kills it.
++		sigs = make(chan os.Signal, 2)
++		signal.Notify(sigs, stopSignals...)
++		forwarded = make(chan struct{})
++		go func() {
++			defer close(forwarded)
++			n := 0
++			for sig := range sigs {
++				if n++; n == 1 && cmd.Process.Signal(sig) == nil {
++					continue
++				}
++				cmd.Process.Kill()
++			}
++		}()
++	}
++	// The second, forceful step of stopping a single process is skipped once
++	// it has exited: its process ID may already belong to something else.
++	var exited atomic.Bool
++	stop := func() {
++		if x.Group {
++			if stopGroup(cmd, false) != nil {
++				stopGroup(cmd, true)
++				return
++			}
++			if runtime.GOOS == "windows" {
++				return // taskkill /F has ended the tree already
++			}
++			// The group's ID stays taken while any of it runs, so this also
++			// reaches what the command left behind ignoring SIGTERM.
++			time.AfterFunc(5*time.Second, func() { stopGroup(cmd, true) })
++			return
++		}
++		if cmd.Process.Signal(os.Interrupt) != nil {
++			cmd.Process.Kill()
++			return
++		}
++		time.AfterFunc(5*time.Second, func() {
++			if !exited.Load() {
++				cmd.Process.Kill()
++			}
++		})
++	}
++	if x.Cancel != nil {
++		finished := make(chan struct{})
++		defer close(finished)
++		go func() {
++			select {
++			case <-x.Cancel:
++				stop()
++			case <-finished:
++			}
++		}()
++	}
++	var timedOut atomic.Bool
++	if x.Timeout > 0 {
++		t := time.AfterFunc(x.Timeout, func() {
++			timedOut.Store(true)
++			stop()
++		})
++		defer t.Stop()
++	}
++
++	e := &executed{}
++	spool, err := os.CreateTemp("", "abbreviatory-run-*")
++	if err != nil {
++		io.Copy(io.Discard, r)
++		cmd.Wait()
++		if x.Forward {
++			signal.Stop(sigs)
++			close(sigs)
++			<-forwarded
++		}
++		return nil, err
++	}
++	e.spool = spool
++	var written atomic.Int64
++	copied := make(chan error, 1)
++	go func() {
++		_, err := io.Copy(countingWriter{spool, &written}, r)
++		copied <- err
++	}()
++	waitErr := cmd.Wait()
++	exited.Store(true)
++	e.Status = exitOf(cmd, 1)
++	if x.Forward {
++		signal.Stop(sigs)
++		close(sigs)
++		<-forwarded
++	}
++	if waitErr != nil && cmd.ProcessState == nil {
++		e.Warnings = append(e.Warnings, waitErr.Error())
++	}
++	if timedOut.Load() {
++		e.Warnings = append(e.Warnings, "the command ran past its time limit of "+x.Timeout.String()+" and was stopped")
++	}
++
++	// Something the command started in the background can keep the output
++	// open after the command is gone; take what came within a grace period
++	// and leave the rest.
++	select {
++	case err := <-copied:
++		r.Close()
++		if err != nil {
++			e.Close()
++			return nil, fmt.Errorf("reading the command's output: %w", err)
++		}
++		if _, err := spool.Seek(0, io.SeekStart); err != nil {
++			e.Close()
++			return nil, err
++		}
++		e.Output = spool
++	case <-time.After(outputGrace):
++		e.Warnings = append(e.Warnings, fmt.Sprintf("the output was still open %s after the command exited (a process it started in the background?); reading stopped", outputGrace))
++		rf, err := os.Open(spool.Name())
++		if err != nil {
++			e.Close()
++			return nil, err
++		}
++		e.extra = rf
++		e.Output = io.LimitReader(rf, written.Load())
++	}
++	return e, nil
++}
++
++// countingWriter counts what it writes.
++type countingWriter struct {
++	w io.Writer
++	n *atomic.Int64
++}
++
++func (c countingWriter) Write(p []byte) (int, error) {
++	n, err := c.w.Write(p)
++	c.n.Add(int64(n))
++	return n, err
++}
++
++// outputGrace is how long run keeps reading output after the command exits.
++var outputGrace = 5 * time.Second
++
++// stopSignals are the signals run passes on to the command.
++var stopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
++
++// exitOf is the command's exit status: its own code, 128 plus the signal
++// number when a signal ended it, or def if it never ran.
++func exitOf(cmd *exec.Cmd, def int) int {
++	ps := cmd.ProcessState
++	if ps == nil {
++		return def
++	}
++	if code := ps.ExitCode(); code >= 0 {
++		return code
++	}
++	if ws, ok := ps.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
++		return 128 + int(ws.Signal())
++	}
++	return def
++}
++
++// defaultKey names the history of a command: the project it runs in (the
++// enclosing Git repository, or dir itself) and the command.
++func defaultKey(dir, command string) string {
++	if dir == "" {
++		d, err := os.Getwd()
++		if err != nil {
++			return command
++		}
++		dir = d
++	}
++	if abs, err := filepath.Abs(dir); err == nil {
++		dir = abs
++	}
++	project := dir
++	for d := dir; ; {
++		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
++			project = d
++			break
++		}
++		parent := filepath.Dir(d)
++		if parent == d {
++			break
++		}
++		d = parent
++	}
++	return project + ": " + command
++}
+diff --git a/cmd/abbreviatory/main.go b/cmd/abbreviatory/main.go
+index dc1e30e..cb1d951 100644
+--- a/cmd/abbreviatory/main.go
++++ b/cmd/abbreviatory/main.go
+@@ -9,17 +9,10 @@ import (
+ 	"flag"
+ 	"fmt"
+ 	"io"
+-	"io/fs"
+ 	"os"
+-	"os/exec"
+ 	"os/signal"
+-	"path/filepath"
+-	"regexp"
+ 	"strconv"
+ 	"strings"
+-	"sync/atomic"
+-	"syscall"
+-	"time"
+ 
+ 	abbreviatory "github.com/abbreviatory/engine"
+ 	"github.com/abbreviatory/engine/store"
+@@ -33,11 +26,13 @@ Usage:
+                                        with its last run, keep its exit status
+   abbreviatory history [KEY]           list run histories, or one history's runs
+   abbreviatory expand REF              print what a reference points to
++  abbreviatory serve [flags]           serve reduce, expand and history over HTTP
++  abbreviatory mcp [flags]             serve them to coding agents over MCP (stdio)
+   abbreviatory prune [flags]           remove old stored originals
+   abbreviatory formats                 list the input formats
+   abbreviatory version                 print the version
+ 
+-Run "abbreviatory reduce -h" or "abbreviatory run -h" for their flags.
++Run "abbreviatory COMMAND -h" for a command's flags.
+ `
+ 
+ func main() {
+@@ -58,16 +53,14 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		return cmdHistory(args[1:], stdout, stderr)
+ 	case "expand":
+ 		return cmdExpand(args[1:], stdout, stderr)
++	case "serve":
++		return cmdServe(args[1:], stdout, stderr)
++	case "mcp":
++		return cmdMCP(args[1:], stdin, stdout, stderr)
+ 	case "prune":
+ 		return cmdPrune(args[1:], stdout, stderr)
+ 	case "formats":
+-		fmt.Fprintln(stdout, "auto         detect the format (the default)")
+-		fmt.Fprintln(stdout, "test-output  a test run: detect the runner, or read it as a log")
+-		fmt.Fprintln(stdout, "logs         application or terminal logs")
+-		fmt.Fprintln(stdout, "json         one JSON document")
+-		for _, f := range abbreviatory.FormatNames() {
+-			fmt.Fprintln(stdout, f)
+-		}
++		fmt.Fprint(stdout, formatsText())
+ 		return 0
+ 	case "version", "-version", "--version":
+ 		fmt.Fprintln(stdout, "abbreviatory "+abbreviatory.Version)
+@@ -80,6 +73,18 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	return 2
+ }
+ 
++func formatsText() string {
++	var b strings.Builder
++	b.WriteString("auto         detect the format (the default)\n")
++	b.WriteString("test-output  a test run: detect the runner, or read it as a log\n")
++	b.WriteString("logs         application or terminal logs\n")
++	b.WriteString("json         one JSON document\n")
++	for _, f := range abbreviatory.FormatNames() {
++		b.WriteString(f + "\n")
++	}
++	return b.String()
++}
++
+ type multiFlag []string
+ 
+ func (m *multiFlag) String() string     { return strings.Join(*m, ",") }
+@@ -89,77 +94,75 @@ func storeFlag(fs *flag.FlagSet) *string {
+ 	return fs.String("store", "", "store directory (default $ABBREVIATORY_STORE or the user cache directory)")
+ }
+ 
+-func openStore(dir string) (*store.Store, error) {
+-	if dir == "" {
+-		d, err := store.DefaultDir()
+-		if err != nil {
+-			return nil, err
+-		}
+-		dir = d
+-	}
+-	return store.Open(dir)
+-}
+-
+ // reduceFlags are the flags reduce and run share.
+ type reduceFlags struct {
+-	format, preserve, dir, key string
+-	budget                     int
+-	keep                       multiFlag
+-	asJSON, noStore, full      bool
++	q        request
++	preserve string
++	keep     multiFlag
++	asJSON   bool
++	dir      string
+ }
+ 
+ func addReduceFlags(fs *flag.FlagSet) *reduceFlags {
+ 	f := &reduceFlags{}
+-	fs.StringVar(&f.format, "format", "auto", "input format: auto, test-output, logs, json, or a format from \"abbreviatory formats\"")
+-	fs.IntVar(&f.budget, "budget", abbreviatory.DefaultBudget, "most bytes of output")
++	fs.StringVar(&f.q.Format, "format", "auto", "input format: auto, test-output, logs, json, or a format from \"abbreviatory formats\"")
++	fs.IntVar(&f.q.Budget, "budget", abbreviatory.DefaultBudget, "most bytes of output")
+ 	fs.StringVar(&f.preserve, "preserve", "errors,failures,warnings", "what is always shown or referenced (any of errors, failures, warnings; empty for none)")
+ 	fs.Var(&f.keep, "keep", "also preserve lines matching this regular expression (repeatable)")
+ 	fs.BoolVar(&f.asJSON, "json", false, "print a JSON object with the counts and the text")
+-	fs.BoolVar(&f.noStore, "no-store", false, "don't store the original; the output then has no references")
+-	fs.BoolVar(&f.full, "full", false, "with history, print the whole report even when nothing changed since the last run")
+-	f.dir = ""
++	fs.BoolVar(&f.q.NoStore, "no-store", false, "don't store the original; the output then has no references")
++	fs.BoolVar(&f.q.Full, "full", false, "with history, print the whole report even when nothing changed since the last run")
+ 	fs.StringVar(&f.dir, "store", "", "store directory (default $ABBREVIATORY_STORE or the user cache directory)")
+ 	return f
+ }
+ 
+-// options checks the flags and turns them into reduce options. A non-zero
+-// code means a usage error was printed.
+-func (f *reduceFlags) options(stderr io.Writer) (abbreviatory.Options, int) {
+-	if f.budget < abbreviatory.MinBudget {
++// request is the reduction the flags ask for, checked: a usage mistake is
++// printed and gives a non-zero code.
++func (f *reduceFlags) request(stderr io.Writer) (request, int) {
++	q := f.q
++	q.Preserve = &f.preserve
++	q.Keep = f.keep
++	if q.Budget < abbreviatory.MinBudget {
++		// Zero means the default elsewhere; on the command line it's a
++		// mistake.
+ 		fmt.Fprintf(stderr, "abbreviatory: -budget must be at least %d bytes\n", abbreviatory.MinBudget)
+-		return abbreviatory.Options{}, 2
+-	}
+-	if err := abbreviatory.CheckFormat(f.format); err != nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return abbreviatory.Options{}, 2
++		return q, 2
+ 	}
+-	opt := abbreviatory.Options{Format: f.format, Budget: f.budget, NoRefs: f.noStore, Full: f.full}
+-	opt.Preserve = []string{}
+-	for _, p := range strings.Split(f.preserve, ",") {
+-		if p = strings.TrimSpace(p); p != "" {
+-			opt.Preserve = append(opt.Preserve, p)
++	if _, err := q.options(); err != nil {
++		msg := err.Error()
++		if strings.HasPrefix(msg, "keep:") {
++			msg = "-" + msg
+ 		}
++		fmt.Fprintln(stderr, "abbreviatory:", msg)
++		return q, 2
+ 	}
+-	if err := abbreviatory.CheckPreserve(opt.Preserve); err != nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return opt, 2
++	return q, 0
++}
++
++// print prints a reduction as text or JSON, and its warnings.
++func (f *reduceFlags) print(o *outcome, stdout, stderr io.Writer) error {
++	for _, w := range o.Warnings {
++		fmt.Fprintln(stderr, "abbreviatory: warning:", w)
+ 	}
+-	for _, k := range f.keep {
+-		re, err := regexp.Compile(k)
+-		if err != nil {
+-			fmt.Fprintln(stderr, "abbreviatory: -keep:", err)
+-			return opt, 2
+-		}
+-		opt.Keep = append(opt.Keep, re)
++	if f.asJSON {
++		return writeJSON(stdout, o.JSON())
+ 	}
+-	return opt, 0
++	_, err := io.WriteString(stdout, o.Res.Text)
++	return err
++}
++
++func writeJSON(w io.Writer, v any) error {
++	enc := json.NewEncoder(w)
++	enc.SetEscapeHTML(false)
++	enc.SetIndent("", "  ")
++	return enc.Encode(v)
+ }
+ 
+ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	fs := flag.NewFlagSet("reduce", flag.ContinueOnError)
+ 	fs.SetOutput(stderr)
+ 	f := addReduceFlags(fs)
+-	fs.StringVar(&f.key, "key", "", "keep a run history under this name and report what changed since the last run")
++	fs.StringVar(&f.q.Key, "key", "", "keep a run history under this name and report what changed since the last run")
+ 	fs.Usage = func() {
+ 		fmt.Fprint(stderr, "Usage: abbreviatory reduce [flags] [file]\n\nReads the file, or standard input, and prints the reduction.\n\n")
+ 		fs.PrintDefaults()
+@@ -174,7 +177,7 @@ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		fmt.Fprintln(stderr, "abbreviatory reduce: one file at most")
+ 		return 2
+ 	}
+-	opt, code := f.options(stderr)
++	q, code := f.request(stderr)
+ 	if code != 0 {
+ 		return code
+ 	}
+@@ -188,184 +191,22 @@ func cmdReduce(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		defer file.Close()
+ 		in = file
+ 	}
+-	if f.key != "" && (fs.NArg() == 0 || fs.Arg(0) == "-") {
+-		// With a history the lock is held from reading the history to
+-		// writing this run. Read piped input to a file first, so the lock
+-		// isn't held while whatever writes the pipe is still running.
+-		sp, err := spoolInput(in)
+-		if err != nil {
+-			fmt.Fprintln(stderr, "abbreviatory:", err)
+-			return 1
+-		}
+-		defer os.Remove(sp.Name())
+-		defer sp.Close()
+-		in = sp
+-	}
+-	if err := reduceAndPrint(in, opt, f, nil, stdout, stderr); err != nil {
++	o, err := core{f.dir}.reduce(in, q, nil)
++	if err != nil {
+ 		fmt.Fprintln(stderr, "abbreviatory:", err)
+ 		return 1
+ 	}
+-	return 0
+-}
+-
+-// spoolInput copies in to a temporary file and returns it, rewound.
+-func spoolInput(in io.Reader) (*os.File, error) {
+-	sp, err := os.CreateTemp("", "abbreviatory-in-*")
+-	if err != nil {
+-		return nil, err
+-	}
+-	if _, err := io.Copy(sp, in); err != nil {
+-		sp.Close()
+-		os.Remove(sp.Name())
+-		return nil, err
+-	}
+-	if _, err := sp.Seek(0, io.SeekStart); err != nil {
+-		sp.Close()
+-		os.Remove(sp.Name())
+-		return nil, err
+-	}
+-	return sp, nil
+-}
+-
+-// reduceAndPrint reduces in, storing the original and recording the run in
+-// the history when asked, and prints the report.
+-// Closing cancel stops a wait for the history's lock; the report is then
+-// made without a comparison.
+-func reduceAndPrint(in io.Reader, opt abbreviatory.Options, f *reduceFlags, cancel <-chan struct{}, stdout, stderr io.Writer) error {
+-	var st *store.Store
+-	if !f.noStore || f.key != "" {
+-		s, err := openStore(f.dir)
+-		if err != nil {
+-			return err
+-		}
+-		st = s
+-	}
+-	var pend *store.Pending
+-	if !f.noStore {
+-		p, err := st.Begin()
+-		if err != nil {
+-			return err
+-		}
+-		pend = p
+-		opt.Sink = pend
+-	}
+-	var res *abbreviatory.Result
+-	reduce := func() error {
+-		var err error
+-		res, err = abbreviatory.Reduce(in, opt)
+-		if err != nil {
+-			if pend != nil {
+-				pend.Abort()
+-			}
+-			return err
+-		}
+-		if pend != nil {
+-			if err := pend.Commit(res.Index); err != nil {
+-				// The report is still worth having; say its references
+-				// won't expand.
+-				fmt.Fprintln(stderr, "abbreviatory: warning: the original could not be stored, so the references in this report can't be expanded:", err)
+-			}
+-		}
+-		return nil
+-	}
+-	if f.key == "" {
+-		if err := reduce(); err != nil {
+-			return err
+-		}
+-	} else {
+-		// Compare and record under the history's lock, so a run of the
+-		// same key at the same time waits and then compares with this one.
+-		var reduceErr error
+-		err := st.UpdateCancel(f.key, cancel, func(h *store.History) (*abbreviatory.Run, error) {
+-			opt.Track = true
+-			opt.History = h.Runs
+-			if reduceErr = reduce(); reduceErr != nil {
+-				return nil, nil
+-			}
+-			res.Run.Time = time.Now().UTC().Format(time.RFC3339)
+-			return res.Run, nil
+-		})
+-		if reduceErr != nil {
+-			return reduceErr
+-		}
+-		if err != nil {
+-			if res == nil {
+-				// The history couldn't be locked or read: report without it.
+-				fmt.Fprintln(stderr, "abbreviatory: warning: no comparison with the last run:", err)
+-				opt.Track, opt.History = false, nil
+-				if err := reduce(); err != nil {
+-					return err
+-				}
+-			} else {
+-				fmt.Fprintln(stderr, "abbreviatory: warning: this run could not be added to the history:", err)
+-			}
+-		}
+-	}
+-	if st != nil {
+-		st.PruneNow()
+-	}
+-	if f.asJSON {
+-		out := map[string]any{
+-			"version":     abbreviatory.Version,
+-			"format":      res.Format,
+-			"family":      res.Family,
+-			"input_bytes": res.InputBytes,
+-			"input_lines": res.InputLines,
+-			"overflow":    res.Overflow,
+-			"records":     res.Records,
+-			"lines":       res.Lines,
+-			"text":        res.Text,
+-		}
+-		if !f.noStore {
+-			out["ref"] = res.ID
+-		}
+-		if res.Delta != nil {
+-			out["run"] = res.Run.N
+-			out["delta"] = deltaJSON(res.Delta)
+-		}
+-		if opt.Exit != nil {
+-			out["exit"] = *opt.Exit
+-		}
+-		enc := json.NewEncoder(stdout)
+-		enc.SetEscapeHTML(false)
+-		enc.SetIndent("", "  ")
+-		return enc.Encode(out)
+-	}
+-	_, err := io.WriteString(stdout, res.Text)
+-	return err
+-}
+-
+-func deltaJSON(d *abbreviatory.Delta) map[string]any {
+-	items := func(list []abbreviatory.DeltaItem) []map[string]any {
+-		out := []map[string]any{}
+-		for _, it := range list {
+-			m := map[string]any{"head": it.Head, "ref": it.Ref}
+-			if it.Flips > 0 {
+-				m["now"], m["changes"], m["window"] = it.Now, it.Flips, it.Window
+-			}
+-			out = append(out, m)
+-		}
+-		return out
+-	}
+-	return map[string]any{
+-		"since":     d.Since,
+-		"identical": d.Identical,
+-		"unchanged": d.Unchanged,
+-		"failing":   d.Failing,
+-		"new":       items(d.New),
+-		"fixed":     items(d.Fixed),
+-		"not_run":   items(d.NotRun),
+-		"flaky":     items(d.Flaky),
+-		"still":     d.Still,
+-		"longest":   d.Longest,
++	if f.print(o, stdout, stderr) != nil {
++		return 1
+ 	}
++	return 0
+ }
+ 
+ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 	flags := flag.NewFlagSet("run", flag.ContinueOnError)
+ 	flags.SetOutput(stderr)
+ 	f := addReduceFlags(flags)
+-	flags.StringVar(&f.key, "key", "", "history name (default: the project directory and the command)")
++	flags.StringVar(&f.q.Key, "key", "", "history name (default: the project directory and the command)")
+ 	noHistory := flags.Bool("no-history", false, "don't keep a run history or compare with the last run")
+ 	flags.Usage = func() {
+ 		fmt.Fprint(stderr, "Usage: abbreviatory run [flags] -- command [args]\n\nRuns the command, reduces what it prints (standard output and standard\nerror together), compares the run with the last run of the same command\nand exits with the command's exit status.\n\n")
+@@ -377,86 +218,34 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 		}
+ 		return 2
+ 	}
+-	cmdArgs := flags.Args()
+-	if len(cmdArgs) == 0 {
++	argv := flags.Args()
++	if len(argv) == 0 {
+ 		flags.Usage()
+ 		return 2
+ 	}
+-	opt, code := f.options(stderr)
++	q, code := f.request(stderr)
+ 	if code != 0 {
+ 		return code
+ 	}
+-	command := strings.Join(cmdArgs, " ")
+-	opt.Command = command
++	q.Command = strings.Join(argv, " ")
+ 	if *noHistory {
+-		f.key = ""
+-	} else if f.key == "" {
+-		f.key = defaultKey(command)
++		q.Key = ""
++	} else if q.Key == "" {
++		q.Key = defaultKey("", q.Command)
+ 	}
+ 
+-	r, w, err := os.Pipe()
++	e, err := execute(argv, execOpts{Stdin: stdin, Forward: true})
+ 	if err != nil {
+ 		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return 1
+-	}
+-	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
+-	cmd.Stdin = stdin
+-	cmd.Stdout = w
+-	cmd.Stderr = w
+-	if err := cmd.Start(); err != nil {
+-		w.Close()
+-		r.Close()
+-		fmt.Fprintf(stderr, "abbreviatory: cannot run %s: %v\n", cmdArgs[0], err)
+-		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
+-			return 127
+-		}
+-		return 126
+-	}
+-	w.Close()
+-
+-	// A signal meant to stop the job (a CI timeout or cancel, Ctrl-C) is
+-	// passed on to the command; the report is still made from what it
+-	// printed. A second one kills it.
+-	sigs := make(chan os.Signal, 2)
+-	signal.Notify(sigs, stopSignals...)
+-	forwarded := make(chan struct{})
+-	go func() {
+-		defer close(forwarded)
+-		n := 0
+-		for sig := range sigs {
+-			if n++; n == 1 && cmd.Process.Signal(sig) == nil {
+-				continue
+-			}
+-			cmd.Process.Kill()
++		var se *startError
++		if errors.As(err, &se) {
++			return se.Status
+ 		}
+-	}()
+-
+-	// The exit status is only known once the command ends, and the report
+-	// shows it: spool the output to disk first (memory stays flat), then
+-	// reduce it.
+-	spool, err := os.CreateTemp("", "abbreviatory-run-*")
+-	if err != nil {
+-		io.Copy(io.Discard, r)
+-		cmd.Wait()
+-		signal.Stop(sigs)
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return exitOf(cmd, 1)
++		return 1
+ 	}
+-	defer os.Remove(spool.Name())
+-	defer spool.Close()
+-	var written atomic.Int64
+-	copied := make(chan error, 1)
+-	go func() {
+-		_, err := io.Copy(countingWriter{spool, &written}, r)
+-		copied <- err
+-	}()
+-	waitErr := cmd.Wait()
+-	status := exitOf(cmd, 1)
+-	signal.Stop(sigs)
+-	close(sigs)
+-	<-forwarded
+-	if waitErr != nil && cmd.ProcessState == nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", waitErr)
++	defer e.Close()
++	for _, w := range e.Warnings {
++		fmt.Fprintln(stderr, "abbreviatory:", w)
+ 	}
+ 
+ 	// The command is gone. From here a first signal stops any wait for the
+@@ -473,102 +262,24 @@ func cmdRun(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+ 				close(cancel)
+ 				continue
+ 			}
+-			os.Remove(spool.Name())
+-			os.Exit(status)
++			e.Close()
++			os.Exit(e.Status)
+ 		}
+ 	}()
+ 
+-	// Something the command started in the background can keep the output
+-	// open after the command is gone; reduce what came within a grace
+-	// period and leave the rest.
+-	var in io.Reader
+-	select {
+-	case err := <-copied:
+-		r.Close()
+-		if err != nil {
+-			fmt.Fprintln(stderr, "abbreviatory: reading the command's output:", err)
+-			return status
+-		}
+-		if _, err := spool.Seek(0, io.SeekStart); err != nil {
+-			fmt.Fprintln(stderr, "abbreviatory:", err)
+-			return status
+-		}
+-		in = spool
+-	case <-time.After(outputGrace):
+-		fmt.Fprintf(stderr, "abbreviatory: the output was still open %s after the command exited (a process it started in the background?); reading stopped\n", outputGrace)
+-		rf, err := os.Open(spool.Name())
+-		if err != nil {
+-			fmt.Fprintln(stderr, "abbreviatory:", err)
+-			return status
+-		}
+-		defer rf.Close()
+-		in = io.LimitReader(rf, written.Load())
+-	}
+-	opt.Exit = &status
+-	if err := reduceAndPrint(in, opt, f, cancel, stdout, stderr); err != nil {
++	status := e.Status
++	q.Exit = &status
++	o, err := core{f.dir}.reduce(e.Output, q, cancel)
++	if err != nil {
+ 		// The command's status decides the exit either way: a CI step
+ 		// shouldn't pass or fail because of the report.
+ 		fmt.Fprintln(stderr, "abbreviatory: could not reduce the output:", err)
++		return status
+ 	}
++	f.print(o, stdout, stderr)
+ 	return status
+ }
+ 
+-// countingWriter counts what it writes.
+-type countingWriter struct {
+-	w io.Writer
+-	n *atomic.Int64
+-}
+-
+-func (c countingWriter) Write(p []byte) (int, error) {
+-	n, err := c.w.Write(p)
+-	c.n.Add(int64(n))
+-	return n, err
+-}
+-
+-// outputGrace is how long run keeps reading output after the command exits.
+-var outputGrace = 5 * time.Second
+-
+-// stopSignals are the signals run passes on to the command.
+-var stopSignals = []os.Signal{os.Interrupt, syscall.SIGTERM}
+-
+-// exitOf is the command's exit status: its own code, 128 plus the signal
+-// number when a signal ended it, or def if it never ran.
+-func exitOf(cmd *exec.Cmd, def int) int {
+-	ps := cmd.ProcessState
+-	if ps == nil {
+-		return def
+-	}
+-	if code := ps.ExitCode(); code >= 0 {
+-		return code
+-	}
+-	if ws, ok := ps.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+-		return 128 + int(ws.Signal())
+-	}
+-	return def
+-}
+-
+-// defaultKey names the history of a command: the project it runs in (the
+-// enclosing Git repository, or the current directory) and the command.
+-func defaultKey(command string) string {
+-	dir, err := os.Getwd()
+-	if err != nil {
+-		return command
+-	}
+-	project := dir
+-	for d := dir; ; {
+-		if _, err := os.Stat(filepath.Join(d, ".git")); err == nil {
+-			project = d
+-			break
+-		}
+-		parent := filepath.Dir(d)
+-		if parent == d {
+-			break
+-		}
+-		d = parent
+-	}
+-	return project + ": " + command
+-}
+-
+ func cmdHistory(args []string, stdout, stderr io.Writer) int {
+ 	fs := flag.NewFlagSet("history", flag.ContinueOnError)
+ 	fs.SetOutput(stderr)
+@@ -588,122 +299,33 @@ func cmdHistory(args []string, stdout, stderr io.Writer) int {
+ 		fs.Usage()
+ 		return 2
+ 	}
+-	st, err := openStore(*dir)
+-	if err != nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return 1
+-	}
+-	all, err := st.Histories()
+-	if err != nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return 1
+-	}
++	c := core{*dir}
+ 	if fs.NArg() == 0 {
+-		if *asJSON {
+-			list := []map[string]any{}
+-			for _, h := range all {
+-				m := map[string]any{"key": h.Key, "runs": len(h.Runs)}
+-				if l := h.Last(); l != nil {
+-					m["last"], m["time"], m["failing"] = l.N, l.Time, l.Failing
+-				}
+-				list = append(list, m)
+-			}
+-			return encodeJSON(stdout, stderr, list)
+-		}
+-		if len(all) == 0 {
+-			fmt.Fprintln(stdout, "no histories yet; use reduce -key NAME or run -- COMMAND")
+-			return 0
++		all, err := c.histories()
++		if err != nil {
++			fmt.Fprintln(stderr, "abbreviatory:", err)
++			return 1
+ 		}
+-		for _, h := range all {
+-			l := h.Last()
+-			if l == nil {
+-				continue
+-			}
+-			fmt.Fprintf(stdout, "%s\n    run %d, %s, %s\n", h.Key, l.N, showTime(l.Time), failingWord(l.Failing))
++		if *asJSON {
++			return exitJSON(stdout, stderr, historiesJSON(all))
+ 		}
++		fmt.Fprint(stdout, historiesText(all))
+ 		return 0
+ 	}
+-	key := fs.Arg(0)
+-	var match *store.History
+-	var matches []string
+-	for _, h := range all {
+-		if h.Key == key {
+-			match, matches = h, nil
+-			break
+-		}
+-		if strings.Contains(h.Key, key) {
+-			match = h
+-			matches = append(matches, h.Key)
+-		}
+-	}
+-	if len(matches) > 1 {
+-		fmt.Fprintf(stderr, "abbreviatory: %q matches %d histories:\n", key, len(matches))
+-		for _, m := range matches {
+-			fmt.Fprintln(stderr, "  "+m)
+-		}
+-		return 1
+-	}
+-	if match == nil {
+-		fmt.Fprintf(stderr, "abbreviatory: no history matches %q\n", key)
++	h, err := c.history(fs.Arg(0))
++	if err != nil {
++		fmt.Fprintln(stderr, "abbreviatory:", err)
+ 		return 1
+ 	}
+ 	if *asJSON {
+-		runs := []map[string]any{}
+-		for _, r := range match.Runs {
+-			m := map[string]any{"run": r.N, "time": r.Time, "ref": r.ID, "format": r.Format, "failing": r.Failing, "new": r.New, "fixed": r.Fixed, "records": r.Records}
+-			if r.Exit != nil {
+-				m["exit"] = *r.Exit
+-			}
+-			runs = append(runs, m)
+-		}
+-		return encodeJSON(stdout, stderr, map[string]any{"key": match.Key, "runs": runs})
+-	}
+-	fmt.Fprintln(stdout, match.Key)
+-	for i := len(match.Runs) - 1; i >= 0; i-- {
+-		r := match.Runs[i]
+-		line := fmt.Sprintf("run %d  %s  %s", r.N, showTime(r.Time), failingWord(r.Failing))
+-		var changes []string
+-		if r.New > 0 {
+-			changes = append(changes, fmt.Sprintf("%d new", r.New))
+-		}
+-		if r.Fixed > 0 {
+-			changes = append(changes, fmt.Sprintf("%d fixed", r.Fixed))
+-		}
+-		if len(changes) > 0 {
+-			line += " (" + strings.Join(changes, ", ") + ")"
+-		}
+-		if r.Exit != nil {
+-			line += fmt.Sprintf("  exit %d", *r.Exit)
+-		}
+-		line += "  ref " + r.ID
+-		fmt.Fprintln(stdout, line)
++		return exitJSON(stdout, stderr, historyJSON(h))
+ 	}
++	fmt.Fprint(stdout, historyText(h))
+ 	return 0
+ }
+ 
+-func failingWord(n int) string {
+-	switch n {
+-	case 0:
+-		return "nothing failing"
+-	case 1:
+-		return "1 failing"
+-	}
+-	return strconv.Itoa(n) + " failing"
+-}
+-
+-func showTime(s string) string {
+-	t, err := time.Parse(time.RFC3339, s)
+-	if err != nil {
+-		return "(no time)"
+-	}
+-	return t.UTC().Format("2006-01-02 15:04 UTC")
+-}
+-
+-func encodeJSON(stdout, stderr io.Writer, v any) int {
+-	enc := json.NewEncoder(stdout)
+-	enc.SetEscapeHTML(false)
+-	enc.SetIndent("", "  ")
+-	if err := enc.Encode(v); err != nil {
++func exitJSON(stdout, stderr io.Writer, v any) int {
++	if err := writeJSON(stdout, v); err != nil {
+ 		fmt.Fprintln(stderr, "abbreviatory:", err)
+ 		return 1
+ 	}
+@@ -728,22 +350,15 @@ func cmdExpand(args []string, stdout, stderr io.Writer) int {
+ 		fs.Usage()
+ 		return 2
+ 	}
+-	st, err := openStore(*dir)
+-	if err != nil {
+-		fmt.Fprintln(stderr, "abbreviatory:", err)
+-		return 1
+-	}
+-	data, err := st.Expand(fs.Arg(0))
+-	if err != nil {
++	if err := (core{*dir}).expand(stdout, fs.Arg(0)); err != nil {
+ 		fmt.Fprintln(stderr, "abbreviatory:", err)
+ 		return 1
+ 	}
+-	if _, err := stdout.Write(data); err != nil {
+-		return 1
+-	}
+ 	return 0
+ }
+ 
++func openStore(dir string) (*store.Store, error) { return core{dir}.store() }
++
+ func cmdPrune(args []string, stdout, stderr io.Writer) int {
+ 	fs := flag.NewFlagSet("prune", flag.ContinueOnError)
+ 	fs.SetOutput(stderr)
+diff --git a/cmd/abbreviatory/mcp.go b/cmd/abbreviatory/mcp.go
+new file mode 100644
+index 0000000..61268d9
+--- /dev/null
++++ b/cmd/abbreviatory/mcp.go
+@@ -0,0 +1,515 @@
++package main
++
++// abbreviatory mcp: a Model Context Protocol server over standard input and
++// output, for coding agents. It speaks JSON-RPC 2.0, one message per line,
++// and offers four tools: reduce, run, expand and history.
++
++import (
++	"bufio"
++	"bytes"
++	"encoding/json"
++	"errors"
++	"flag"
++	"fmt"
++	"io"
++	"os"
++	"os/signal"
++	"strings"
++	"sync"
++	"time"
++
++	abbreviatory "github.com/abbreviatory/engine"
++)
++
++// mcpVersions are the protocol versions the server speaks, newest first.
++var mcpVersions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
++
++// Limits for the MCP server.
++const (
++	mcpMaxMessage    = 256 << 20 // the largest message read
++	mcpDefaultExpand = 4 << 20   // what expand returns at most unless asked
++	mcpMaxExpand     = 64 << 20
++	mcpDefaultTime   = 10 * time.Minute
++)
++
++func cmdMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
++	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
++	fs.SetOutput(stderr)
++	dir := storeFlag(fs)
++	fs.Usage = func() {
++		fmt.Fprint(stderr, "Usage: abbreviatory mcp [flags]\n\nServes the tools reduce, run, expand and history to a coding agent over\nthe Model Context Protocol on standard input and output. Add it to the\nagent's MCP settings as the command \"abbreviatory mcp\".\n\n")
++		fs.PrintDefaults()
++	}
++	if err := fs.Parse(args); err != nil {
++		if errors.Is(err, flag.ErrHelp) {
++			return 0
++		}
++		return 2
++	}
++	if fs.NArg() > 0 {
++		fs.Usage()
++		return 2
++	}
++	s := &mcpServer{c: core{*dir}, out: stdout, running: map[string]*mcpCall{}}
++	// Stopped by a signal (a client shutting the server down): stop the
++	// commands still running, with what they started, before going.
++	sigs := make(chan os.Signal, 1)
++	signal.Notify(sigs, stopSignals...)
++	defer signal.Stop(sigs)
++	go func() {
++		if _, ok := <-sigs; ok {
++			s.shutdown()
++			os.Exit(0)
++		}
++	}()
++	if err := s.serve(stdin); err != nil {
++		fmt.Fprintln(stderr, "abbreviatory:", err)
++		return 1
++	}
++	return 0
++}
++
++type mcpServer struct {
++	c       core
++	out     io.Writer
++	mu      sync.Mutex // guards out and running
++	running map[string]*mcpCall
++	wg      sync.WaitGroup
++}
++
++// mcpCall is a tools/call in progress. Closing stop stops its command; a
++// call the client cancelled gets no answer, one stopped because the server
++// is stopping still does.
++type mcpCall struct {
++	stop      chan struct{}
++	stopped   bool
++	cancelled bool
++}
++
++func (c *mcpCall) halt() {
++	if !c.stopped {
++		c.stopped = true
++		close(c.stop)
++	}
++}
++
++type rpcMessage struct {
++	JSONRPC string          `json:"jsonrpc"`
++	ID      json.RawMessage `json:"id,omitempty"`
++	Method  string          `json:"method,omitempty"`
++	Params  json.RawMessage `json:"params,omitempty"`
++}
++
++type rpcError struct {
++	Code    int    `json:"code"`
++	Message string `json:"message"`
++}
++
++// serve reads messages until the input ends. Each request is answered in its
++// own goroutine, so a long run doesn't hold up a ping or a cancellation. When
++// the input ends the client is gone: running commands are stopped.
++func (s *mcpServer) serve(in io.Reader) error {
++	r := bufio.NewReaderSize(in, 1<<20)
++	defer s.shutdown()
++	for {
++		line, err := readMessage(r)
++		if len(bytes.TrimSpace(line)) > 0 {
++			s.handle(line)
++		}
++		if err == io.EOF {
++			return nil
++		}
++		if err != nil {
++			return err
++		}
++	}
++}
++
++// shutdown stops every running command (SIGTERM to its process group, then
++// SIGKILL after 5 seconds) and waits for them, at most 8 seconds.
++func (s *mcpServer) shutdown() {
++	s.mu.Lock()
++	for _, c := range s.running {
++		c.halt()
++	}
++	s.mu.Unlock()
++	done := make(chan struct{})
++	go func() {
++		s.wg.Wait()
++		close(done)
++	}()
++	select {
++	case <-done:
++	case <-time.After(8 * time.Second):
++	}
++}
++
++func readMessage(r *bufio.Reader) ([]byte, error) {
++	var buf []byte
++	for {
++		part, err := r.ReadSlice('\n')
++		buf = append(buf, part...)
++		if len(buf) > mcpMaxMessage {
++			// Skip the rest of it.
++			for err == bufio.ErrBufferFull {
++				_, err = r.ReadSlice('\n')
++			}
++			return []byte(`{"jsonrpc":"2.0","method":"(too large)"}`), err
++		}
++		if err != bufio.ErrBufferFull {
++			return buf, err
++		}
++	}
++}
++
++func (s *mcpServer) send(v any) {
++	data, err := json.Marshal(v)
++	if err != nil {
++		data, _ = json.Marshal(map[string]any{"jsonrpc": "2.0", "error": rpcError{-32603, err.Error()}})
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	s.out.Write(append(data, '\n'))
++}
++
++func (s *mcpServer) reply(id json.RawMessage, result any) {
++	s.send(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
++}
++
++func (s *mcpServer) fail(id json.RawMessage, code int, msg string) {
++	if id == nil {
++		id = json.RawMessage("null")
++	}
++	s.send(map[string]any{"jsonrpc": "2.0", "id": id, "error": rpcError{code, msg}})
++}
++
++func (s *mcpServer) handle(line []byte) {
++	if !json.Valid(line) {
++		s.fail(nil, -32700, "parse error: not JSON")
++		return
++	}
++	if t := bytes.TrimSpace(line); t[0] != '{' {
++		// Batches went out of the protocol in 2025-06-18; anything but an
++		// object isn't a request.
++		s.fail(nil, -32600, "invalid request: expected one JSON-RPC object")
++		return
++	}
++	var m rpcMessage
++	if err := json.Unmarshal(line, &m); err != nil {
++		s.fail(nil, -32600, "invalid request: "+err.Error())
++		return
++	}
++	if m.Method == "" {
++		// A response from the client (the server sends no requests), or
++		// nonsense: nothing to answer.
++		return
++	}
++	if m.Method == "(too large)" {
++		s.fail(nil, -32600, fmt.Sprintf("message larger than %d MB", mcpMaxMessage>>20))
++		return
++	}
++	notification := len(m.ID) == 0
++	switch m.Method {
++	case "notifications/initialized", "notifications/roots/list_changed":
++		return
++	case "notifications/cancelled":
++		var p struct {
++			RequestID json.RawMessage `json:"requestId"`
++		}
++		json.Unmarshal(m.Params, &p)
++		s.mu.Lock()
++		if c, ok := s.running[string(p.RequestID)]; ok {
++			c.cancelled = true
++			c.halt()
++		}
++		s.mu.Unlock()
++		return
++	}
++	if notification {
++		return
++	}
++	switch m.Method {
++	case "initialize":
++		var p struct {
++			ProtocolVersion string `json:"protocolVersion"`
++		}
++		json.Unmarshal(m.Params, &p)
++		version := mcpVersions[0]
++		for _, v := range mcpVersions {
++			if v == p.ProtocolVersion {
++				version = v
++			}
++		}
++		s.reply(m.ID, map[string]any{
++			"protocolVersion": version,
++			"capabilities":    map[string]any{"tools": map[string]any{}},
++			"serverInfo":      map[string]any{"name": "abbreviatory", "version": abbreviatory.Version},
++			"instructions":    mcpInstructions,
++		})
++	case "ping":
++		s.reply(m.ID, map[string]any{})
++	case "tools/list":
++		s.reply(m.ID, map[string]any{"tools": mcpTools()})
++	case "tools/call":
++		call := &mcpCall{stop: make(chan struct{})}
++		s.mu.Lock()
++		s.running[string(m.ID)] = call
++		s.mu.Unlock()
++		s.wg.Add(1)
++		go func() {
++			defer s.wg.Done()
++			result, rerr := s.call(m.Params, call.stop)
++			s.mu.Lock()
++			cancelled := call.cancelled
++			if s.running[string(m.ID)] == call {
++				delete(s.running, string(m.ID))
++			}
++			s.mu.Unlock()
++			if cancelled {
++				return // the client cancelled it: no answer is expected
++			}
++			if rerr != nil {
++				s.fail(m.ID, rerr.Code, rerr.Message)
++				return
++			}
++			s.reply(m.ID, result)
++		}()
++	default:
++		s.fail(m.ID, -32601, "unknown method "+m.Method)
++	}
++}
++
++const mcpInstructions = "Abbreviatory reduces large tool output (test runs, build and application logs, JSON) to a short report within a byte budget: failures, errors and warnings first, repeats folded into one line with a count, every left-out part reachable through a reference such as [ref 3f2a9c1b7e04:g12]. Use run to run a test or build command instead of reading its whole output; with a history it says what changed since the last run (new, fixed, still failing, flaky), and one line when nothing did. Use expand on a reference to see the original lines."
++
++// toolArgs are the arguments every tool may get; each uses its own.
++type toolArgs struct {
++	Text      *string  `json:"text"`
++	Path      string   `json:"path"`
++	Command   []string `json:"command"`
++	Cwd       string   `json:"cwd"`
++	Timeout   int      `json:"timeout_seconds"`
++	Ref       string   `json:"ref"`
++	MaxBytes  int      `json:"max_bytes"`
++	Format    string   `json:"format"`
++	Budget    int      `json:"budget"`
++	Preserve  *string  `json:"preserve"`
++	Keep      []string `json:"keep"`
++	Key       string   `json:"key"`
++	Full      bool     `json:"full"`
++	NoStore   bool     `json:"no_store"`
++	NoHistory bool     `json:"no_history"`
++	Stdin     *string  `json:"stdin"`
++}
++
++func (a toolArgs) request() request {
++	return request{Format: a.Format, Budget: a.Budget, Preserve: a.Preserve, Keep: a.Keep, Key: a.Key, Full: a.Full, NoStore: a.NoStore}
++}
++
++// call runs a tool. Problems with the tool's work come back as a result
++// with isError set, as the protocol asks; only an unknown tool or arguments
++// that aren't JSON are protocol errors.
++func (s *mcpServer) call(params json.RawMessage, cancel <-chan struct{}) (any, *rpcError) {
++	var p struct {
++		Name      string          `json:"name"`
++		Arguments json.RawMessage `json:"arguments"`
++	}
++	if err := json.Unmarshal(params, &p); err != nil {
++		return nil, &rpcError{-32602, "invalid params: " + err.Error()}
++	}
++	var a toolArgs
++	if len(p.Arguments) > 0 && string(p.Arguments) != "null" {
++		dec := json.NewDecoder(bytes.NewReader(p.Arguments))
++		dec.DisallowUnknownFields()
++		if err := dec.Decode(&a); err != nil {
++			return toolError("bad arguments for " + p.Name + ": " + err.Error()), nil
++		}
++	}
++	switch p.Name {
++	case "reduce":
++		return s.toolReduce(a, cancel), nil
++	case "run":
++		return s.toolRun(a, cancel), nil
++	case "expand":
++		return s.toolExpand(a), nil
++	case "history":
++		return s.toolHistory(a), nil
++	}
++	return nil, &rpcError{-32602, "unknown tool " + p.Name}
++}
++
++func toolError(msg string) map[string]any {
++	return map[string]any{"content": []map[string]any{{"type": "text", "text": msg}}, "isError": true}
++}
++
++func toolText(text string, structured any) map[string]any {
++	out := map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": false}
++	if structured != nil {
++		out["structuredContent"] = structured
++	}
++	return out
++}
++
++func (s *mcpServer) toolReduce(a toolArgs, cancel <-chan struct{}) map[string]any {
++	var in io.Reader
++	switch {
++	case a.Text != nil && a.Path != "":
++		return toolError("give text or path, not both")
++	case a.Text != nil:
++		in = strings.NewReader(*a.Text)
++	case a.Path != "":
++		f, err := os.Open(a.Path)
++		if err != nil {
++			return toolError(err.Error())
++		}
++		defer f.Close()
++		in = f
++	default:
++		return toolError("give the output to reduce as text, or a file as path")
++	}
++	o, err := s.c.reduce(in, a.request(), cancel)
++	if err != nil {
++		return toolError(err.Error())
++	}
++	return withWarnings(toolText(o.Res.Text, o.JSON()), o.Warnings)
++}
++
++func (s *mcpServer) toolRun(a toolArgs, cancel <-chan struct{}) map[string]any {
++	if len(a.Command) == 0 {
++		return toolError("give the command as an array, such as [\"go\", \"test\", \"./...\"]")
++	}
++	timeout := mcpDefaultTime
++	if a.Timeout > 0 {
++		timeout = time.Duration(a.Timeout) * time.Second
++	}
++	x := execOpts{Dir: a.Cwd, Timeout: timeout, Cancel: cancel, Group: true}
++	if a.Stdin != nil {
++		x.Stdin = strings.NewReader(*a.Stdin)
++	}
++	e, err := execute(a.Command, x)
++	if err != nil {
++		var se *startError
++		if errors.As(err, &se) {
++			return toolError(fmt.Sprintf("%v (exit status %d)", err, se.Status))
++		}
++		return toolError(err.Error())
++	}
++	defer e.Close()
++	q := a.request()
++	q.Command = strings.Join(a.Command, " ")
++	status := e.Status
++	q.Exit = &status
++	if a.NoHistory {
++		q.Key = ""
++	} else if q.Key == "" {
++		q.Key = defaultKey(a.Cwd, q.Command)
++	}
++	o, err := s.c.reduce(e.Output, q, cancel)
++	if err != nil {
++		return toolError(fmt.Sprintf("the command exited with status %d, and its output could not be reduced: %v", status, err))
++	}
++	o.Warnings = append(e.Warnings, o.Warnings...)
++	result := toolText(o.Res.Text, o.JSON())
++	if a.NoHistory {
++		// Without a history the report doesn't show the exit status.
++		result["content"] = append(result["content"].([]map[string]any), map[string]any{"type": "text", "text": fmt.Sprintf("exit status %d", status)})
++	}
++	return withWarnings(result, o.Warnings)
++}
++
++func withWarnings(result map[string]any, warnings []string) map[string]any {
++	if len(warnings) > 0 {
++		result["content"] = append(result["content"].([]map[string]any), map[string]any{"type": "text", "text": "warning: " + strings.Join(warnings, "\nwarning: ")})
++	}
++	return result
++}
++
++func (s *mcpServer) toolExpand(a toolArgs) map[string]any {
++	if a.Ref == "" {
++		return toolError("give a reference such as 3f2a9c1b7e04:g12")
++	}
++	limit := mcpDefaultExpand
++	if a.MaxBytes > 0 {
++		limit = min(a.MaxBytes, mcpMaxExpand)
++	}
++	lw := &limitWriter{n: limit}
++	if err := s.c.expand(lw, a.Ref); err != nil {
++		if errors.Is(err, errTooLarge) {
++			return toolError(fmt.Sprintf("%s is more than the %d bytes this returns; expand a part of it, such as a group (:g12), a kind (:error) or a line range (:L1-500), or raise max_bytes (up to %d)", a.Ref, limit, mcpMaxExpand))
++		}
++		return toolError(err.Error())
++	}
++	return toolText(string(lw.buf), nil)
++}
++
++func (s *mcpServer) toolHistory(a toolArgs) map[string]any {
++	if a.Key == "" {
++		all, err := s.c.histories()
++		if err != nil {
++			return toolError(err.Error())
++		}
++		return toolText(historiesText(all), map[string]any{"histories": historiesJSON(all)})
++	}
++	h, err := s.c.history(a.Key)
++	if err != nil {
++		return toolError(err.Error())
++	}
++	return toolText(historyText(h), historyJSON(h))
++}
++
++// mcpTools describes the tools for tools/list.
++func mcpTools() []map[string]any {
++	str := func(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
++	integer := func(desc string) map[string]any { return map[string]any{"type": "integer", "description": desc} }
++	boolean := func(desc string) map[string]any { return map[string]any{"type": "boolean", "description": desc} }
++	common := func(props map[string]any) map[string]any {
++		props["format"] = str("auto (the default), test-output, logs, json, or one of: " + strings.Join(abbreviatory.FormatNames(), ", "))
++		props["budget"] = integer(fmt.Sprintf("most bytes of the report; default %d, at least %d", abbreviatory.DefaultBudget, abbreviatory.MinBudget))
++		props["preserve"] = str("what is always shown or referenced: any of errors, failures, warnings, comma separated; default all three, empty for none")
++		props["keep"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "regular expressions; matching lines are kept like errors"}
++		props["full"] = boolean("with a history, the whole report even when nothing changed since the last run")
++		props["no_store"] = boolean("don't keep the original; the report then has no references")
++		return props
++	}
++	return []map[string]any{
++		{
++			"name":        "reduce",
++			"title":       "Reduce output",
++			"description": "Reduce tool output (a test run, a build or application log, a JSON document) to a short report: failures, errors and warnings first, repeats folded with a count, within the byte budget. Parts left out carry references for expand. Give key to compare with the last reduction under that key.",
++			"inputSchema": map[string]any{"type": "object", "properties": common(map[string]any{
++				"text": str("the output to reduce"),
++				"path": str("a file to reduce instead of text"),
++				"key":  str("a history name: compare with the last run under it and record this one"),
++			})},
++		},
++		{
++			"name":        "run",
++			"title":       "Run a command and reduce its output",
++			"description": "Run a command (tests, a build, a linter), reduce what it prints (standard output and standard error together) and compare with its last run: new failures, fixed ones, still failing, flaky. One line when nothing changed. The report shows the exit status.",
++			"inputSchema": map[string]any{"type": "object", "required": []string{"command"}, "properties": common(map[string]any{
++				"command":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "the command and its arguments, such as [\"go\", \"test\", \"./...\"]; not run through a shell"},
++				"cwd":             str("the directory to run it in; default the server's"),
++				"timeout_seconds": integer("stop the command after this long; default 600"),
++				"stdin":           str("text to give the command on standard input"),
++				"key":             str("the history name; default the project directory and the command"),
++				"no_history":      boolean("don't compare with the last run or record this one"),
++			})},
++		},
++		{
++			"name":        "expand",
++			"title":       "Expand a reference",
++			"description": "Return the original lines a reference from a report points to, byte for byte. References look like 3f2a9c1b7e04:g12 (a group), :error or :fail (every line of a kind), :L10-40 (a line range), or no selector (the whole input).",
++			"inputSchema": map[string]any{"type": "object", "required": []string{"ref"}, "properties": map[string]any{
++				"ref":       str("the reference, with or without the brackets and the word ref"),
++				"max_bytes": integer(fmt.Sprintf("the most bytes to return; default %d, up to %d", mcpDefaultExpand, mcpMaxExpand)),
++			}},
++		},
++		{
++			"name":        "history",
++			"title":       "List run histories",
++			"description": "List the run histories, or with key the runs of one: when, how many failing, how many new and fixed, the exit status and the reference of each.",
++			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{
++				"key": str("the history's key, or a part of it that matches one"),
++			}},
++		},
++	}
++}
+diff --git a/cmd/abbreviatory/mcp_test.go b/cmd/abbreviatory/mcp_test.go
+new file mode 100644
+index 0000000..0bf63a8
+--- /dev/null
++++ b/cmd/abbreviatory/mcp_test.go
+@@ -0,0 +1,269 @@
++package main
++
++import (
++	"bufio"
++	"encoding/json"
++	"io"
++	"os"
++	"os/exec"
++	"path/filepath"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++)
++
++// mcpSession drives the MCP server over pipes, as an agent would.
++type mcpSession struct {
++	t    *testing.T
++	in   io.WriteCloser
++	out  *bufio.Reader
++	done chan int
++}
++
++func startMCP(t *testing.T, dir string) *mcpSession {
++	inR, inW := io.Pipe()
++	outR, outW := io.Pipe()
++	s := &mcpSession{t: t, in: inW, out: bufio.NewReader(outR), done: make(chan int, 1)}
++	go func() {
++		code := run([]string{"mcp", "-store", dir}, inR, outW, io.Discard)
++		outW.Close()
++		s.done <- code
++	}()
++	t.Cleanup(func() { inW.Close() })
++	return s
++}
++
++func (s *mcpSession) send(msg string) {
++	if _, err := io.WriteString(s.in, msg+"\n"); err != nil {
++		s.t.Fatal(err)
++	}
++}
++
++func (s *mcpSession) recv() map[string]any {
++	type line struct {
++		b   []byte
++		err error
++	}
++	ch := make(chan line, 1)
++	go func() {
++		b, err := s.out.ReadBytes('\n')
++		ch <- line{b, err}
++	}()
++	select {
++	case l := <-ch:
++		if l.err != nil {
++			s.t.Fatalf("reading from the server: %v", l.err)
++		}
++		var m map[string]any
++		if err := json.Unmarshal(l.b, &m); err != nil {
++			s.t.Fatalf("not JSON: %s", l.b)
++		}
++		return m
++	case <-time.After(20 * time.Second):
++		s.t.Fatal("no answer from the server")
++		return nil
++	}
++}
++
++func TestMCPProtocol(t *testing.T) {
++	s := startMCP(t, t.TempDir())
++	s.send(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}`)
++	m := s.recv()
++	r := m["result"].(map[string]any)
++	if r["protocolVersion"] != "2025-03-26" || r["serverInfo"].(map[string]any)["name"] != "abbreviatory" {
++		t.Fatalf("initialize: %v", m)
++	}
++	s.send(`{"jsonrpc":"2.0","method":"notifications/initialized"}`)
++	s.send(`{"jsonrpc":"2.0","id":"a","method":"ping"}`)
++	if m := s.recv(); m["id"] != "a" || m["result"] == nil {
++		t.Fatalf("ping: %v", m)
++	}
++	s.send(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)
++	tools := s.recv()["result"].(map[string]any)["tools"].([]any)
++	var names []string
++	for _, tl := range tools {
++		tm := tl.(map[string]any)
++		names = append(names, tm["name"].(string))
++		if tm["inputSchema"].(map[string]any)["type"] != "object" || tm["description"] == "" {
++			t.Fatalf("tool %v", tm)
++		}
++	}
++	if strings.Join(names, ",") != "reduce,run,expand,history" {
++		t.Fatalf("tools: %v", names)
++	}
++	// An unknown version gets the newest.
++	s.send(`{"jsonrpc":"2.0","id":3,"method":"initialize","params":{"protocolVersion":"1999-01-01"}}`)
++	if v := s.recv()["result"].(map[string]any)["protocolVersion"]; v != mcpVersions[0] {
++		t.Fatalf("version for an unknown one: %v", v)
++	}
++	for _, c := range []struct {
++		msg  string
++		code float64
++	}{
++		{`{"jsonrpc":"2.0","id":4,"method":"resources/list"}`, -32601},
++		{`{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"frobnicate","arguments":{}}}`, -32602},
++		{`not json`, -32700},
++	} {
++		s.send(c.msg)
++		m := s.recv()
++		if e, ok := m["error"].(map[string]any); !ok || e["code"] != c.code {
++			t.Fatalf("%s: %v", c.msg, m)
++		}
++	}
++	// Tool problems come back as results marked as errors.
++	for _, args := range []string{`{}`, `{"text":"x","path":"y"}`, `{"text":"x","budget":5}`, `{"text":"x","bogus":1}`, `{"path":"/no/such/file"}`} {
++		s.send(`{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"reduce","arguments":` + args + `}}`)
++		r := s.recv()["result"].(map[string]any)
++		if r["isError"] != true {
++			t.Fatalf("reduce %s: %v", args, r)
++		}
++	}
++	s.send(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"reduce","arguments":{"text":"2026-10-18T08:00:01Z ERROR disk full\n"}}}`)
++	r = s.recv()["result"].(map[string]any)
++	text := r["content"].([]any)[0].(map[string]any)["text"].(string)
++	if r["isError"] != false || !strings.Contains(text, "ERROR disk full") {
++		t.Fatalf("reduce: %v", r)
++	}
++	ref := r["structuredContent"].(map[string]any)["ref"].(string)
++	s.send(`{"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"expand","arguments":{"ref":"` + ref + `","max_bytes":10}}}`)
++	if r := s.recv()["result"].(map[string]any); r["isError"] != true || !strings.Contains(r["content"].([]any)[0].(map[string]any)["text"].(string), "raise max_bytes") {
++		t.Fatalf("expand over the limit: %v", r)
++	}
++	s.in.Close()
++	if code := <-s.done; code != 0 {
++		t.Fatalf("exit %d at the end of input", code)
++	}
++}
++
++func TestMCPRun(t *testing.T) {
++	if runtime.GOOS == "windows" {
++		t.Skip("uses sh")
++	}
++	dir := t.TempDir()
++	s := startMCP(t, dir)
++	call := func(id, args string) map[string]any {
++		s.send(`{"jsonrpc":"2.0","id":` + id + `,"method":"tools/call","params":{"name":"run","arguments":` + args + `}}`)
++		return s.recv()["result"].(map[string]any)
++	}
++	texts := func(r map[string]any) []string {
++		var out []string
++		for _, c := range r["content"].([]any) {
++			out = append(out, c.(map[string]any)["text"].(string))
++		}
++		return out
++	}
++	r := call("1", `{"command":["sh","-c","echo x ERROR boom; exit 3"],"key":"job"}`)
++	if r["isError"] != false || !strings.Contains(texts(r)[0], "run 1, exit status 3") || r["structuredContent"].(map[string]any)["exit"] != float64(3) {
++		t.Fatalf("run: %v", r)
++	}
++	r = call("2", `{"command":["sh","-c","echo x ERROR boom; exit 3"],"key":"job"}`)
++	if !strings.Contains(texts(r)[0], "run 2, exit status 3, identical to run 1") {
++		t.Fatalf("second run: %v", texts(r))
++	}
++	r = call("3", `{"command":["sh","-c","echo fine"],"no_history":true}`)
++	if tx := texts(r); len(tx) != 2 || tx[1] != "exit status 0" {
++		t.Fatalf("no history: %v", tx)
++	}
++	r = call("4", `{"command":["no-such-command-abbreviatory"]}`)
++	if r["isError"] != true || !strings.Contains(texts(r)[0], "exit status 127") {
++		t.Fatalf("missing command: %v", r)
++	}
++	r = call("5", `{"command":["sh","-c","echo in $(pwd); cat"],"cwd":"`+dir+`","stdin":"from stdin\n","no_history":true}`)
++	if !strings.Contains(texts(r)[0], "in "+dir) || !strings.Contains(texts(r)[0], "from stdin") {
++		t.Fatalf("cwd and stdin: %v", texts(r))
++	}
++	start := time.Now()
++	r = call("6", `{"command":["sh","-c","echo started; sleep 30"],"timeout_seconds":1,"no_history":true}`)
++	if time.Since(start) > 10*time.Second || !strings.Contains(strings.Join(texts(r), "\n"), "time limit") {
++		t.Fatalf("timeout after %s: %v", time.Since(start), texts(r))
++	}
++	// A cancelled run is stopped and gets no answer; the next request does.
++	s.send(`{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"run","arguments":{"command":["sleep","30"],"no_history":true}}}`)
++	time.Sleep(300 * time.Millisecond)
++	start = time.Now()
++	s.send(`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":7}}`)
++	s.send(`{"jsonrpc":"2.0","id":8,"method":"ping"}`)
++	if m := s.recv(); m["id"] != float64(8) {
++		t.Fatalf("after a cancel: %v", m)
++	}
++	// The default key is the directory and the command.
++	call("9", `{"command":["sh","-c","echo x ERROR a"],"cwd":"`+dir+`"}`)
++	s.send(`{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"history","arguments":{}}}`)
++	if h := texts(s.recv()["result"].(map[string]any))[0]; !strings.Contains(h, dir+": sh -c echo x ERROR a") || !strings.Contains(h, "job") {
++		t.Fatalf("history: %s", h)
++	}
++	s.in.Close()
++	select {
++	case <-s.done:
++	case <-time.After(15 * time.Second):
++		t.Fatal("the cancelled run wasn't stopped")
++	}
++	if time.Since(start) > 15*time.Second {
++		t.Fatal("cancelling took too long")
++	}
++}
++
++func buildBinary(t *testing.T) string {
++	bin := filepath.Join(t.TempDir(), "abbreviatory")
++	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
++		t.Skipf("can't build: %v %s", err, out)
++	}
++	return bin
++}
++
++func execCommand(name string, args ...string) *exec.Cmd { return exec.Command(name, args...) }
++
++// Review of 0.3: batches and non-objects are invalid requests; a response
++// from the client gets no answer; the end of input stops running commands.
++func TestMCPMessagesAndShutdown(t *testing.T) {
++	s := startMCP(t, t.TempDir())
++	for _, msg := range []string{`[{"jsonrpc":"2.0","id":1,"method":"ping"}]`, `42`, `"ping"`} {
++		s.send(msg)
++		if e, ok := s.recv()["error"].(map[string]any); !ok || e["code"] != float64(-32600) {
++			t.Fatalf("%s: not an invalid request", msg)
++		}
++	}
++	s.send(`{"jsonrpc":"2.0","id":99,"result":{}}`)
++	s.send(`{"jsonrpc":"2.0","id":2,"method":"ping"}`)
++	if m := s.recv(); m["id"] != float64(2) {
++		t.Fatalf("a client response was answered: %v", m)
++	}
++	if runtime.GOOS == "windows" {
++		return
++	}
++	marker := filepath.Join(t.TempDir(), "still-running")
++	s.send(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"command":["sh","-c","sleep 30 & echo $! > ` + marker + `; wait"],"no_history":true}}}`)
++	time.Sleep(500 * time.Millisecond)
++	start := time.Now()
++	go io.Copy(io.Discard, s.out) // the stopped run is still answered
++	s.in.Close()
++	select {
++	case <-s.done:
++	case <-time.After(10 * time.Second):
++		t.Fatal("the server waited for the running command")
++	}
++	if d := time.Since(start); d > 7*time.Second {
++		t.Fatalf("stopping took %s", d)
++	}
++	pid, _ := os.ReadFile(marker)
++	if p := strings.TrimSpace(string(pid)); p != "" {
++		// The signal lands a moment later; a zombie left for init counts
++		// as gone.
++		alive := func() bool {
++			st, err := os.ReadFile("/proc/" + p + "/stat")
++			if err != nil {
++				return exec.Command("kill", "-0", p).Run() == nil
++			}
++			f := strings.Fields(string(st))
++			return len(f) > 2 && f[2] != "Z"
++		}
++		for i := 0; i < 30 && alive(); i++ {
++			time.Sleep(100 * time.Millisecond)
++		}
++		if alive() {
++			exec.Command("kill", "-9", p).Run()
++			t.Fatalf("what the command started (pid %s) is still running", p)
++		}
++	}
++}
+diff --git a/cmd/abbreviatory/norace_test.go b/cmd/abbreviatory/norace_test.go
+new file mode 100644
+index 0000000..94aee52
+--- /dev/null
++++ b/cmd/abbreviatory/norace_test.go
+@@ -0,0 +1,5 @@
++//go:build !race
++
++package main
++
++const raceEnabled = false
+diff --git a/cmd/abbreviatory/parity_test.go b/cmd/abbreviatory/parity_test.go
+new file mode 100644
+index 0000000..6b16265
+--- /dev/null
++++ b/cmd/abbreviatory/parity_test.go
+@@ -0,0 +1,380 @@
++package main
++
++// The 0.3 acceptance test: the command line, the HTTP service and the MCP
++// server give the same results on the whole corpus. Each front end gets a
++// store of its own; every fixture is reduced with several option sets,
++// every reference in every report is expanded, and run histories built
++// through each are compared.
++
++import (
++	"bytes"
++	"encoding/json"
++	"io"
++	"net/http"
++	"net/http/httptest"
++	"net/url"
++	"os"
++	"path/filepath"
++	"reflect"
++	"regexp"
++	"sort"
++	"strconv"
++	"strings"
++	"testing"
++)
++
++// option sets, as command line flags; the HTTP and MCP forms are derived.
++type optSet struct {
++	name     string
++	format   string
++	budget   int
++	preserve *string
++	keep     []string
++	noStore  bool
++}
++
++func strp(s string) *string { return &s }
++
++var optSets = []optSet{
++	{name: "defaults"},
++	{name: "small", budget: 1024},
++	{name: "failures and a keep rule", budget: 2048, preserve: strp("failures"), keep: []string{`queue depth=3[0-9]|test_parse`}},
++	{name: "read as a log", format: "logs", budget: 3000},
++	{name: "nothing preserved, no store", preserve: strp(""), noStore: true},
++}
++
++func (o optSet) flags() []string {
++	var f []string
++	if o.format != "" {
++		f = append(f, "-format", o.format)
++	}
++	if o.budget != 0 {
++		f = append(f, "-budget", strconv.Itoa(o.budget))
++	}
++	if o.preserve != nil {
++		f = append(f, "-preserve", *o.preserve)
++	}
++	for _, k := range o.keep {
++		f = append(f, "-keep", k)
++	}
++	if o.noStore {
++		f = append(f, "-no-store")
++	}
++	return f
++}
++
++func (o optSet) query() url.Values {
++	v := url.Values{}
++	if o.format != "" {
++		v.Set("format", o.format)
++	}
++	if o.budget != 0 {
++		v.Set("budget", strconv.Itoa(o.budget))
++	}
++	if o.preserve != nil {
++		v.Set("preserve", *o.preserve)
++	}
++	for _, k := range o.keep {
++		v.Add("keep", k)
++	}
++	if o.noStore {
++		v.Set("no_store", "true")
++	}
++	return v
++}
++
++func (o optSet) args() map[string]any {
++	a := map[string]any{}
++	if o.format != "" {
++		a["format"] = o.format
++	}
++	if o.budget != 0 {
++		a["budget"] = o.budget
++	}
++	if o.preserve != nil {
++		a["preserve"] = *o.preserve
++	}
++	if len(o.keep) > 0 {
++		a["keep"] = o.keep
++	}
++	if o.noStore {
++		a["no_store"] = true
++	}
++	return a
++}
++
++// frontEnds are the three ways in, each with its own store.
++type frontEnds struct {
++	t                   *testing.T
++	cliDir, mcpDir      string
++	srv                 *httptest.Server
++	mcp                 *mcpServer
++	token               string
++	cliRuns, mcpRunsOut bytes.Buffer
++}
++
++func newFrontEnds(t *testing.T) *frontEnds {
++	f := &frontEnds{t: t, cliDir: t.TempDir(), mcpDir: t.TempDir(), token: "s3cret"}
++	f.srv = httptest.NewServer(newHandler(core{t.TempDir()}, f.token, 1<<30))
++	t.Cleanup(f.srv.Close)
++	f.mcp = &mcpServer{c: core{f.mcpDir}, out: io.Discard, running: map[string]*mcpCall{}}
++	return f
++}
++
++func decode(t *testing.T, data []byte) map[string]any {
++	t.Helper()
++	var m map[string]any
++	if err := json.Unmarshal(data, &m); err != nil {
++		t.Fatalf("not JSON: %v\n%s", err, data)
++	}
++	return m
++}
++
++// normal drops what may differ between front ends for good reason: the
++// time a run was recorded.
++func normal(v any) any {
++	switch x := v.(type) {
++	case map[string]any:
++		out := map[string]any{}
++		for k, val := range x {
++			if k != "time" {
++				out[k] = normal(val)
++			}
++		}
++		return out
++	case []any:
++		out := make([]any, len(x))
++		for i, val := range x {
++			out[i] = normal(val)
++		}
++		return out
++	}
++	return v
++}
++
++// jsonRound passes a value through JSON, so maps built in Go compare with
++// maps decoded from JSON.
++func jsonRound(t *testing.T, v any) any {
++	data, err := json.Marshal(v)
++	if err != nil {
++		t.Fatal(err)
++	}
++	var out any
++	json.Unmarshal(data, &out)
++	return out
++}
++
++func (f *frontEnds) cliReduce(path string, extra ...string) map[string]any {
++	args := append([]string{"reduce", "-store", f.cliDir, "-json"}, extra...)
++	args = append(args, path)
++	out, errs, code := runCLI(f.t, "", args...)
++	if code != 0 {
++		f.t.Fatalf("cli %v: exit %d: %s", args, code, errs)
++	}
++	return decode(f.t, []byte(out))
++}
++
++func (f *frontEnds) httpDo(method, path string, body io.Reader, accept string) (int, []byte) {
++	req, _ := http.NewRequest(method, f.srv.URL+path, body)
++	req.Header.Set("Authorization", "Bearer "+f.token)
++	if accept != "" {
++		req.Header.Set("Accept", accept)
++	}
++	resp, err := http.DefaultClient.Do(req)
++	if err != nil {
++		f.t.Fatal(err)
++	}
++	defer resp.Body.Close()
++	data, _ := io.ReadAll(resp.Body)
++	return resp.StatusCode, data
++}
++
++func (f *frontEnds) httpReduce(path string, q url.Values) map[string]any {
++	file, err := os.Open(path)
++	if err != nil {
++		f.t.Fatal(err)
++	}
++	defer file.Close()
++	code, data := f.httpDo("POST", "/reduce?"+q.Encode(), file, "")
++	if code != 200 {
++		f.t.Fatalf("http reduce %s: %d %s", q.Encode(), code, data)
++	}
++	return decode(f.t, data)
++}
++
++// mcpCall calls a tool and returns its result.
++func (f *frontEnds) mcpCall(name string, args map[string]any) map[string]any {
++	params, _ := json.Marshal(map[string]any{"name": name, "arguments": args})
++	res, rerr := f.mcp.call(params, nil)
++	if rerr != nil {
++		f.t.Fatalf("mcp %s: %v", name, rerr.Message)
++	}
++	return jsonRound(f.t, res).(map[string]any)
++}
++
++func mcpText(r map[string]any) string {
++	return r["content"].([]any)[0].(map[string]any)["text"].(string)
++}
++
++var anyRefRE = regexp.MustCompile(`(?:\[ref |"ref": "|, ref )([0-9a-f]{12})(?::([^\]"\s)]+))?`)
++
++func TestFrontEndsAgree(t *testing.T) {
++	paths, _ := filepath.Glob("../../test/fixtures/*")
++	var fixtures []string
++	for _, p := range paths {
++		if info, err := os.Stat(p); err == nil && info.Mode().IsRegular() {
++			fixtures = append(fixtures, p)
++		}
++	}
++	sort.Strings(fixtures)
++	if len(fixtures) < 8 {
++		t.Fatalf("expected the fixtures, found %d", len(fixtures))
++	}
++	sets := optSets
++	if testing.Short() || raceEnabled {
++		// The race detector makes this slow: the defaults and one other set
++		// still cover every fixture and every reference.
++		sets = optSets[:2]
++	}
++	f := newFrontEnds(t)
++	reductions, expansions := 0, 0
++	for _, path := range fixtures {
++		name := filepath.Base(path)
++		for _, o := range sets {
++			cli := f.cliReduce(path, o.flags()...)
++			web := f.httpReduce(path, o.query())
++			m := f.mcpCall("reduce", mergeArgs(o.args(), map[string]any{"path": path}))
++			if m["isError"] == true {
++				t.Fatalf("%s, %s: mcp: %s", name, o.name, mcpText(m))
++			}
++			viaMCP := m["structuredContent"].(map[string]any)
++			if !reflect.DeepEqual(cli, web) || !reflect.DeepEqual(cli, viaMCP) {
++				t.Fatalf("%s, %s: the front ends differ\ncli:  %v\nhttp: %v\nmcp:  %v", name, o.name, cli, web, viaMCP)
++			}
++			if mcpText(m) != cli["text"] {
++				t.Fatalf("%s, %s: mcp text differs from the report", name, o.name)
++			}
++			reductions++
++			if o.noStore {
++				continue
++			}
++			// Every reference expands to the same bytes everywhere.
++			text := cli["text"].(string)
++			refs := anyRefRE.FindAllStringSubmatch(text, -1)
++			if len(refs) == 0 {
++				t.Fatalf("%s, %s: no references in\n%s", name, o.name, text)
++			}
++			for _, r := range refs {
++				ref := r[1]
++				if r[2] != "" {
++					ref += ":" + r[2]
++				}
++				a, errs, code := runCLI(t, "", "expand", "-store", f.cliDir, ref)
++				if code != 0 {
++					t.Fatalf("cli expand %s: %s", ref, errs)
++				}
++				hc, b := f.httpDo("GET", "/expand/"+url.PathEscape(ref), nil, "")
++				if hc != 200 {
++					t.Fatalf("http expand %s: %d %s", ref, hc, b)
++				}
++				mc := f.mcpCall("expand", map[string]any{"ref": ref, "max_bytes": 64 << 20})
++				if mc["isError"] == true {
++					t.Fatalf("mcp expand %s: %s", ref, mcpText(mc))
++				}
++				if a != string(b) || a != mcpText(mc) {
++					t.Fatalf("%s: expand %s differs (%d, %d, %d bytes)", name, ref, len(a), len(b), len(mcpText(mc)))
++				}
++				expansions++
++			}
++		}
++	}
++
++	// Run histories: the same sequence of runs through each front end gives
++	// the same changes, run by run, and the same histories.
++	histories := 0
++	for _, path := range fixtures {
++		name := filepath.Base(path)
++		data, _ := os.ReadFile(path)
++		if (testing.Short() || raceEnabled) && len(data) > 1<<20 {
++			continue
++		}
++		other := filepath.Join(t.TempDir(), name)
++		os.WriteFile(other, everyThirdLineDropped(data), 0o600)
++		key := "parity " + name
++		for i, p := range []string{path, other, other, path} {
++			cli := f.cliReduce(p, "-key", key, "-budget", "2048")
++			q := url.Values{"key": {key}, "budget": {"2048"}}
++			web := f.httpReduce(p, q)
++			m := f.mcpCall("reduce", map[string]any{"path": p, "key": key, "budget": 2048})
++			viaMCP := m["structuredContent"].(map[string]any)
++			if !reflect.DeepEqual(cli, web) || !reflect.DeepEqual(cli, viaMCP) {
++				t.Fatalf("%s, run %d: the front ends differ\ncli:  %v\nhttp: %v\nmcp:  %v", name, i+1, cli["delta"], web["delta"], viaMCP["delta"])
++			}
++		}
++		cliOut, _, _ := runCLI(t, "", "history", "-store", f.cliDir, "-json", key)
++		_, webOut := f.httpDo("GET", "/runs/"+url.PathEscape(key), nil, "")
++		m := f.mcpCall("history", map[string]any{"key": key})
++		a, b, c := normal(decode(t, []byte(cliOut))), normal(decode(t, webOut)), normal(m["structuredContent"])
++		if !reflect.DeepEqual(a, b) || !reflect.DeepEqual(a, c) {
++			t.Fatalf("%s: histories differ\ncli:  %v\nhttp: %v\nmcp:  %v", name, a, b, c)
++		}
++		histories++
++	}
++	var cliList, mcpList []any
++	out, _, _ := runCLI(t, "", "history", "-store", f.cliDir, "-json")
++	json.Unmarshal([]byte(out), &cliList)
++	_, webData := f.httpDo("GET", "/runs", nil, "")
++	var webList []any
++	json.Unmarshal(webData, &webList)
++	mcpList = f.mcpCall("history", map[string]any{})["structuredContent"].(map[string]any)["histories"].([]any)
++	// Listed most recent first; the front ends recorded in the same order.
++	if !reflect.DeepEqual(normal(cliList), normal(webList)) || !reflect.DeepEqual(normal(cliList), normal(mcpList)) {
++		t.Fatalf("history lists differ:\n%v\n%v\n%v", cliList, webList, mcpList)
++	}
++	t.Logf("%d fixtures: %d reductions, %d expansions and %d histories the same through the command line, HTTP and MCP", len(fixtures), reductions, expansions, histories)
++}
++
++func mergeArgs(a, b map[string]any) map[string]any {
++	for k, v := range b {
++		a[k] = v
++	}
++	return a
++}
++
++func everyThirdLineDropped(data []byte) []byte {
++	if bytes.HasPrefix(bytes.TrimSpace(data), []byte("{")) || bytes.HasPrefix(bytes.TrimSpace(data), []byte("<")) {
++		// A document: change one value instead of breaking it.
++		if bytes.Contains(data, []byte(`"error"`)) {
++			return bytes.Replace(data, []byte(`"error"`), []byte(`"Error"`), 1)
++		}
++		return bytes.Replace(data, []byte("<failure"), []byte("<skipped"), 1)
++	}
++	var out []byte
++	for i, l := range bytes.SplitAfter(data, []byte("\n")) {
++		if i%3 != 2 {
++			out = append(out, l...)
++		}
++	}
++	return out
++}
++
++// The report alone, as text, is the same through all three too.
++func TestFrontEndsAgreeOnText(t *testing.T) {
++	f := newFrontEnds(t)
++	path := "../../test/fixtures/gotest-json.txt"
++	cliText, _, _ := runCLI(t, "", "reduce", "-store", f.cliDir, path)
++	file, _ := os.Open(path)
++	defer file.Close()
++	_, webText := f.httpDo("POST", "/reduce", file, "text/plain")
++	mcp := mcpText(f.mcpCall("reduce", map[string]any{"path": path}))
++	if cliText != string(webText) || cliText != mcp {
++		t.Fatalf("texts differ:\n%s\n---\n%s\n---\n%s", cliText, webText, mcp)
++	}
++	data, _ := os.ReadFile(path)
++	if mcp2 := mcpText(f.mcpCall("reduce", map[string]any{"text": string(data)})); mcp2 != cliText {
++		t.Fatal("reducing text and reducing the file differ")
++	}
++	if !strings.Contains(cliText, "FAILED (7)") {
++		t.Fatalf("unexpected report:\n%s", cliText)
++	}
++}
+diff --git a/cmd/abbreviatory/proc_unix.go b/cmd/abbreviatory/proc_unix.go
+new file mode 100644
+index 0000000..383b645
+--- /dev/null
++++ b/cmd/abbreviatory/proc_unix.go
+@@ -0,0 +1,23 @@
++//go:build !windows
++
++package main
++
++import (
++	"os/exec"
++	"syscall"
++)
++
++// ownGroup starts the command in a process group of its own, so stopping it
++// stops what it started too.
++func ownGroup(cmd *exec.Cmd) {
++	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
++}
++
++// stopGroup asks the command's process group to stop, or kills it.
++func stopGroup(cmd *exec.Cmd, kill bool) error {
++	sig := syscall.SIGTERM
++	if kill {
++		sig = syscall.SIGKILL
++	}
++	return syscall.Kill(-cmd.Process.Pid, sig)
++}
+diff --git a/cmd/abbreviatory/proc_windows.go b/cmd/abbreviatory/proc_windows.go
+new file mode 100644
+index 0000000..a1fd691
+--- /dev/null
++++ b/cmd/abbreviatory/proc_windows.go
+@@ -0,0 +1,20 @@
++//go:build windows
++
++package main
++
++import (
++	"os/exec"
++	"strconv"
++)
++
++// ownGroup does nothing on Windows; stopGroup stops the process tree instead.
++func ownGroup(cmd *exec.Cmd) {}
++
++// stopGroup ends the command and every process it started (taskkill /T),
++// or, if that fails, the command alone.
++func stopGroup(cmd *exec.Cmd, kill bool) error {
++	if err := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid)).Run(); err != nil {
++		return cmd.Process.Kill()
++	}
++	return nil
++}
+diff --git a/cmd/abbreviatory/race_test.go b/cmd/abbreviatory/race_test.go
+new file mode 100644
+index 0000000..ad0458f
+--- /dev/null
++++ b/cmd/abbreviatory/race_test.go
+@@ -0,0 +1,5 @@
++//go:build race
++
++package main
++
++const raceEnabled = true
+diff --git a/cmd/abbreviatory/serve.go b/cmd/abbreviatory/serve.go
+new file mode 100644
+index 0000000..f98d58d
+--- /dev/null
++++ b/cmd/abbreviatory/serve.go
+@@ -0,0 +1,373 @@
++package main
++
++// abbreviatory serve: the HTTP service. It answers on this machine only
++// unless a token is set, and then asks every caller for it.
++
++import (
++	"context"
++	"crypto/subtle"
++	"errors"
++	"flag"
++	"fmt"
++	"io"
++	"net"
++	"net/http"
++	"net/url"
++	"os"
++	"os/signal"
++	"runtime"
++	"strconv"
++	"strings"
++	"time"
++
++	abbreviatory "github.com/abbreviatory/engine"
++	"github.com/abbreviatory/engine/store"
++)
++
++// DefaultAddr is where serve listens unless told otherwise.
++const DefaultAddr = "127.0.0.1:7878"
++
++func cmdServe(args []string, stdout, stderr io.Writer) int {
++	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
++	fs.SetOutput(stderr)
++	addr := fs.String("addr", DefaultAddr, "address to listen on")
++	token := fs.String("token", "", "require this bearer token (default $ABBREVIATORY_TOKEN); needed to listen beyond this machine")
++	dir := storeFlag(fs)
++	maxBody := fs.String("max-body", "1GB", "largest input accepted")
++	fs.Usage = func() {
++		fmt.Fprint(stderr, "Usage: abbreviatory serve [flags]\n\nServes reduce, expand and run histories over HTTP:\n  POST /reduce        the request body is the input; returns JSON (or the\n                      report alone with Accept: text/plain)\n  GET  /expand/{ref}  what a reference points to\n  GET  /runs          the histories; GET /runs/{key} one history's runs\n  GET  /healthz       {\"status\": \"ok\"}\n\n")
++		fs.PrintDefaults()
++	}
++	if err := fs.Parse(args); err != nil {
++		if errors.Is(err, flag.ErrHelp) {
++			return 0
++		}
++		return 2
++	}
++	if fs.NArg() > 0 {
++		fs.Usage()
++		return 2
++	}
++	if *token == "" {
++		*token = os.Getenv("ABBREVIATORY_TOKEN")
++	}
++	limit, err := parseSize(*maxBody)
++	if err != nil {
++		fmt.Fprintln(stderr, "abbreviatory: -max-body:", err)
++		return 2
++	}
++	if !isLoopback(*addr) && *token == "" {
++		fmt.Fprintf(stderr, "abbreviatory: %s is reachable from other machines; set -token (or $ABBREVIATORY_TOKEN) to serve there\n", *addr)
++		return 2
++	}
++	c := core{*dir}
++	if _, err := c.store(); err != nil {
++		fmt.Fprintln(stderr, "abbreviatory:", err)
++		return 1
++	}
++	ln, err := net.Listen("tcp", *addr)
++	if err != nil {
++		fmt.Fprintln(stderr, "abbreviatory:", err)
++		return 1
++	}
++	srv := &http.Server{
++		Handler:           newHandler(c, *token, limit),
++		ReadHeaderTimeout: 10 * time.Second,
++		// A body may be a large log on a slow link, but not forever.
++		ReadTimeout: 30 * time.Minute,
++		IdleTimeout: 2 * time.Minute,
++	}
++	fmt.Fprintf(stderr, "abbreviatory %s: serving on http://%s\n", abbreviatory.Version, ln.Addr())
++
++	stop := make(chan os.Signal, 1)
++	signal.Notify(stop, stopSignals...)
++	defer signal.Stop(stop)
++	done := make(chan error, 1)
++	go func() { done <- srv.Serve(ln) }()
++	select {
++	case err := <-done:
++		fmt.Fprintln(stderr, "abbreviatory:", err)
++		return 1
++	case <-stop:
++		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
++		defer cancel()
++		srv.Shutdown(ctx)
++		return 0
++	}
++}
++
++// isLoopback reports whether addr only listens on this machine.
++func isLoopback(addr string) bool {
++	host, _, err := net.SplitHostPort(addr)
++	if err != nil {
++		return false
++	}
++	if host == "localhost" {
++		return true
++	}
++	ip := net.ParseIP(host)
++	return ip != nil && ip.IsLoopback()
++}
++
++// newHandler is the HTTP API over c. With a token, every request but the
++// health check must carry it as "Authorization: Bearer TOKEN". Without one
++// the service is for this machine only, and it also turns away what a web
++// page in the user's browser could send it: a request for another host name
++// (DNS rebinding) or with a foreign Origin (a cross-site form or fetch).
++func newHandler(c core, token string, maxBody int64) http.Handler {
++	// Reductions take memory and CPU: a few at a time. A slot is only taken
++	// once the body has arrived, so a slow upload holds up nobody else.
++	// (Expansions stream and need no slot.)
++	heavy := make(chan struct{}, max(2, runtime.NumCPU()))
++	mux := http.NewServeMux()
++	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
++		replyJSON(w, http.StatusOK, map[string]any{"status": "ok", "version": abbreviatory.Version})
++	})
++	mux.HandleFunc("POST /reduce", func(w http.ResponseWriter, r *http.Request) {
++		q, err := requestFromQuery(r)
++		if err != nil {
++			replyError(w, err)
++			return
++		}
++		body, err := spoolInput(http.MaxBytesReader(w, r.Body, maxBody))
++		if err != nil {
++			replyError(w, err)
++			return
++		}
++		defer os.Remove(body.Name())
++		defer body.Close()
++		select {
++		case heavy <- struct{}{}:
++			defer func() { <-heavy }()
++		case <-r.Context().Done():
++			return
++		}
++		o, err := c.reduce(body, q, r.Context().Done())
++		if err != nil {
++			replyError(w, err)
++			return
++		}
++		if wantsText(r) {
++			for _, warn := range o.Warnings {
++				w.Header().Add("Abbreviatory-Warning", warn)
++			}
++			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++			io.WriteString(w, o.Res.Text)
++			return
++		}
++		replyJSON(w, http.StatusOK, o.JSON())
++	})
++	// {ref...}: a JSON pointer reference has slashes, encoded or not.
++	mux.HandleFunc("GET /expand/{ref...}", func(w http.ResponseWriter, r *http.Request) {
++		lw := &lazyWriter{w: w}
++		if err := c.expand(lw, r.PathValue("ref")); err != nil && !lw.started {
++			replyError(w, err)
++			return
++		}
++		if !lw.started {
++			lw.start() // an empty part
++		}
++	})
++	runs := func(w http.ResponseWriter, r *http.Request) {
++		key := r.PathValue("key")
++		if key == "" {
++			all, err := c.histories()
++			if err != nil {
++				replyError(w, err)
++				return
++			}
++			if wantsText(r) {
++				w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++				io.WriteString(w, historiesText(all))
++				return
++			}
++			replyJSON(w, http.StatusOK, historiesJSON(all))
++			return
++		}
++		h, err := c.history(key)
++		if err != nil {
++			replyError(w, err)
++			return
++		}
++		if wantsText(r) {
++			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
++			io.WriteString(w, historyText(h))
++			return
++		}
++		replyJSON(w, http.StatusOK, historyJSON(h))
++	}
++	mux.HandleFunc("GET /runs", runs)
++	mux.HandleFunc("GET /runs/{key...}", runs)
++
++	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if token == "" {
++			if !loopbackHost(r.Host) {
++				replyJSON(w, http.StatusForbidden, map[string]any{"error": "this service answers for localhost only; set a token to serve other host names"})
++				return
++			}
++			if o := r.Header.Get("Origin"); o != "" && !loopbackOrigin(o) {
++				replyJSON(w, http.StatusForbidden, map[string]any{"error": "requests from web pages aren't accepted"})
++				return
++			}
++		} else if r.URL.Path != "/healthz" && !validBearer(r.Header.Get("Authorization"), token) {
++			w.Header().Set("WWW-Authenticate", `Bearer realm="abbreviatory"`)
++			replyJSON(w, http.StatusUnauthorized, map[string]any{"error": "a bearer token is required"})
++			return
++		}
++		mux.ServeHTTP(&jsonErrors{ResponseWriter: w}, r)
++	})
++}
++
++// validBearer checks an Authorization header; the scheme is case-insensitive.
++func validBearer(header, token string) bool {
++	scheme, got, ok := strings.Cut(strings.TrimSpace(header), " ")
++	if !ok || !strings.EqualFold(scheme, "Bearer") {
++		return false
++	}
++	return subtle.ConstantTimeCompare([]byte(strings.TrimSpace(got)), []byte(token)) == 1
++}
++
++// loopbackHost reports whether a Host header names this machine.
++func loopbackHost(host string) bool {
++	h := host
++	if hh, _, err := net.SplitHostPort(host); err == nil {
++		h = hh
++	}
++	h = strings.TrimSuffix(strings.TrimPrefix(h, "["), "]")
++	if strings.EqualFold(h, "localhost") {
++		return true
++	}
++	ip := net.ParseIP(h)
++	return ip != nil && ip.IsLoopback()
++}
++
++// loopbackOrigin reports whether an Origin header is a page on this machine.
++func loopbackOrigin(origin string) bool {
++	u, err := url.Parse(origin)
++	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && loopbackHost(u.Host)
++}
++
++// lazyWriter sets the headers for raw bytes on the first write, so an error
++// found before anything is written can still get its own status.
++type lazyWriter struct {
++	w       http.ResponseWriter
++	started bool
++}
++
++func (l *lazyWriter) start() {
++	l.started = true
++	l.w.Header().Set("Content-Type", "application/octet-stream")
++	l.w.WriteHeader(http.StatusOK)
++}
++
++func (l *lazyWriter) Write(p []byte) (int, error) {
++	if !l.started {
++		l.start()
++	}
++	return l.w.Write(p)
++}
++
++// jsonErrors turns the mux's own plain-text 404 and 405 answers into JSON,
++// as every other error is.
++type jsonErrors struct {
++	http.ResponseWriter
++	swallow bool
++}
++
++func (j *jsonErrors) WriteHeader(code int) {
++	if (code == http.StatusNotFound || code == http.StatusMethodNotAllowed) && strings.HasPrefix(j.Header().Get("Content-Type"), "text/plain") {
++		j.Header().Set("Content-Type", "application/json")
++		j.Header().Del("X-Content-Type-Options")
++		j.ResponseWriter.WriteHeader(code)
++		writeJSON(j.ResponseWriter, map[string]any{"error": http.StatusText(code)})
++		j.swallow = true
++		return
++	}
++	j.ResponseWriter.WriteHeader(code)
++}
++
++func (j *jsonErrors) Write(p []byte) (int, error) {
++	if j.swallow {
++		return len(p), nil
++	}
++	return j.ResponseWriter.Write(p)
++}
++
++// requestFromQuery reads a reduction's options from the query string:
++// format, budget, preserve, keep (repeatable), key, full, no_store, command
++// and exit, as the command line's flags.
++func requestFromQuery(r *http.Request) (request, error) {
++	v := r.URL.Query()
++	q := request{Format: v.Get("format"), Keep: v["keep"], Key: v.Get("key"), Command: v.Get("command")}
++	if s := v.Get("budget"); s != "" {
++		n, err := strconv.Atoi(s)
++		if err != nil {
++			return q, usagef("budget: %q is not a number", s)
++		}
++		q.Budget = n
++	}
++	if v.Has("preserve") {
++		p := v.Get("preserve")
++		q.Preserve = &p
++	}
++	var err error
++	if q.Full, err = boolParam(v.Get("full")); err != nil {
++		return q, usagef("full: %v", err)
++	}
++	if q.NoStore, err = boolParam(v.Get("no_store")); err != nil {
++		return q, usagef("no_store: %v", err)
++	}
++	if s := v.Get("exit"); s != "" {
++		n, err := strconv.Atoi(s)
++		if err != nil {
++			return q, usagef("exit: %q is not a number", s)
++		}
++		q.Exit = &n
++	}
++	_, err = q.options()
++	return q, err
++}
++
++func boolParam(s string) (bool, error) {
++	if s == "" {
++		return false, nil
++	}
++	return strconv.ParseBool(s)
++}
++
++func wantsText(r *http.Request) bool {
++	a := r.Header.Get("Accept")
++	return strings.HasPrefix(a, "text/plain")
++}
++
++func replyJSON(w http.ResponseWriter, status int, v any) {
++	w.Header().Set("Content-Type", "application/json")
++	w.WriteHeader(status)
++	writeJSON(w, v)
++}
++
++// replyError answers with the status that fits the error.
++func replyError(w http.ResponseWriter, err error) {
++	status := http.StatusInternalServerError
++	var ue *usageError
++	var be *abbreviatory.BudgetError
++	var mb *http.MaxBytesError
++	var ie *abbreviatory.InputError
++	switch {
++	case errors.As(err, &ue):
++		status = http.StatusBadRequest
++	case errors.As(err, &mb):
++		status = http.StatusRequestEntityTooLarge
++	case errors.Is(err, store.ErrNotFound), errors.Is(err, errNoHistory):
++		status = http.StatusNotFound
++	case errors.As(err, &ie):
++		status = http.StatusBadRequest
++		if !strings.HasPrefix(ie.Msg, "JSON:") {
++			break
++		}
++		fallthrough
++	case errors.As(err, &be), errors.Is(err, abbreviatory.ErrBinary):
++		status = http.StatusUnprocessableEntity
++	}
++	replyJSON(w, status, map[string]any{"error": err.Error()})
++}
+diff --git a/cmd/abbreviatory/serve_test.go b/cmd/abbreviatory/serve_test.go
+new file mode 100644
+index 0000000..a768384
+--- /dev/null
++++ b/cmd/abbreviatory/serve_test.go
+@@ -0,0 +1,285 @@
++package main
++
++import (
++	"encoding/json"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptest"
++	"runtime"
++	"strings"
++	"testing"
++	"time"
++)
++
++func TestHTTPService(t *testing.T) {
++	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "tok", 1<<20))
++	defer srv.Close()
++	do := func(method, path, body, token, accept string) (int, string, http.Header) {
++		req, _ := http.NewRequest(method, srv.URL+path, strings.NewReader(body))
++		if token != "" {
++			req.Header.Set("Authorization", "Bearer "+token)
++		}
++		if accept != "" {
++			req.Header.Set("Accept", accept)
++		}
++		resp, err := http.DefaultClient.Do(req)
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer resp.Body.Close()
++		data, _ := io.ReadAll(resp.Body)
++		return resp.StatusCode, string(data), resp.Header
++	}
++	log := "2026-10-18T08:00:00Z INFO up\n2026-10-18T08:00:01Z ERROR disk full\n"
++
++	if code, body, _ := do("GET", "/healthz", "", "", ""); code != 200 || !strings.Contains(body, `"status": "ok"`) {
++		t.Fatalf("healthz without a token: %d %s", code, body)
++	}
++	for _, tok := range []string{"", "wrong"} {
++		if code, _, h := do("POST", "/reduce", log, tok, ""); code != 401 || h.Get("WWW-Authenticate") == "" {
++			t.Fatalf("token %q: %d", tok, code)
++		}
++	}
++	code, body, _ := do("POST", "/reduce?budget=600", log, "tok", "")
++	var v map[string]any
++	if code != 200 || json.Unmarshal([]byte(body), &v) != nil || v["format"] != "logs" {
++		t.Fatalf("reduce: %d %s", code, body)
++	}
++	ref := v["ref"].(string)
++	if code, body, _ := do("POST", "/reduce", log, "tok", "text/plain"); code != 200 || !strings.HasPrefix(body, "[abbreviatory] log") {
++		t.Fatalf("text: %d %s", code, body)
++	}
++	if code, body, _ := do("GET", "/expand/"+ref+":L2", "", "tok", ""); code != 200 || body != "2026-10-18T08:00:01Z ERROR disk full\n" {
++		t.Fatalf("expand: %d %q", code, body)
++	}
++	for _, c := range []struct {
++		method, path, body string
++		want               int
++	}{
++		{"GET", "/expand/nonsense", "", 400},
++		{"GET", "/expand/" + ref + ":L99", "", 400},
++		{"GET", "/expand/0123456789ab:g0", "", 404},
++		{"POST", "/reduce?budget=5", log, 400},
++		{"POST", "/reduce?budget=five", log, 400},
++		{"POST", "/reduce?format=yaml", log, 400},
++		{"POST", "/reduce?keep=(", log, 400},
++		{"POST", "/reduce?full=maybe", log, 400},
++		{"POST", "/reduce?format=json", `{"a": [1,`, 422},
++		{"POST", "/reduce", string([]byte{0, 1, 2, 3, 0, 0, 0}), 422},
++		{"POST", "/reduce", strings.Repeat("x\n", 600000), 413},
++		{"GET", "/runs/nothing-here", "", 404},
++		{"GET", "/reduce", "", 405},
++		{"DELETE", "/runs", "", 405},
++	} {
++		if code, body, _ := do(c.method, c.path, c.body, "tok", ""); code != c.want || !strings.Contains(body, "error") && code != 405 {
++			t.Errorf("%s %s: %d, want %d: %s", c.method, c.path, code, c.want, body)
++		}
++	}
++	// Histories, with a key that has slashes and spaces.
++	key := "/home/me/app: go test ./..."
++	q := "/reduce?key=" + strings.ReplaceAll(strings.ReplaceAll(key, " ", "%20"), "/", "%2F")
++	do("POST", q, log, "tok", "")
++	code, body, _ = do("POST", q, log, "tok", "")
++	if code != 200 || !strings.Contains(body, `"run": 2`) {
++		t.Fatalf("second run: %d %s", code, body)
++	}
++	if code, body, _ := do("GET", "/runs/%2Fhome%2Fme%2Fapp:%20go%20test%20.%2F...", "", "tok", "text/plain"); code != 200 || !strings.HasPrefix(body, key+"\nrun 2") {
++		t.Fatalf("runs by key: %d %s", code, body)
++	}
++	if code, body, _ := do("GET", "/runs/me/app", "", "tok", ""); code != 200 || !strings.Contains(body, `"key": "/home/me/app: go test ./..."`) {
++		t.Fatalf("runs by part of the key: %d %s", code, body)
++	}
++}
++
++func TestHTTPNoToken(t *testing.T) {
++	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "", 1<<20))
++	defer srv.Close()
++	resp, err := http.Post(srv.URL+"/reduce", "text/plain", strings.NewReader("x ERROR one\n"))
++	if err != nil || resp.StatusCode != 200 {
++		t.Fatalf("without a token configured: %v %v", err, resp.StatusCode)
++	}
++}
++
++func TestServeAddress(t *testing.T) {
++	for addr, want := range map[string]bool{"127.0.0.1:1": true, "localhost:1": true, "[::1]:1": true, "0.0.0.0:1": false, ":7878": false, "10.0.0.5:1": false, "nonsense": false} {
++		if isLoopback(addr) != want {
++			t.Errorf("isLoopback(%q) = %v", addr, !want)
++		}
++	}
++	_, errs, code := runCLI(t, "", "serve", "-addr", "0.0.0.0:0", "-store", t.TempDir())
++	if code != 2 || !strings.Contains(errs, "set -token") {
++		t.Fatalf("serving everywhere without a token: exit %d %s", code, errs)
++	}
++	_, errs, code = runCLI(t, "", "serve", "-max-body", "lots")
++	if code != 2 || !strings.Contains(errs, "-max-body") {
++		t.Fatalf("bad -max-body: exit %d %s", code, errs)
++	}
++}
++
++// serve stops cleanly on a signal; started as a real process.
++func TestServeProcess(t *testing.T) {
++	if runtime.GOOS == "windows" || testing.Short() {
++		t.Skip("needs a built binary and signals")
++	}
++	bin := buildBinary(t)
++	cmd := execCommand(bin, "serve", "-addr", "127.0.0.1:0", "-store", t.TempDir())
++	stderr, _ := cmd.StderrPipe()
++	if err := cmd.Start(); err != nil {
++		t.Fatal(err)
++	}
++	buf := make([]byte, 200)
++	n, _ := stderr.Read(buf)
++	line := string(buf[:n])
++	i := strings.Index(line, "http://")
++	if i < 0 {
++		cmd.Process.Kill()
++		t.Fatalf("no address in %q", line)
++	}
++	url := strings.TrimSpace(line[i:])
++	resp, err := http.Get(url + "/healthz")
++	if err != nil || resp.StatusCode != 200 {
++		cmd.Process.Kill()
++		t.Fatalf("healthz: %v", err)
++	}
++	cmd.Process.Signal(stopSignals[1])
++	done := make(chan error, 1)
++	go func() { done <- cmd.Wait() }()
++	select {
++	case <-done:
++		if code := cmd.ProcessState.ExitCode(); code != 0 {
++			t.Fatalf("exit %d after a signal", code)
++		}
++	case <-time.After(5 * time.Second):
++		cmd.Process.Kill()
++		t.Fatal("serve didn't stop on a signal")
++	}
++}
++
++// Review of 0.3: without a token the service answers this machine only,
++// and not web pages: no other host names (DNS rebinding), no foreign
++// Origin (cross-site requests).
++func TestHTTPLocalOnly(t *testing.T) {
++	h := newHandler(core{t.TempDir()}, "", 1<<20)
++	do := func(method, target, host, origin string) (int, string) {
++		req := httptest.NewRequest(method, target, strings.NewReader("x ERROR secret password=hunter2\n"))
++		req.Host = host
++		if origin != "" {
++			req.Header.Set("Origin", origin)
++		}
++		rec := httptest.NewRecorder()
++		h.ServeHTTP(rec, req)
++		return rec.Code, rec.Body.String()
++	}
++	for _, c := range []struct {
++		method, target, host, origin string
++		want                         int
++	}{
++		{"POST", "/reduce?key=proj", "localhost:7878", "", 200},
++		{"POST", "/reduce", "127.0.0.1:7878", "", 200},
++		{"POST", "/reduce", "[::1]:7878", "", 200},
++		{"POST", "/reduce", "localhost:7878", "http://localhost:3000", 200},
++		{"GET", "/runs", "attacker.example:7878", "", 403},
++		{"GET", "/runs", "attacker.example", "", 403},
++		{"POST", "/reduce?key=proj", "localhost:7878", "http://evil.example", 403},
++		{"POST", "/reduce?key=proj", "localhost:7878", "null", 403},
++		{"GET", "/healthz", "evil.example", "", 403},
++	} {
++		if code, body := do(c.method, c.target, c.host, c.origin); code != c.want {
++			t.Errorf("%s %s Host %s Origin %q: %d, want %d: %s", c.method, c.target, c.host, c.origin, code, c.want, body)
++		}
++	}
++}
++
++func TestHTTPDetails(t *testing.T) {
++	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "tok", 1<<30))
++	defer srv.Close()
++	get := func(method, path, auth string, body io.Reader) (int, string, string) {
++		req, _ := http.NewRequest(method, srv.URL+path, body)
++		if auth != "" {
++			req.Header.Set("Authorization", auth)
++		}
++		resp, err := http.DefaultClient.Do(req)
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer resp.Body.Close()
++		data, _ := io.ReadAll(resp.Body)
++		return resp.StatusCode, resp.Header.Get("Content-Type"), string(data)
++	}
++	for _, auth := range []string{"Bearer tok", "bearer tok", "BEARER  tok"} {
++		if code, _, _ := get("GET", "/runs", auth, nil); code != 200 {
++			t.Errorf("%q: %d", auth, code)
++		}
++	}
++	for _, auth := range []string{"Bearer", "Basic tok", "Bearer tokx", "tok"} {
++		if code, _, _ := get("GET", "/runs", auth, nil); code != 401 {
++			t.Errorf("%q: %d, want 401", auth, code)
++		}
++	}
++	for _, c := range []struct {
++		method, path string
++		want         int
++	}{{"GET", "/nothing", 404}, {"GET", "/reduce", 405}, {"DELETE", "/runs", 405}} {
++		code, ct, body := get(c.method, c.path, "Bearer tok", nil)
++		if code != c.want || !strings.HasPrefix(ct, "application/json") || !strings.Contains(body, `"error"`) {
++			t.Errorf("%s %s: %d %s %s", c.method, c.path, code, ct, body)
++		}
++	}
++	// /runs/ with nothing after it is the list.
++	if code, _, body := get("GET", "/runs/", "Bearer tok", nil); code != 200 || !strings.HasPrefix(strings.TrimSpace(body), "[") {
++		t.Errorf("/runs/: %d %s", code, body)
++	}
++	// A large original expands, streamed.
++	big := strings.Repeat("2026-10-18T08:00:00Z INFO tick 12345\n", 200000) + "x ERROR end\n"
++	code, _, body := get("POST", "/reduce", "Bearer tok", strings.NewReader(big))
++	var v map[string]any
++	if code != 200 || json.Unmarshal([]byte(body), &v) != nil {
++		t.Fatalf("reduce: %d", code)
++	}
++	code, ct, whole := get("GET", "/expand/"+v["ref"].(string), "Bearer tok", nil)
++	if code != 200 || ct != "application/octet-stream" || whole != big {
++		t.Fatalf("whole expand: %d %s, %d bytes of %d", code, ct, len(whole), len(big))
++	}
++	code, _, part := get("GET", "/expand/"+v["ref"].(string)+":L200001", "Bearer tok", nil)
++	if code != 200 || part != "x ERROR end\n" {
++		t.Fatalf("last line: %d %q", code, part)
++	}
++}
++
++// Review of 0.3, second pass: slow uploads hold up nobody, and a JSON
++// pointer reference expands with its slashes as they are.
++func TestHTTPSlowUploadsAndPointers(t *testing.T) {
++	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "", 1<<20))
++	defer srv.Close()
++	host := strings.TrimPrefix(srv.URL, "http://")
++	for i := 0; i < runtime.NumCPU()+2; i++ {
++		conn, err := net.Dial("tcp", host)
++		if err != nil {
++			t.Fatal(err)
++		}
++		defer conn.Close()
++		io.WriteString(conn, "POST /reduce HTTP/1.1\r\nHost: "+host+"\r\nContent-Length: 1000000\r\n\r\n0123456789")
++	}
++	time.Sleep(200 * time.Millisecond)
++	client := &http.Client{Timeout: 5 * time.Second}
++	resp, err := client.Post(srv.URL+"/reduce?format=json", "application/octet-stream", strings.NewReader(`{"items": [{"id": 1, "error": "boom"}]}`))
++	if err != nil {
++		t.Fatalf("held up by slow uploads: %v", err)
++	}
++	var v map[string]any
++	json.NewDecoder(resp.Body).Decode(&v)
++	resp.Body.Close()
++	ref, _ := v["ref"].(string)
++	for _, path := range []string{"/expand/" + ref + ":/items/0/error", "/expand/" + ref + ":%2Fitems%2F0%2Ferror"} {
++		resp, err := client.Get(srv.URL + path)
++		if err != nil {
++			t.Fatal(err)
++		}
++		body, _ := io.ReadAll(resp.Body)
++		resp.Body.Close()
++		if resp.StatusCode != 200 || string(body) != "\"boom\"\n" {
++			t.Fatalf("%s: %d %q", path, resp.StatusCode, body)
++		}
++	}
++}
+diff --git a/demo/index.html b/demo/index.html
+new file mode 100644
+index 0000000..e8b86ac
+--- /dev/null
++++ b/demo/index.html
+@@ -0,0 +1,315 @@
++<!doctype html>
++<html lang="en">
++<head>
++<meta charset="utf-8">
++<meta name="viewport" content="width=device-width, initial-scale=1">
++<title>Try Abbreviatory in Your Browser</title>
++<meta name="description" content="Reduce a test run, a log or a JSON document in your browser with Abbreviatory, compiled to WebAssembly. Nothing you paste leaves the page.">
++<style>
++:root {
++  --navy: #1f3a5f; --teal: #0e7c86; --teal-bg: #e8f4f5; --ink: #17202a; --gray: #5d6b7c;
++  --line: #cbd5e1; --light: #f1f5f9; --red: #b8401f; --amber: #9a6a00; --white: #fff;
++  --mono: ui-monospace, SFMono-Regular, "DejaVu Sans Mono", Menlo, Consolas, monospace;
++}
++* { box-sizing: border-box; }
++body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--white); }
++a { color: var(--teal); }
++header.top { border-bottom: 1px solid var(--line); }
++.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
++header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
++.brand { font-weight: 700; color: var(--navy); text-decoration: none; font-size: 19px; }
++nav a { margin-left: 18px; color: var(--gray); text-decoration: none; font-size: 15px; }
++nav a:hover { color: var(--teal); }
++h1 { font-size: 30px; line-height: 1.2; margin: 32px 0 8px; color: var(--navy); }
++.lede { color: var(--gray); margin: 0 0 22px; max-width: 760px; }
++.controls { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: end; padding: 16px; background: var(--light); border: 1px solid var(--line); border-radius: 12px; }
++.controls label { display: flex; flex-direction: column; font-size: 13px; color: var(--gray); gap: 4px; }
++select, input[type=number] { font: inherit; font-size: 15px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--ink); }
++input[type=range] { width: 180px; accent-color: var(--teal); }
++button { font: inherit; cursor: pointer; }
++.go { background: var(--navy); color: var(--white); border: 0; border-radius: 8px; padding: 9px 22px; font-weight: 600; }
++.go:hover { background: #2b4d7a; }
++.go:disabled { opacity: .5; cursor: wait; }
++.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
++.pane h2 { font-size: 15px; margin: 0 0 6px; color: var(--navy); display: flex; justify-content: space-between; gap: 12px; }
++.pane h2 small { font-weight: 400; color: var(--gray); }
++textarea, pre.out { width: 100%; height: 560px; margin: 0; font: 12.5px/1.45 var(--mono); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
++textarea { resize: vertical; white-space: pre; overflow: auto; color: var(--ink); }
++pre.out { overflow: auto; background: #fbfcfd; white-space: pre-wrap; word-break: break-word; }
++.stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; min-height: 28px; }
++.chip { font-size: 13px; padding: 3px 10px; border-radius: 99px; background: var(--teal-bg); color: var(--teal); }
++.chip.big { background: var(--navy); color: var(--white); font-weight: 600; }
++.ref { font: inherit; color: var(--teal); background: none; border: 0; padding: 0; text-decoration: underline dotted; }
++.ref:hover { color: var(--navy); }
++.l-fail { color: var(--red); font-weight: 600; }
++.l-warn { color: var(--amber); }
++.l-delta { color: var(--navy); font-weight: 600; }
++.l-new { color: var(--red); }
++.l-fixed { color: var(--teal); }
++.expanded { margin-top: 20px; display: none; }
++.expanded pre { max-height: 380px; overflow: auto; font: 12.5px/1.45 var(--mono); background: var(--light); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 6px 0 0; white-space: pre; }
++.runs { margin-top: 28px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
++.runs h2 { margin: 0 0 6px; font-size: 19px; color: var(--navy); }
++.runs p { margin: 0 0 14px; color: var(--gray); }
++.steps { display: flex; flex-wrap: wrap; gap: 10px; }
++.step { background: var(--white); border: 1px solid var(--teal); color: var(--teal); border-radius: 8px; padding: 8px 14px; }
++.step:hover { background: var(--teal-bg); }
++.step.done { background: var(--teal); color: var(--white); }
++.plain { background: none; border: 0; color: var(--gray); text-decoration: underline; padding: 8px 4px; }
++.err { color: var(--red); }
++footer { margin: 40px 0 30px; color: var(--gray); font-size: 14px; }
++.loading { color: var(--gray); }
++@media (max-width: 860px) {
++  .panes { grid-template-columns: 1fr; }
++  textarea, pre.out { height: 380px; }
++  nav a { margin-left: 10px; }
++  nav a.hide-s { display: none; }
++}
++</style>
++</head>
++<body>
++<header class="top"><div class="wrap">
++  <a class="brand" href="/">Abbreviatory</a>
++  <nav><a href="/what-context-reduction-is-and-why-abbreviatory-does-it-without-a-language-model/" class="hide-s">What It Is</a><a href="/quick-start/">Quick Start</a><a href="/reference/" class="hide-s">Reference</a><a href="/download/">Download</a></nav>
++</div></header>
++
++<main class="wrap">
++  <h1>Try Abbreviatory in Your Browser</h1>
++  <p class="lede">Pick a sample or paste your own test run, log or JSON, and reduce it. The engine runs right here, compiled to WebAssembly, the same code as the <a href="/download/">command line tool</a>. Nothing you paste leaves this page. Click any <code>[ref …]</code> in the report to see the original lines it stands for.</p>
++
++  <div class="controls">
++    <label>Sample
++      <select id="sample">
++        <option value="gotest-verbose.txt" data-format="go test -v">go test -v, 2,453 lines</option>
++        <option value="pytest-verbose.txt">pytest -v, 1,072 lines</option>
++        <option value="junit-pytest.xml">JUnit XML report</option>
++        <option value="app.log">Application log, 12,000 lines</option>
++        <option value="api-response.json">API response, JSON</option>
++        <option value="">Paste your own</option>
++      </select>
++    </label>
++    <label><span>Budget: <span id="budgetValue">4,096</span> bytes</span>
++      <input type="range" id="budget" min="512" max="16384" step="256" value="4096">
++    </label>
++    <label>Format
++      <select id="format">
++        <option value="auto">auto (detect)</option>
++        <option value="test-output">test output</option>
++        <option value="logs">log</option>
++        <option value="json">JSON</option>
++      </select>
++    </label>
++    <button class="go" id="go" disabled>Loading the engine…</button>
++  </div>
++
++  <div class="panes">
++    <section class="pane">
++      <h2>Input <small id="inStats"></small></h2>
++      <textarea id="input" spellcheck="false" placeholder="Paste a test run, a log or a JSON document here."></textarea>
++    </section>
++    <section class="pane">
++      <h2>Report <small id="engine" class="loading">loading…</small></h2>
++      <div class="stats" id="stats"></div>
++      <pre class="out" id="out"></pre>
++    </section>
++  </div>
++
++  <section class="expanded" id="expanded">
++    <h2 style="font-size:15px;color:var(--navy);margin:0">Expanded <code id="expRef"></code> <small id="expStats" style="color:var(--gray);font-weight:400"></small></h2>
++    <pre id="expOut"></pre>
++  </section>
++
++  <section class="runs">
++    <h2>Compare Two Runs</h2>
++    <p>With a history, each report starts with what changed since the last run. Here are two runs of the same go test suite: between them one test started failing and another got fixed. Reduce them in order, then reduce the second one again.</p>
++    <div class="steps">
++      <button class="step" data-step="1">1. Reduce the earlier run</button>
++      <button class="step" data-step="2">2. Reduce the later run</button>
++      <button class="step" data-step="3">3. The later run again</button>
++      <button class="plain" id="forget">Start over</button>
++    </div>
++  </section>
++
++  <footer>Abbreviatory <span id="ver"></span>, open source under Apache 2.0. The engine is the Go code from <a href="https://github.com/abbreviatory/engine">github.com/abbreviatory/engine</a>, compiled to WebAssembly. The samples are the project's test fixtures.</footer>
++</main>
++
++<script src="wasm_exec.js"></script>
++<script>
++"use strict";
++const $ = (id) => document.getElementById(id);
++const samples = {};
++let ready = false;
++
++function fmtBytes(n) {
++  if (n < 1000) return n + " B";
++  if (n < 1e6) return (n / 1000).toFixed(1) + " kB";
++  return (n / 1e6).toFixed(1) + " MB";
++}
++function group3(n) { return n.toLocaleString("en-US"); }
++function esc(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
++
++async function loadSample(name) {
++  if (!name) return "";
++  if (!samples[name]) {
++    const r = await fetch("samples/" + name);
++    if (!r.ok) throw new Error("couldn't load the sample " + name);
++    samples[name] = await r.text();
++  }
++  return samples[name];
++}
++
++function showInput(text) {
++  $("input").value = text;
++  updateInStats();
++}
++function updateInStats() {
++  const t = $("input").value;
++  const lines = t ? t.split("\n").length - (t.endsWith("\n") ? 1 : 0) : 0;
++  $("inStats").textContent = t ? group3(lines) + " lines, " + fmtBytes(new TextEncoder().encode(t).length) : "";
++}
++
++// The report as HTML: references become buttons, sections get colour.
++function renderReport(text) {
++  const refRe = /\[ref ([0-9a-f]{12})(?::([^\]]+))?\]|(, ref )([0-9a-f]{12})|("ref": ")([0-9a-f]{12}:[^"]+)(")/g;
++  return text.split("\n").map((line) => {
++    let cls = "";
++    if (/^(FAILED|ERRORS)\b/.test(line)) cls = "l-fail";
++    else if (/^WARNINGS\b/.test(line)) cls = "l-warn";
++    else if (/^run \d+/.test(line)) cls = "l-delta";
++    else if (/^new: /.test(line)) cls = "l-new";
++    else if (/^(fixed|gone): /.test(line)) cls = "l-fixed";
++    let out = "", last = 0, m;
++    refRe.lastIndex = 0;
++    while ((m = refRe.exec(line))) {
++      out += esc(line.slice(last, m.index));
++      if (m[1]) {
++        const ref = m[1] + (m[2] ? ":" + m[2] : "");
++        out += '<button class="ref" data-ref="' + esc(ref) + '">' + esc(m[0]) + "</button>";
++      } else if (m[4]) {
++        out += esc(m[3]) + '<button class="ref" data-ref="' + m[4] + '">' + m[4] + "</button>";
++      } else {
++        out += esc(m[5]) + '<button class="ref" data-ref="' + esc(m[6]) + '">' + esc(m[6]) + "</button>" + esc(m[7]);
++      }
++      last = m.index + m[0].length;
++    }
++    out += esc(line.slice(last));
++    return cls ? '<span class="' + cls + '">' + out + "</span>" : out;
++  }).join("\n");
++}
++
++function reduceText(text, extra) {
++  const opts = Object.assign({ budget: +$("budget").value, format: $("format").value }, extra || {});
++  const raw = abbreviatory.reduce(text, JSON.stringify(opts));
++  if (typeof raw !== "string") throw new Error(raw.error);
++  return JSON.parse(raw);
++}
++
++function show(res) {
++  $("out").innerHTML = renderReport(res.text);
++  const out = new TextEncoder().encode(res.text).length;
++  const pct = res.input_bytes ? (100 * out / res.input_bytes) : 0;
++  const chips = [
++    '<span class="chip big">' + fmtBytes(res.input_bytes) + " → " + fmtBytes(out) + "</span>",
++    '<span class="chip">' + (pct < 1 ? pct.toFixed(2) : pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "% of the input</span>",
++    '<span class="chip">' + esc(res.format) + "</span>",
++    '<span class="chip">' + res.ms.toFixed(0) + " ms</span>",
++  ];
++  if (res.run) chips.push('<span class="chip">run ' + res.run + "</span>");
++  $("stats").innerHTML = chips.join("");
++  $("expanded").style.display = "none";
++}
++
++function fail(err) {
++  $("stats").innerHTML = "";
++  $("out").innerHTML = '<span class="err">' + esc(String(err.message || err)) + "</span>";
++}
++
++function go() {
++  try {
++    const text = $("input").value;
++    if (!text.trim()) { fail("Paste something to reduce first."); return; }
++    show(reduceText(text));
++  } catch (e) { fail(e); }
++}
++
++$("out").addEventListener("click", (ev) => {
++  const b = ev.target.closest(".ref");
++  if (!b) return;
++  const got = abbreviatory.expand(b.dataset.ref);
++  $("expanded").style.display = "block";
++  $("expRef").textContent = b.dataset.ref;
++  if (typeof got !== "string") {
++    $("expOut").innerHTML = '<span class="err">' + esc(got.error) + "</span>";
++    $("expStats").textContent = "";
++  } else {
++    const shown = got.length > 400000 ? got.slice(0, 400000) + "\n… (the rest left out of this page)" : got;
++    $("expOut").textContent = shown;
++    const n = got.split("\n").length - (got.endsWith("\n") ? 1 : 0);
++    $("expStats").textContent = group3(n) + " original lines, " + fmtBytes(new TextEncoder().encode(got).length);
++  }
++  $("expanded").scrollIntoView({ behavior: "smooth", block: "nearest" });
++});
++
++$("budget").addEventListener("input", () => { $("budgetValue").textContent = group3(+$("budget").value); });
++$("budget").addEventListener("change", () => { if (ready && $("input").value.trim()) go(); });
++$("format").addEventListener("change", () => { if (ready && $("input").value.trim()) go(); });
++$("input").addEventListener("input", updateInStats);
++$("go").addEventListener("click", go);
++$("sample").addEventListener("change", async () => {
++  try {
++    const name = $("sample").value;
++    showInput(await loadSample(name));
++    if (name && ready) go(); else { $("out").textContent = ""; $("stats").innerHTML = ""; }
++  } catch (e) { fail(e); }
++});
++
++const runFiles = { 1: "gotest-run1.txt", 2: "gotest-verbose.txt", 3: "gotest-verbose.txt" };
++document.querySelectorAll(".step").forEach((b) => b.addEventListener("click", async () => {
++  if (!ready) return;
++  try {
++    const step = +b.dataset.step;
++    if (step === 1) abbreviatory.forget(); // the earlier run starts the comparison over
++    const text = await loadSample(runFiles[step]);
++    showInput(text);
++    $("sample").value = step === 1 ? "" : "gotest-verbose.txt";
++    show(reduceText(text, { key: "demo" }));
++    document.querySelectorAll(".step").forEach((s) => s.classList.toggle("done", +s.dataset.step <= step));
++    $("out").scrollIntoView({ behavior: "smooth", block: "nearest" });
++  } catch (e) { fail(e); }
++}));
++$("forget").addEventListener("click", () => {
++  if (ready) abbreviatory.forget();
++  document.querySelectorAll(".step").forEach((s) => s.classList.remove("done"));
++});
++
++window.abbreviatoryReady = () => {
++  ready = true;
++  $("go").disabled = false;
++  $("go").textContent = "Reduce";
++  $("engine").textContent = "engine " + abbreviatory.version + ", in your browser";
++  $("engine").classList.remove("loading");
++  $("ver").textContent = abbreviatory.version;
++  if ($("input").value.trim()) go();
++};
++
++(async () => {
++  try {
++    showInput(await loadSample($("sample").value));
++  } catch (e) { fail(e); }
++  const goRuntime = new Go();
++  let result;
++  try {
++    result = await WebAssembly.instantiateStreaming(fetch("abbreviatory.wasm"), goRuntime.importObject);
++  } catch (e) {
++    // A server that doesn't send application/wasm: load it the slower way.
++    const bytes = await (await fetch("abbreviatory.wasm")).arrayBuffer();
++    result = await WebAssembly.instantiate(bytes, goRuntime.importObject);
++  }
++  goRuntime.run(result.instance);
++})().catch((e) => {
++  $("engine").textContent = "the engine couldn't load: " + e.message;
++  $("go").textContent = "Unavailable";
++});
++</script>
++</body>
++</html>
+diff --git a/docs/reference.md b/docs/reference.md
+index 4930481..b4639de 100644
+--- a/docs/reference.md
++++ b/docs/reference.md
+@@ -1,6 +1,6 @@
+ # Abbreviatory reference
+ 
+-This is the full reference for version 0.2. The [README](../README.md) has the
++This is the full reference for version 0.3. The [README](../README.md) has the
+ overview and the quick start.
+ 
+ ## Commands
+@@ -11,6 +11,8 @@ abbreviatory run [flags] -- CMD      run a command, reduce what it prints,
+                                      compare with its last run
+ abbreviatory history [flags] [KEY]   list run histories, or one history's runs
+ abbreviatory expand [flags] REF      print what a reference points to
++abbreviatory serve [flags]           serve reduce, expand and histories over HTTP
++abbreviatory mcp [flags]             serve them to coding agents over MCP (stdio)
+ abbreviatory prune [flags]           remove old stored originals
+ abbreviatory formats                 list the input formats
+ abbreviatory version                 print the version
+@@ -43,7 +45,8 @@ budget). With a history it also has `run` (this run's number) and `delta`:
+ `since`, `identical`, `unchanged`, `failing`, `new`, `fixed`, `not_run` and
+ `flaky` (lists of `{head, ref}`, flaky ones with `now`, `changes` and
+ `window`), `still` and `longest`. From `run` it also has `exit`, the
+-command's exit status.
++command's exit status, and `warnings` lists any warnings (an original that
++couldn't be stored, a history that couldn't be read).
+ 
+ ### run
+ 
+@@ -69,6 +72,71 @@ exits, reading stops 5 seconds later, with a warning. If the output can't be
+ reduced (it is binary, say), the error is printed and the exit status is
+ still the command's.
+ 
++### serve
++
++`abbreviatory serve [-addr 127.0.0.1:7878] [-token T] [-store DIR] [-max-body 1GB]`
++serves the same work over HTTP. It listens on this machine only unless it has
++a token (`-token`, else `$ABBREVIATORY_TOKEN`); an address reachable from
++other machines without one is refused. With a token, every request but the
++health check needs `Authorization: Bearer T` (the word Bearer in any case).
++
++Without a token it also turns away what a web page open in the user's
++browser could send it, with 403: a request whose `Host` isn't `localhost`,
++`127.0.0.1` or `[::1]` (a page using DNS rebinding to reach the service), and
++a request with an `Origin` that isn't a page on this machine (a cross-site
++form or fetch that could read stored originals or write runs into a
++history).
++
++| Request | Answer |
++|---|---|
++| `POST /reduce` | The body is the input. Query parameters: `format`, `budget`, `preserve` (present and empty for nothing), `keep` (repeatable), `key`, `full`, `no_store`, and `command` and `exit` to record with the run. The answer is the JSON of `reduce -json`; with `Accept: text/plain` the report alone, warnings in `Abbreviatory-Warning` headers |
++| `GET /expand/{ref}` | The original bytes, as `application/octet-stream`; a JSON pointer's slashes may stay as they are |
++| `GET /runs` | The histories, as `history -json` lists them (or as text with `Accept: text/plain`) |
++| `GET /runs/{key}` | One history's runs; the key percent-encoded, a part of it matching one key works |
++| `GET /healthz` | `{"status": "ok", "version": "..."}` |
++
++Errors are `{"error": "..."}` with 400 (a bad option, reference or line
++range), 401 (no or a wrong token), 403 (see above), 404 (a reference not in
++the store, no history matching, or no such endpoint), 405, 413 (a body past
++`-max-body`), 422 (input it can't read: binary data, a JSON document that
++doesn't parse, a budget too small for this input) or 500. Expansions stream
++from the store, so memory doesn't grow with the original (a JSON pointer
++reads its document whole); a JSON pointer in a reference may keep its
++slashes or have them percent-encoded. A reduction reads its body to a
++temporary file first, then waits for a turn: at most as many reductions as
++the machine has CPUs (at least 2) run at once, and a slow upload holds up
++nobody. A request may take 30 minutes to send its body, and an idle
++connection is closed after 2 minutes. A SIGINT or SIGTERM stops
++the service, letting requests in progress finish for up to 30 seconds.
++
++### mcp
++
++`abbreviatory mcp [-store DIR]` is a Model Context Protocol server over
++standard input and output: JSON-RPC 2.0, one message per line, protocol
++versions 2025-06-18, 2025-03-26 and 2024-11-05. It offers four tools; their
++results have the report (or the expansion, or the history) as text, and the
++JSON of the command line's `-json` as structured content.
++
++| Tool | Arguments |
++|---|---|
++| `reduce` | `text` or `path`; `key`; the options below |
++| `run` | `command` (an array, not run through a shell); `cwd`; `timeout_seconds` (default 600); `stdin`; `key` (default: the project directory and the command); `no_history`; the options below |
++| `expand` | `ref`; `max_bytes` (default 4 MB, up to 64 MB; a larger part is refused with a hint to expand a smaller one) |
++| `history` | `key`, or none for the list |
++
++The options are `format`, `budget`, `preserve`, `keep` (an array), `full` and
++`no_store`, as the flags. `run` starts the command in a process group of its
++own; at the time limit, when the client cancels the request
++(`notifications/cancelled`), or when the server stops (its input ends, or it
++gets SIGINT or SIGTERM), the group gets SIGTERM and, 5 seconds later,
++SIGKILL. A request the client cancelled gets no answer; one stopped because
++the server is stopping is answered with what the command printed. On Windows the command's process tree is ended with `taskkill /T`.
++A problem with the work (a command not found, binary output, a bad option)
++comes back as a result with `isError` set; an unknown tool or method is a
++protocol error, a batch or anything but a JSON object an invalid request,
++and a response from the client is ignored. Requests are answered as they
++finish, so a long `run` doesn't hold up others.
++
+ ### history
+ 
+ `abbreviatory history` lists the histories, most recent first. `abbreviatory
+diff --git a/expand.go b/expand.go
+index 0384853..f844515 100644
+--- a/expand.go
++++ b/expand.go
+@@ -1,8 +1,9 @@
+ package abbreviatory
+ 
+ import (
++	"bufio"
+ 	"bytes"
+-	"errors"
++	"io"
+ 	"net/url"
+ 	"regexp"
+ 	"strconv"
+@@ -20,7 +21,7 @@ func ParseRef(s string) (id, sel string, err error) {
+ 	s = strings.TrimSpace(s)
+ 	id, sel, _ = strings.Cut(s, ":")
+ 	if !refIDPattern.MatchString(id) {
+-		return "", "", errors.New("not a reference: " + quote(s) + " (expected something like 3f2a9c1b7e04:g12)")
++		return "", "", inputError("not a reference: " + quote(s) + " (expected something like 3f2a9c1b7e04:g12)")
+ 	}
+ 	return id, sel, nil
+ }
+@@ -46,7 +47,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
+ 			b, _ = strconv.ParseInt(m[2], 10, 64)
+ 		}
+ 		if a < 1 || b < a || b > ix.Lines {
+-			return nil, errors.New("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
++			return nil, inputError("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
+ 		}
+ 		return extractLines(original, []Range{{a, b}}), nil
+ 	}
+@@ -61,7 +62,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
+ 		if strings.HasPrefix(sel, "/") {
+ 			ptr, err := url.PathUnescape(sel)
+ 			if err != nil {
+-				return nil, errors.New("bad JSON pointer " + quote(sel) + ": " + err.Error())
++				return nil, inputError("bad JSON pointer " + quote(sel) + ": " + err.Error())
+ 			}
+ 			n, err := doc.lookup(ptr)
+ 			if err != nil {
+@@ -74,7 +75,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
+ 	if m := groupSel.FindStringSubmatch(sel); m != nil {
+ 		i, _ := strconv.Atoi(m[1])
+ 		if i < 0 || i >= len(ix.Groups) {
+-			return nil, errors.New("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
++			return nil, inputError("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
+ 		}
+ 		rs = groupRanges(ix.Groups[i])
+ 	} else if _, ok := ParseKind(sel); ok || sel == "keep" {
+@@ -85,7 +86,7 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
+ 		}
+ 		rs = mergeRanges(rs)
+ 	} else {
+-		return nil, errors.New("unknown selector " + quote(sel) + "; use " + selectors)
++		return nil, inputError("unknown selector " + quote(sel) + "; use " + selectors)
+ 	}
+ 	if ix.Unit == "bytes" {
+ 		return extractBytes(original, rs), nil
+@@ -93,6 +94,117 @@ func Expand(original []byte, ix *Index, sel string) ([]byte, error) {
+ 	return extractLines(original, rs), nil
+ }
+ 
++// ExpandTo writes the part of an original that a selector names to w, as
++// Expand returns it, reading the original as a stream: memory doesn't grow
++// with the original, except for a JSON pointer or the errors of a JSON
++// document, which need the document whole. A bad selector is reported
++// before anything is written.
++func ExpandTo(w io.Writer, original io.Reader, ix *Index, sel string) error {
++	if sel == "" {
++		_, err := io.Copy(w, original)
++		return err
++	}
++	if !lineSel.MatchString(sel) && ix.Format == "json" && (sel == "errors" || strings.HasPrefix(sel, "/")) {
++		data, err := io.ReadAll(original)
++		if err != nil {
++			return err
++		}
++		part, err := Expand(data, ix, sel)
++		if err != nil {
++			return err
++		}
++		_, err = w.Write(part)
++		return err
++	}
++	rs, unit, err := selectRanges(ix, sel)
++	if err != nil {
++		return err
++	}
++	bw := bufio.NewWriterSize(w, 64<<10)
++	br := bufio.NewReaderSize(original, 64<<10)
++	if unit == "bytes" {
++		var pos int64
++		for _, r := range rs {
++			if r.Start < pos || r.End < r.Start {
++				continue
++			}
++			if _, err := io.CopyN(io.Discard, br, r.Start-pos); err != nil {
++				break
++			}
++			n, err := io.CopyN(bw, br, r.End-r.Start+1)
++			pos = r.Start + n
++			if err != nil {
++				break
++			}
++			bw.WriteByte('\n')
++		}
++		return bw.Flush()
++	}
++	line := int64(1)
++	ri := 0
++	for ri < len(rs) {
++		chunk, err := br.ReadSlice('\n')
++		if len(chunk) > 0 {
++			if line >= rs[ri].Start {
++				if _, werr := bw.Write(chunk); werr != nil {
++					return werr
++				}
++			}
++			if err == nil {
++				if line >= rs[ri].End {
++					ri++
++				}
++				line++
++			}
++		}
++		if err == bufio.ErrBufferFull {
++			continue // a long line: the rest of it comes next
++		}
++		if err != nil {
++			break
++		}
++	}
++	return bw.Flush()
++}
++
++// selectRanges resolves a line, group or kind selector to sorted, merged
++// ranges and their unit.
++func selectRanges(ix *Index, sel string) ([]Range, string, error) {
++	if m := lineSel.FindStringSubmatch(sel); m != nil {
++		a, _ := strconv.ParseInt(m[1], 10, 64)
++		b := a
++		if m[2] != "" {
++			b, _ = strconv.ParseInt(m[2], 10, 64)
++		}
++		if a < 1 || b < a || b > ix.Lines {
++			return nil, "", inputError("line range " + sel + " is outside the input, which has " + plural(ix.Lines, "line", "lines"))
++		}
++		return []Range{{a, b}}, "lines", nil
++	}
++	var rs []Range
++	if m := groupSel.FindStringSubmatch(sel); m != nil {
++		i, _ := strconv.Atoi(m[1])
++		if i < 0 || i >= len(ix.Groups) {
++			return nil, "", inputError("no group " + sel + "; this input has " + plural(int64(len(ix.Groups)), "group", "groups"))
++		}
++		rs = mergeRanges(groupRanges(ix.Groups[i]))
++	} else if _, ok := ParseKind(sel); ok || sel == "keep" {
++		for _, g := range ix.Groups {
++			if (sel == "keep" && g.Kept) || g.Kind == sel {
++				rs = append(rs, groupRanges(g)...)
++			}
++		}
++		rs = mergeRanges(rs)
++	} else {
++		return nil, "", inputError("unknown selector " + quote(sel) + "; use " + selectors)
++	}
++	unit := "lines"
++	if ix.Unit == "bytes" {
++		unit = "bytes"
++	}
++	return rs, unit, nil
++}
++
+ // extractBytes copies byte ranges (inclusive) out of data, one per line.
+ func extractBytes(data []byte, rs []Range) []byte {
+ 	var out bytes.Buffer
+diff --git a/expandto_test.go b/expandto_test.go
+new file mode 100644
+index 0000000..5c6577e
+--- /dev/null
++++ b/expandto_test.go
+@@ -0,0 +1,61 @@
++package abbreviatory
++
++import (
++	"bytes"
++	"strconv"
++	"testing"
++)
++
++// The streaming expand gives the same bytes as Expand, for every selector
++// of every fixture.
++func TestExpandToMatchesExpand(t *testing.T) {
++	checked := 0
++	for name, data := range fixtures(t) {
++		res, err := Reduce(bytes.NewReader(data), Options{Budget: 4096})
++		if err != nil {
++			t.Fatal(err)
++		}
++		sels := []string{"", "fail", "error", "warn", "info", "pass", "skip", "keep", "L1", "L1-3", "L" + strconv.FormatInt(res.InputLines, 10)}
++		if res.InputLines > 10 {
++			sels = append(sels, "L5-"+strconv.FormatInt(res.InputLines-2, 10))
++		}
++		for i := range res.Index.Groups {
++			sels = append(sels, "g"+strconv.Itoa(i))
++		}
++		if res.Format == "json" {
++			sels = append(sels, "errors", "/items/3", "/items/2/name")
++		}
++		for _, sel := range sels {
++			want, werr := Expand(data, res.Index, sel)
++			var got bytes.Buffer
++			gerr := ExpandTo(&got, bytes.NewReader(data), res.Index, sel)
++			if (werr == nil) != (gerr == nil) {
++				t.Fatalf("%s %q: Expand error %v, ExpandTo error %v", name, sel, werr, gerr)
++			}
++			if werr == nil && !bytes.Equal(want, got.Bytes()) {
++				t.Fatalf("%s %q: %d bytes from Expand, %d from ExpandTo", name, sel, len(want), got.Len())
++			}
++			checked++
++		}
++	}
++	for _, sel := range []string{"g999999", "L0", "nonsense"} {
++		var b bytes.Buffer
++		ix := &Index{Lines: 3, Groups: []IndexGroup{}}
++		if err := ExpandTo(&b, bytes.NewReader([]byte("a\nb\nc\n")), ix, sel); err == nil || b.Len() != 0 {
++			t.Fatalf("%q: error %v, wrote %d bytes", sel, err, b.Len())
++		}
++	}
++	// Lines longer than the read buffer, and a last line with no newline.
++	long := bytes.Repeat([]byte("x"), 200<<10)
++	data := append(append(append([]byte("one\n"), long...), '\n'), []byte("three")...)
++	ix := &Index{Lines: 3, Unit: "lines"}
++	for _, sel := range []string{"L2", "L2-3", "L3", "L1-3"} {
++		want, _ := Expand(data, ix, sel)
++		var got bytes.Buffer
++		ExpandTo(&got, bytes.NewReader(data), ix, sel)
++		if !bytes.Equal(want, got.Bytes()) {
++			t.Fatalf("long lines %q: %d vs %d bytes", sel, len(want), got.Len())
++		}
++	}
++	t.Logf("%d selectors checked", checked)
++}
+diff --git a/jsondoc.go b/jsondoc.go
+index 0cc1adf..a067876 100644
+--- a/jsondoc.go
++++ b/jsondoc.go
+@@ -3,7 +3,6 @@ package abbreviatory
+ import (
+ 	"bytes"
+ 	"encoding/json"
+-	"errors"
+ 	"net/url"
+ 	"strconv"
+ 	"strings"
+@@ -61,7 +60,7 @@ func (p *jparser) skipBOM() {
+ 
+ func (p *jparser) fail(msg string) error {
+ 	line := 1 + bytes.Count(p.data[:p.i], []byte{'\n'})
+-	return errors.New("JSON: " + msg + " on line " + strconv.Itoa(line))
++	return inputError("JSON: " + msg + " on line " + strconv.Itoa(line))
+ }
+ 
+ func (p *jparser) ws() {
+@@ -304,7 +303,7 @@ func (d *jsonDoc) lookup(ptr string) (*jnode, error) {
+ 		return d.root, nil
+ 	}
+ 	if !strings.HasPrefix(ptr, "/") {
+-		return nil, errors.New("a JSON pointer starts with /")
++		return nil, inputError("a JSON pointer starts with /")
+ 	}
+ 	n := d.root
+ 	for _, part := range strings.Split(ptr[1:], "/") {
+@@ -320,16 +319,16 @@ func (d *jsonDoc) lookup(ptr string) (*jnode, error) {
+ 				}
+ 			}
+ 			if !found {
+-				return nil, errors.New("no member " + quote(part) + " at " + ptr)
++				return nil, inputError("no member " + quote(part) + " at " + ptr)
+ 			}
+ 		case 'a':
+ 			i, err := strconv.Atoi(part)
+ 			if err != nil || i < 0 || i >= len(n.vals) {
+-				return nil, errors.New("no element " + quote(part) + " at " + ptr)
++				return nil, inputError("no element " + quote(part) + " at " + ptr)
+ 			}
+ 			n = n.vals[i]
+ 		default:
+-			return nil, errors.New(ptr + " goes inside a value that is not an object or array")
++			return nil, inputError(ptr + " goes inside a value that is not an object or array")
+ 		}
+ 	}
+ 	return n, nil
+diff --git a/scripts/build-demo.sh b/scripts/build-demo.sh
+new file mode 100644
+index 0000000..4aa1abb
+--- /dev/null
++++ b/scripts/build-demo.sh
+@@ -0,0 +1,52 @@
++#!/bin/sh
++# Copyright Abbreviatory.com 2026
++# SPDX-License-Identifier: Apache-2.0
++#
++# Builds the browser demo into a site checkout: the engine compiled to
++# WebAssembly, Go's loader for it, the page (demo/index.html) and samples
++# from the test fixtures. The site serves it at /demo/.
++#
++#   sh scripts/build-demo.sh SITE_DIR
++#
++# SITE_DIR is a checkout of the abbreviatory.com site; the demo goes to
++# SITE_DIR/static/demo/. Needs Go and Python 3.
++set -eu
++site=${1:?usage: build-demo.sh SITE_DIR}
++cd "$(dirname "$0")/.."
++out="$site/static/demo"
++rm -rf "$out"
++mkdir -p "$out/samples"
++
++GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o "$out/abbreviatory.wasm" ./cmd/abbreviatory-wasm
++goroot=$(go env GOROOT)
++if test -f "$goroot/lib/wasm/wasm_exec.js"; then
++	cp "$goroot/lib/wasm/wasm_exec.js" "$out/"
++else
++	cp "$goroot/misc/wasm/wasm_exec.js" "$out/"
++fi
++cp "$goroot/LICENSE" "$out/wasm_exec.LICENSE.txt"
++cp demo/index.html "$out/index.html"
++
++f=test/fixtures
++cp "$f/gotest-verbose.txt" "$f/pytest-verbose.txt" "$f/junit-pytest.xml" "$f/api-response.json" "$out/samples/"
++head -n 12000 "$f/app.log" > "$out/samples/app.log"
++
++# The earlier of the two runs for "Compare two runs": TestFieldSpaces still
++# passed, TestFieldNegative still failed.
++python3 - "$f/gotest-verbose.txt" "$out/samples/gotest-run1.txt" <<'PY'
++import sys
++src, dst = sys.argv[1], sys.argv[2]
++text = open(src, encoding="utf-8").read()
++spaces = ('=== RUN   TestFieldSpaces\n'
++          '    parse_test.go:33: Field("width = 12"): unexpected error: strconv.Atoi: parsing " 12": invalid syntax\n'
++          '    parse_test.go:36: Field("width = 12") = 0, want 12\n'
++          '--- FAIL: TestFieldSpaces (0.00s)\n')
++negative = '=== RUN   TestFieldNegative\n--- PASS: TestFieldNegative (0.00s)\n'
++assert spaces in text and negative in text, "the fixture changed; update build-demo.sh"
++text = text.replace(spaces, '=== RUN   TestFieldSpaces\n--- PASS: TestFieldSpaces (0.00s)\n')
++text = text.replace(negative, '=== RUN   TestFieldNegative\n'
++                    '    parse_test.go:28: Field("depth=-3") = 3, want -3\n'
++                    '--- FAIL: TestFieldNegative (0.00s)\n')
++open(dst, "w", encoding="utf-8").write(text)
++PY
++ls -la "$out" "$out/samples" | awk 'NF > 5 {print $5, $NF}'
+diff --git a/scripts/smoke.py b/scripts/smoke.py
+index 013b33c..456aed1 100755
+--- a/scripts/smoke.py
++++ b/scripts/smoke.py
+@@ -13,8 +13,10 @@
+ # bytes twice; every reference in the output expands, and the whole-input
+ # reference gives the fixture back byte for byte; -json, -no-store, -keep and
+ # prune work; history (reduce -key, -full, history) and run (keeping the
+-# exit status) work; and bad input fails cleanly.
++# exit status) work; serve and mcp give the same report as reduce; and bad
++# input fails cleanly.
+ import json
++import urllib.error
+ import os
+ import re
+ import subprocess
+@@ -145,6 +147,54 @@ def main():
+     require(r.returncode == 2 and b"exit status 2" in r.stdout, f"run of a failing command: exit {r.returncode}, {r.stdout!r}")
+     checks += 1
+ 
++    # serve: the HTTP service gives the same report as the command line.
++    path = FIXTURES / "gotest-json.txt"
++    want = run([exe, "reduce", "-store", store, path]).stdout.decode().replace("\r\n", "\n")
++    proc = subprocess.Popen([str(exe), "serve", "-addr", "127.0.0.1:0", "-store", store, "-token", "smoke"],
++                            stderr=subprocess.PIPE, text=True)
++    try:
++        line = proc.stderr.readline()
++        found = re.search(r"http://\S+", line)
++        require(found, f"serve printed {line!r}")
++        base = found.group(0)
++        import urllib.request
++        def call(method, url, body=None, accept=None):
++            req = urllib.request.Request(base + url, data=body, method=method, headers={"Authorization": "Bearer smoke"})
++            if accept:
++                req.add_header("Accept", accept)
++            with urllib.request.urlopen(req, timeout=60) as resp:
++                return resp.read()
++        health = json.loads(call("GET", "/healthz"))
++        require(health["version"] == source_version(), f"healthz: {health}")
++        got = call("POST", "/reduce", path.read_bytes(), "text/plain").decode()
++        require(got == want, "serve and reduce give different reports")
++        res = json.loads(call("POST", "/reduce?budget=1024", path.read_bytes()))
++        whole = call("GET", "/expand/" + res["ref"])
++        require(whole == path.read_bytes(), "serve's whole-input reference doesn't give the file back")
++        try:
++            urllib.request.urlopen(base + "/reduce", data=b"x", timeout=60)
++            require(False, "serve answered without the token")
++        except urllib.error.HTTPError as e:
++            require(e.code == 401, f"without the token: {e.code}")
++    finally:
++        proc.terminate()
++        proc.wait(timeout=30)
++    checks += 1
++
++    # mcp: an agent's session over standard input and output.
++    msgs = [
++        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "1"}}},
++        {"jsonrpc": "2.0", "method": "notifications/initialized"},
++        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
++        {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "reduce", "arguments": {"path": str(path)}}},
++    ]
++    r = run([exe, "mcp", "-store", store], stdin="".join(json.dumps(m) + "\n" for m in msgs).encode())
++    answers = {m["id"]: m for m in (json.loads(l) for l in r.stdout.decode().splitlines() if l.strip())}
++    require(answers[1]["result"]["serverInfo"]["version"] == source_version(), f"mcp initialize: {answers.get(1)}")
++    require([t["name"] for t in answers[2]["result"]["tools"]] == ["reduce", "run", "expand", "history"], f"mcp tools: {answers.get(2)}")
++    require(answers[3]["result"]["content"][0]["text"].replace("\r\n", "\n") == want, "mcp and reduce give different reports")
++    checks += 1
++
+     out = run([exe, "prune", "-store", store, "-max-size", "0"]).stdout.decode()
+     require(out.startswith("removed "), f"prune said {out!r}")
+     r = run([exe, "expand", "-store", store, res["ref"]], check=False)
+diff --git a/store/store.go b/store/store.go
+index 29ce6de..f77f038 100644
+--- a/store/store.go
++++ b/store/store.go
+@@ -8,6 +8,7 @@ import (
+ 	"compress/gzip"
+ 	"encoding/json"
+ 	"errors"
++	"fmt"
+ 	"io"
+ 	"io/fs"
+ 	"os"
+@@ -192,6 +193,43 @@ func (s *Store) Load(id string) ([]byte, *abbreviatory.Index, error) {
+ 	return data, &ix, nil
+ }
+ 
++// ExpandTo writes the part of a stored original that a reference names to
++// w, streaming it from the store: memory stays small however large the
++// original is (a JSON pointer still reads its document whole). A bad
++// reference is reported before anything is written.
++func (s *Store) ExpandTo(w io.Writer, ref string) error {
++	id, sel, err := abbreviatory.ParseRef(ref)
++	if err != nil {
++		return err
++	}
++	ixData, err := os.ReadFile(s.path(id, ".idx.json"))
++	if errors.Is(err, fs.ErrNotExist) {
++		return fmt.Errorf("%s: %w", id, ErrNotFound)
++	}
++	if err != nil {
++		return err
++	}
++	var ix abbreviatory.Index
++	if err := json.Unmarshal(ixData, &ix); err != nil {
++		return errors.New("store: damaged index for " + id + ": " + err.Error())
++	}
++	f, err := os.Open(s.path(id, ".gz"))
++	if errors.Is(err, fs.ErrNotExist) {
++		return fmt.Errorf("%s: %w", id, ErrNotFound)
++	}
++	if err != nil {
++		return err
++	}
++	defer f.Close()
++	gz, err := gzip.NewReader(f)
++	if err != nil {
++		return errors.New("store: damaged original for " + id + ": " + err.Error())
++	}
++	now := time.Now()
++	os.Chtimes(s.path(id, ".gz"), now, now)
++	return abbreviatory.ExpandTo(w, gz, &ix, sel)
++}
++
+ // Expand loads a reference's original and returns the part it names.
+ func (s *Store) Expand(ref string) ([]byte, error) {
+ 	id, sel, err := abbreviatory.ParseRef(ref)
+@@ -200,7 +238,7 @@ func (s *Store) Expand(ref string) ([]byte, error) {
+ 	}
+ 	data, ix, err := s.Load(id)
+ 	if err != nil {
+-		return nil, errors.New(id + ": " + err.Error())
++		return nil, fmt.Errorf("%s: %w", id, err)
+ 	}
+ 	return abbreviatory.Expand(data, ix, sel)
+ }
+diff --git a/test/results/delta.txt b/test/results/delta.txt
+index 402ab8c..d42fec0 100644
+--- a/test/results/delta.txt
++++ b/test/results/delta.txt
+@@ -1,6 +1,6 @@
+ # 500 simulated CI runs with known changes, each delta checked against the known statuses
+-# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:30 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: go test -count=1 -v -run TestSimulatedRuns .
+ 
+ === RUN   TestSimulatedRuns
+@@ -10,9 +10,9 @@
+     delta_test.go:438: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
+ === RUN   TestSimulatedRuns/log
+     delta_test.go:438: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
+---- PASS: TestSimulatedRuns (3.66s)
+-    --- PASS: TestSimulatedRuns/go_test_-v (1.34s)
+-    --- PASS: TestSimulatedRuns/go_test (1.23s)
+-    --- PASS: TestSimulatedRuns/log (1.09s)
++--- PASS: TestSimulatedRuns (3.48s)
++    --- PASS: TestSimulatedRuns/go_test_-v (1.33s)
++    --- PASS: TestSimulatedRuns/go_test (1.10s)
++    --- PASS: TestSimulatedRuns/log (1.05s)
+ PASS
+-ok  	github.com/abbreviatory/engine	3.660s
++ok  	github.com/abbreviatory/engine	3.486s
+diff --git a/test/results/memory.txt b/test/results/memory.txt
+index 86af73b..84fe55d 100644
+--- a/test/results/memory.txt
++++ b/test/results/memory.txt
+@@ -1,10 +1,10 @@
+ # A 1024 MB generated log streamed through Reduce: peak heap and speed
+-# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:30 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: ABBREVIATORY_BIG_MB=1024 go test -count=1 -v -run TestLargeInputMemory -timeout 30m .
+ 
+ === RUN   TestLargeInputMemory
+-    robust_test.go:440: memory: 1107 MB input, 12485370 lines, peak heap in use 14.1 MB, output 539 bytes, 31.3 s (35 MB/s)
+---- PASS: TestLargeInputMemory (31.26s)
++    robust_test.go:440: memory: 1107 MB input, 12485370 lines, peak heap in use 16.7 MB, output 539 bytes, 39.8 s (28 MB/s)
++--- PASS: TestLargeInputMemory (39.80s)
+ PASS
+-ok  	github.com/abbreviatory/engine	31.266s
++ok  	github.com/abbreviatory/engine	39.800s
+diff --git a/test/results/race.txt b/test/results/race.txt
+index 4da3945..9f6b176 100644
+--- a/test/results/race.txt
++++ b/test/results/race.txt
+@@ -1,8 +1,8 @@
+ # Every test with the race detector
+-# recorded 2026-10-18 21:49 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:25 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: go test -race -count=1 ./...
+ 
+-ok  	github.com/abbreviatory/engine	208.942s
+-ok  	github.com/abbreviatory/engine/cmd/abbreviatory	3.417s
+-ok  	github.com/abbreviatory/engine/store	2.065s
++ok  	github.com/abbreviatory/engine	306.952s
++ok  	github.com/abbreviatory/engine/cmd/abbreviatory	172.437s
++ok  	github.com/abbreviatory/engine/store	2.195s
+diff --git a/test/results/ratios.txt b/test/results/ratios.txt
+index 3ace2ca..c21ac38 100644
+--- a/test/results/ratios.txt
++++ b/test/results/ratios.txt
+@@ -1,6 +1,6 @@
+ # Reduction of each fixture at the default budget (4,096 bytes)
+-# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:30 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: go test -count=1 -v -run TestRatios .
+ 
+ api-response.json    json            719368 bytes  37527 lines ->  3185 bytes 126 lines (0.44% of the input)
+diff --git a/test/results/release-plan.txt b/test/results/release-plan.txt
+index 66ee3f5..224dcfb 100644
+--- a/test/results/release-plan.txt
++++ b/test/results/release-plan.txt
+@@ -1,6 +1,6 @@
+ # The release plan's cases
+-# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:31 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: python3 -B -m unittest discover -s scripts -p '*_test.py' -v
+ 
+ test_bad_version_fails (release_plan_test.ReleasePlan.test_bad_version_fails) ... ok
+diff --git a/test/results/smoke.txt b/test/results/smoke.txt
+index 31e7aaa..83dbe9a 100644
+--- a/test/results/smoke.txt
++++ b/test/results/smoke.txt
+@@ -1,6 +1,6 @@
+ # The release smoke check on a binary built as the release workflow builds it
+-# recorded 2026-10-18 21:53 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:31 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: python3 scripts/smoke.py BIN
+ 
+-smoke check passed: 23 checks on abbreviatory 0.2.0
++smoke check passed: 25 checks on abbreviatory 0.3.0
+diff --git a/test/results/tests.txt b/test/results/tests.txt
+index e32e7a7..4c6855f 100644
+--- a/test/results/tests.txt
++++ b/test/results/tests.txt
+@@ -1,10 +1,13 @@
+ # Every test, verbose
+-# recorded 2026-10-18 21:48 UTC at a842afc, Abbreviatory 0.2.0, go1.24.7 linux/amd64
+-# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.10GHz, 2 CPUs
++# recorded 2026-10-19 03:24 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
++# Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
+ # command: go test -count=1 -v ./...
+ 
++=== RUN   TestExpandToMatchesExpand
++    expandto_test.go:60: 4409 selectors checked
++--- PASS: TestExpandToMatchesExpand (2.80s)
+ === RUN   TestTrackedPromise
+---- PASS: TestTrackedPromise (14.82s)
++--- PASS: TestTrackedPromise (16.05s)
+ === RUN   TestFirstRunAndNoChange
+ --- PASS: TestFirstRunAndNoChange (0.00s)
+ === RUN   TestTrimmedHistory
+@@ -18,7 +21,7 @@
+ === RUN   TestSameNameTwoPackages
+ --- PASS: TestSameNameTwoPackages (0.00s)
+ === RUN   TestNoPassesIsNotFixed
+---- PASS: TestNoPassesIsNotFixed (0.00s)
++--- PASS: TestNoPassesIsNotFixed (0.01s)
+ === RUN   TestCutShortRunMatches
+ --- PASS: TestCutShortRunMatches (0.00s)
+ === RUN   TestBuildFailedPackageNotFixed
+@@ -26,7 +29,7 @@
+ === RUN   TestCutShortSharedName
+ --- PASS: TestCutShortSharedName (0.00s)
+ === RUN   TestDetection
+---- PASS: TestDetection (0.18s)
++--- PASS: TestDetection (0.23s)
+ === RUN   TestPromise
+ === RUN   TestPromise/gotest-short.txt/256
+ === PAUSE TestPromise/gotest-short.txt/256
+@@ -140,14 +143,29 @@
+ === PAUSE TestPromise/gotest-json.txt/4096
+ === RUN   TestPromise/gotest-json.txt/16384
+ === PAUSE TestPromise/gotest-json.txt/16384
+-=== CONT  TestPromise/gotest-short.txt/256
++=== CONT  TestPromise/app.log/256
+ === CONT  TestPromise/gotest-json.txt/16384
+-=== CONT  TestPromise/pytest-verbose.txt/256
++=== CONT  TestPromise/gotest-short.txt/256
++=== CONT  TestPromise/api-response.json/16384
+ === CONT  TestPromise/gotest-json.txt/4096
++=== CONT  TestPromise/gotest-json.txt/2048
++=== CONT  TestPromise/api-response.json/4096
++=== CONT  TestPromise/api-response.json/2048
++=== CONT  TestPromise/api-response.json/1024
++=== CONT  TestPromise/api-response.json/700
++=== CONT  TestPromise/api-response.json/512
++=== CONT  TestPromise/api-response.json/256
++=== CONT  TestPromise/pytest-verbose.txt/16384
++=== CONT  TestPromise/pytest-verbose.txt/4096
++=== CONT  TestPromise/pytest-verbose.txt/2048
++=== CONT  TestPromise/pytest-verbose.txt/1024
++=== CONT  TestPromise/pytest-verbose.txt/700
++=== CONT  TestPromise/pytest-verbose.txt/512
++=== CONT  TestPromise/pytest-verbose.txt/256
+ === CONT  TestPromise/pytest-short.txt/16384
+ === CONT  TestPromise/pytest-short.txt/4096
+-=== CONT  TestPromise/pytest-short.txt/2048
+ === CONT  TestPromise/pytest-short.txt/1024
++=== CONT  TestPromise/pytest-short.txt/2048
+ === CONT  TestPromise/pytest-short.txt/700
+ === CONT  TestPromise/pytest-short.txt/512
+ === CONT  TestPromise/pytest-short.txt/256
+@@ -165,98 +183,83 @@
+ === CONT  TestPromise/gotest-verbose.txt/700
+ === CONT  TestPromise/gotest-verbose.txt/512
+ === CONT  TestPromise/gotest-verbose.txt/256
+-=== CONT  TestPromise/gotest-json.txt/2048
++=== CONT  TestPromise/gotest-short.txt/16384
++=== CONT  TestPromise/gotest-short.txt/4096
++=== CONT  TestPromise/gotest-short.txt/2048
++=== CONT  TestPromise/gotest-short.txt/1024
++=== CONT  TestPromise/gotest-short.txt/700
++=== CONT  TestPromise/gotest-short.txt/512
++=== CONT  TestPromise/app.log/16384
+ === CONT  TestPromise/gotest-json.txt/1024
+ === CONT  TestPromise/gotest-json.txt/700
+ === CONT  TestPromise/gotest-json.txt/512
+ === CONT  TestPromise/gotest-json.txt/256
+-=== CONT  TestPromise/app.log/16384
++=== CONT  TestPromise/app.log/1024
+ === CONT  TestPromise/app.log/4096
+ === CONT  TestPromise/app.log/2048
+-=== CONT  TestPromise/app.log/1024
+ === CONT  TestPromise/app.log/700
+ === CONT  TestPromise/app.log/512
+-=== CONT  TestPromise/app.log/256
+-=== CONT  TestPromise/api-response.json/16384
+-=== CONT  TestPromise/api-response.json/4096
+-=== CONT  TestPromise/api-response.json/2048
+-=== CONT  TestPromise/api-response.json/1024
+-=== CONT  TestPromise/api-response.json/700
+-=== CONT  TestPromise/api-response.json/512
+-=== CONT  TestPromise/api-response.json/256
+-=== CONT  TestPromise/pytest-verbose.txt/16384
+-=== CONT  TestPromise/pytest-verbose.txt/4096
+-=== CONT  TestPromise/pytest-verbose.txt/2048
+-=== CONT  TestPromise/pytest-verbose.txt/1024
+-=== CONT  TestPromise/pytest-verbose.txt/700
+-=== CONT  TestPromise/pytest-verbose.txt/512
+-=== CONT  TestPromise/gotest-short.txt/16384
+-=== CONT  TestPromise/gotest-short.txt/4096
+-=== CONT  TestPromise/gotest-short.txt/2048
+-=== CONT  TestPromise/gotest-short.txt/1024
+-=== CONT  TestPromise/gotest-short.txt/700
+-=== CONT  TestPromise/gotest-short.txt/512
+ --- PASS: TestPromise (0.01s)
++    --- PASS: TestPromise/app.log/256 (0.00s)
+     --- PASS: TestPromise/gotest-short.txt/256 (0.00s)
++    --- PASS: TestPromise/gotest-json.txt/16384 (0.75s)
++    --- PASS: TestPromise/api-response.json/16384 (1.27s)
++    --- PASS: TestPromise/gotest-json.txt/4096 (0.75s)
++    --- PASS: TestPromise/gotest-json.txt/2048 (0.77s)
++    --- PASS: TestPromise/api-response.json/4096 (1.20s)
++    --- PASS: TestPromise/api-response.json/2048 (1.56s)
++    --- PASS: TestPromise/api-response.json/1024 (1.82s)
++    --- PASS: TestPromise/api-response.json/700 (1.95s)
++    --- PASS: TestPromise/api-response.json/256 (0.00s)
++    --- PASS: TestPromise/pytest-verbose.txt/16384 (0.19s)
++    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.19s)
++    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.20s)
++    --- PASS: TestPromise/api-response.json/512 (1.78s)
++    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.23s)
++    --- PASS: TestPromise/pytest-verbose.txt/512 (0.10s)
+     --- PASS: TestPromise/pytest-verbose.txt/256 (0.00s)
+-    --- PASS: TestPromise/gotest-json.txt/16384 (0.35s)
+-    --- PASS: TestPromise/gotest-json.txt/4096 (0.36s)
+-    --- PASS: TestPromise/pytest-short.txt/16384 (0.02s)
+-    --- PASS: TestPromise/pytest-short.txt/4096 (0.02s)
+-    --- PASS: TestPromise/pytest-short.txt/2048 (0.02s)
+-    --- PASS: TestPromise/pytest-short.txt/1024 (0.02s)
+-    --- PASS: TestPromise/pytest-short.txt/700 (0.01s)
++    --- PASS: TestPromise/pytest-verbose.txt/700 (0.17s)
++    --- PASS: TestPromise/pytest-short.txt/16384 (0.04s)
++    --- PASS: TestPromise/pytest-short.txt/4096 (0.04s)
++    --- PASS: TestPromise/pytest-short.txt/1024 (0.03s)
++    --- PASS: TestPromise/pytest-short.txt/2048 (0.04s)
++    --- PASS: TestPromise/pytest-short.txt/512 (0.02s)
+     --- PASS: TestPromise/pytest-short.txt/256 (0.00s)
+-    --- PASS: TestPromise/pytest-short.txt/512 (0.01s)
+-    --- PASS: TestPromise/junit-pytest.xml/16384 (0.11s)
+-    --- PASS: TestPromise/junit-pytest.xml/4096 (0.11s)
+-    --- PASS: TestPromise/junit-pytest.xml/2048 (0.12s)
+-    --- PASS: TestPromise/junit-pytest.xml/1024 (0.11s)
+-    --- PASS: TestPromise/junit-pytest.xml/700 (0.09s)
++    --- PASS: TestPromise/pytest-short.txt/700 (0.04s)
++    --- PASS: TestPromise/junit-pytest.xml/16384 (0.18s)
++    --- PASS: TestPromise/junit-pytest.xml/4096 (0.21s)
++    --- PASS: TestPromise/junit-pytest.xml/2048 (0.19s)
++    --- PASS: TestPromise/junit-pytest.xml/1024 (0.18s)
++    --- PASS: TestPromise/junit-pytest.xml/700 (0.20s)
+     --- PASS: TestPromise/junit-pytest.xml/256 (0.00s)
+-    --- PASS: TestPromise/junit-pytest.xml/512 (0.09s)
+-    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.08s)
+-    --- PASS: TestPromise/gotest-verbose.txt/4096 (0.09s)
+-    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.09s)
+-    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.08s)
+-    --- PASS: TestPromise/gotest-verbose.txt/700 (0.08s)
++    --- PASS: TestPromise/junit-pytest.xml/512 (0.19s)
++    --- PASS: TestPromise/gotest-verbose.txt/4096 (0.17s)
++    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.18s)
++    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.16s)
++    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.17s)
++    --- PASS: TestPromise/gotest-verbose.txt/700 (0.18s)
+     --- PASS: TestPromise/gotest-verbose.txt/256 (0.00s)
+-    --- PASS: TestPromise/gotest-verbose.txt/512 (0.08s)
+-    --- PASS: TestPromise/gotest-json.txt/2048 (0.34s)
+-    --- PASS: TestPromise/gotest-json.txt/1024 (0.34s)
+-    --- PASS: TestPromise/gotest-json.txt/700 (0.32s)
++    --- PASS: TestPromise/gotest-short.txt/16384 (0.02s)
++    --- PASS: TestPromise/gotest-short.txt/4096 (0.02s)
++    --- PASS: TestPromise/gotest-verbose.txt/512 (0.23s)
++    --- PASS: TestPromise/gotest-short.txt/2048 (0.03s)
++    --- PASS: TestPromise/gotest-short.txt/1024 (0.02s)
++    --- PASS: TestPromise/gotest-short.txt/700 (0.03s)
++    --- PASS: TestPromise/gotest-short.txt/512 (0.03s)
++    --- PASS: TestPromise/gotest-json.txt/1024 (0.91s)
++    --- PASS: TestPromise/gotest-json.txt/700 (0.71s)
++    --- PASS: TestPromise/gotest-json.txt/512 (0.65s)
+     --- PASS: TestPromise/gotest-json.txt/256 (0.00s)
+-    --- PASS: TestPromise/gotest-json.txt/512 (0.33s)
+-    --- PASS: TestPromise/app.log/16384 (3.86s)
+-    --- PASS: TestPromise/app.log/4096 (3.99s)
+-    --- PASS: TestPromise/app.log/2048 (9.34s)
+-    --- PASS: TestPromise/app.log/1024 (11.04s)
+-    --- PASS: TestPromise/app.log/700 (11.05s)
+-    --- PASS: TestPromise/app.log/256 (0.00s)
+-    --- PASS: TestPromise/api-response.json/16384 (0.49s)
+-    --- PASS: TestPromise/api-response.json/4096 (0.49s)
+-    --- PASS: TestPromise/api-response.json/2048 (0.53s)
+-    --- PASS: TestPromise/app.log/512 (11.21s)
+-    --- PASS: TestPromise/api-response.json/1024 (0.59s)
+-    --- PASS: TestPromise/api-response.json/700 (0.75s)
+-    --- PASS: TestPromise/api-response.json/256 (0.00s)
+-    --- PASS: TestPromise/api-response.json/512 (0.76s)
+-    --- PASS: TestPromise/pytest-verbose.txt/16384 (0.09s)
+-    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.11s)
+-    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.11s)
+-    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.10s)
+-    --- PASS: TestPromise/pytest-verbose.txt/700 (0.10s)
+-    --- PASS: TestPromise/gotest-short.txt/16384 (0.01s)
+-    --- PASS: TestPromise/gotest-short.txt/4096 (0.01s)
+-    --- PASS: TestPromise/gotest-short.txt/2048 (0.01s)
+-    --- PASS: TestPromise/gotest-short.txt/1024 (0.01s)
+-    --- PASS: TestPromise/gotest-short.txt/700 (0.02s)
+-    --- PASS: TestPromise/pytest-verbose.txt/512 (0.07s)
+-    --- PASS: TestPromise/gotest-short.txt/512 (0.01s)
++    --- PASS: TestPromise/app.log/16384 (7.51s)
++    --- PASS: TestPromise/app.log/4096 (7.23s)
++    --- PASS: TestPromise/app.log/1024 (16.81s)
++    --- PASS: TestPromise/app.log/2048 (11.02s)
++    --- PASS: TestPromise/app.log/700 (11.44s)
++    --- PASS: TestPromise/app.log/512 (11.46s)
+ === RUN   TestGroupsCoverInput
+---- PASS: TestGroupsCoverInput (0.30s)
++--- PASS: TestGroupsCoverInput (0.36s)
+ === RUN   TestExpectedContent
+---- PASS: TestExpectedContent (0.17s)
++--- PASS: TestExpectedContent (0.23s)
+ === RUN   TestRatios
+     promise_test.go:385: ratio api-response.json    json            719368 bytes  37527 lines ->  3185 bytes 126 lines (0.44% of the input)
+     promise_test.go:385: ratio app.log              logs           5630070 bytes  63369 lines ->  3075 bytes  42 lines (0.05% of the input)
+@@ -266,21 +269,21 @@
+     promise_test.go:385: ratio junit-pytest.xml     junit            82024 bytes    117 lines ->  3961 bytes  89 lines (4.83% of the input)
+     promise_test.go:385: ratio pytest-short.txt     pytest            7479 bytes    169 lines ->  3898 bytes  87 lines (52.12% of the input)
+     promise_test.go:385: ratio pytest-verbose.txt   pytest           79443 bytes   1072 lines ->  3893 bytes  88 lines (4.90% of the input)
+---- PASS: TestRatios (0.17s)
++--- PASS: TestRatios (0.23s)
+ === RUN   TestReviewLogStartingWithBracket
+ --- PASS: TestReviewLogStartingWithBracket (0.00s)
+ === RUN   TestReviewKeepRulesChangeTheID
+---- PASS: TestReviewKeepRulesChangeTheID (0.00s)
++--- PASS: TestReviewKeepRulesChangeTheID (0.01s)
+ === RUN   TestReviewHugePytestCount
+ --- PASS: TestReviewHugePytestCount (0.00s)
+ === RUN   TestReviewPytestStrayErrors
+ --- PASS: TestReviewPytestStrayErrors (0.00s)
+ === RUN   TestReviewDetection
+---- PASS: TestReviewDetection (0.03s)
++--- PASS: TestReviewDetection (0.04s)
+ === RUN   TestReviewPytestFailAndTeardownError
+ --- PASS: TestReviewPytestFailAndTeardownError (0.00s)
+ === RUN   TestReviewDetailCapped
+---- PASS: TestReviewDetailCapped (0.10s)
++--- PASS: TestReviewDetailCapped (0.12s)
+ === RUN   TestReviewGoTestJSONEscapes
+ --- PASS: TestReviewGoTestJSONEscapes (0.00s)
+ === RUN   TestReviewJUnitVariants
+@@ -304,7 +307,7 @@
+ === RUN   TestTruncatedJUnit
+ --- PASS: TestTruncatedJUnit (0.00s)
+ === RUN   TestLongLine
+---- PASS: TestLongLine (0.01s)
++--- PASS: TestLongLine (0.03s)
+ === RUN   TestCRLFAndANSI
+ --- PASS: TestCRLFAndANSI (0.00s)
+ === RUN   TestInvalidUTF8
+@@ -330,12 +333,12 @@
+ === RUN   TestDedupe
+ --- PASS: TestDedupe (0.00s)
+ === RUN   TestManyDistinctBounded
+---- PASS: TestManyDistinctBounded (0.09s)
++--- PASS: TestManyDistinctBounded (0.13s)
+ === RUN   TestRandomLogs
+---- PASS: TestRandomLogs (1.43s)
++--- PASS: TestRandomLogs (1.74s)
+ === RUN   TestLargeInputMemory
+-    robust_test.go:440: memory: 68 MB input, 780335 lines, peak heap in use 7.7 MB, output 515 bytes, 1.9 s (36 MB/s)
+---- PASS: TestLargeInputMemory (1.91s)
++    robust_test.go:440: memory: 68 MB input, 780335 lines, peak heap in use 10.4 MB, output 515 bytes, 2.8 s (24 MB/s)
++--- PASS: TestLargeInputMemory (2.84s)
+ === RUN   TestSimulatedRuns
+ === RUN   TestSimulatedRuns/go_test_-v
+     delta_test.go:438: 500 runs: map[fixed:508 flaky:1399 new:544 new notes:539 not run:45 one line:57 report:443 still:2386 streak notes:1858]
+@@ -343,36 +346,61 @@
+     delta_test.go:438: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
+ === RUN   TestSimulatedRuns/log
+     delta_test.go:438: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
+---- PASS: TestSimulatedRuns (3.98s)
+-    --- PASS: TestSimulatedRuns/go_test_-v (1.52s)
+-    --- PASS: TestSimulatedRuns/go_test (1.36s)
+-    --- PASS: TestSimulatedRuns/log (1.10s)
++--- PASS: TestSimulatedRuns (4.66s)
++    --- PASS: TestSimulatedRuns/go_test_-v (1.86s)
++    --- PASS: TestSimulatedRuns/go_test (1.50s)
++    --- PASS: TestSimulatedRuns/log (1.31s)
+ PASS
+-ok  	github.com/abbreviatory/engine	52.276s
++ok  	github.com/abbreviatory/engine	74.551s
+ === RUN   TestReduceAndExpand
+ --- PASS: TestReduceAndExpand (0.01s)
+ === RUN   TestReduceFileAndJSON
+---- PASS: TestReduceFileAndJSON (0.01s)
++--- PASS: TestReduceFileAndJSON (0.00s)
+ === RUN   TestNoStore
+ --- PASS: TestNoStore (0.00s)
+ === RUN   TestErrors
+ --- PASS: TestErrors (0.00s)
+ === RUN   TestVersionFormatsPrune
+---- PASS: TestVersionFormatsPrune (0.00s)
++--- PASS: TestVersionFormatsPrune (0.01s)
+ === RUN   TestParseSize
+ --- PASS: TestParseSize (0.00s)
+ === RUN   TestReduceWithKeyAndHistory
+---- PASS: TestReduceWithKeyAndHistory (0.02s)
++--- PASS: TestReduceWithKeyAndHistory (0.03s)
+ === RUN   TestRunKeepsExitStatus
+---- PASS: TestRunKeepsExitStatus (0.03s)
++--- PASS: TestRunKeepsExitStatus (0.04s)
+ === RUN   TestRunEdgeCases
+---- PASS: TestRunEdgeCases (0.34s)
++--- PASS: TestRunEdgeCases (0.33s)
+ === RUN   TestRunPassesSignalsOn
+---- PASS: TestRunPassesSignalsOn (1.05s)
++--- PASS: TestRunPassesSignalsOn (1.75s)
+ === RUN   TestRunSignalDuringLockWait
+---- PASS: TestRunSignalDuringLockWait (1.09s)
++--- PASS: TestRunSignalDuringLockWait (1.52s)
++=== RUN   TestMCPProtocol
++--- PASS: TestMCPProtocol (0.01s)
++=== RUN   TestMCPRun
++--- PASS: TestMCPRun (1.36s)
++=== RUN   TestMCPMessagesAndShutdown
++--- PASS: TestMCPMessagesAndShutdown (0.51s)
++=== RUN   TestFrontEndsAgree
++    parity_test.go:334: 8 fixtures: 40 reductions, 424 expansions and 8 histories the same through the command line, HTTP and MCP
++--- PASS: TestFrontEndsAgree (36.13s)
++=== RUN   TestFrontEndsAgreeOnText
++--- PASS: TestFrontEndsAgreeOnText (0.32s)
++=== RUN   TestHTTPService
++--- PASS: TestHTTPService (0.06s)
++=== RUN   TestHTTPNoToken
++--- PASS: TestHTTPNoToken (0.01s)
++=== RUN   TestServeAddress
++--- PASS: TestServeAddress (0.00s)
++=== RUN   TestServeProcess
++--- PASS: TestServeProcess (1.14s)
++=== RUN   TestHTTPLocalOnly
++--- PASS: TestHTTPLocalOnly (0.04s)
++=== RUN   TestHTTPDetails
++--- PASS: TestHTTPDetails (0.69s)
++=== RUN   TestHTTPSlowUploadsAndPointers
++--- PASS: TestHTTPSlowUploadsAndPointers (0.21s)
+ PASS
+-ok  	github.com/abbreviatory/engine/cmd/abbreviatory	2.559s
++ok  	github.com/abbreviatory/engine/cmd/abbreviatory	44.175s
+ === RUN   TestStoreRoundTrip
+ --- PASS: TestStoreRoundTrip (0.01s)
+ === RUN   TestStoreMissing
+@@ -380,22 +408,22 @@ ok  	github.com/abbreviatory/engine/cmd/abbreviatory	2.559s
+ === RUN   TestStoreAbortLeavesNothing
+ --- PASS: TestStoreAbortLeavesNothing (0.00s)
+ === RUN   TestStoreDamaged
+---- PASS: TestStoreDamaged (0.00s)
++--- PASS: TestStoreDamaged (0.01s)
+ === RUN   TestPrune
+---- PASS: TestPrune (0.01s)
++--- PASS: TestPrune (0.02s)
+ === RUN   TestDefaultDir
+ --- PASS: TestDefaultDir (0.00s)
+ === RUN   TestPruneNowOncePerHour
+ --- PASS: TestPruneNowOncePerHour (0.00s)
+ === RUN   TestHistoryRecord
+---- PASS: TestHistoryRecord (0.01s)
++--- PASS: TestHistoryRecord (0.02s)
+ === RUN   TestHistoryLock
+ --- PASS: TestHistoryLock (0.00s)
+ === RUN   TestPruneOldHistory
+---- PASS: TestPruneOldHistory (0.00s)
++--- PASS: TestPruneOldHistory (0.01s)
+ === RUN   TestHistoryUpdateTakesTurns
+ --- PASS: TestHistoryUpdateTakesTurns (0.26s)
+ === RUN   TestLockKeptFresh
+ --- PASS: TestLockKeptFresh (0.71s)
+ PASS
+-ok  	github.com/abbreviatory/engine/store	1.009s
++ok  	github.com/abbreviatory/engine/store	1.049s

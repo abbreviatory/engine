@@ -11,6 +11,10 @@ const (
 	FamilyTests = "test-output"
 	FamilyLogs  = "logs"
 	FamilyJSON  = "json"
+	// FamilyDiff, FamilyHTTP and FamilyListing hold one format each.
+	FamilyDiff    = "diff"
+	FamilyHTTP    = "http"
+	FamilyListing = "listing"
 )
 
 // lineAdapter reads a format line by line. It turns lines into records and
@@ -39,6 +43,9 @@ var formats = []formatInfo{
 	{name: "gotest", family: FamilyTests, display: "go test output", new: func() lineAdapter { return newGoTestText() }},
 	{name: "pytest", family: FamilyTests, display: "pytest output", new: func() lineAdapter { return newPytest() }},
 	{name: "junit", family: FamilyTests, display: "JUnit XML report", whole: true},
+	{name: "diff", family: FamilyDiff, display: "diff", new: func() lineAdapter { return newDiff() }},
+	{name: "http", family: FamilyHTTP, display: "HTTP response", new: func() lineAdapter { return newHTTP() }},
+	{name: "listing", family: FamilyListing, display: "directory listing", new: func() lineAdapter { return newListing() }},
 	{name: "logs", family: FamilyLogs, display: "log", new: func() lineAdapter { return newLogs() }},
 	{name: "json", family: FamilyJSON, display: "JSON document", whole: true},
 }
@@ -87,6 +94,10 @@ func detect(sample []byte, want string) (formatInfo, error) {
 		}
 		return fi, nil
 	}
+	if looksHTTP(sample) {
+		fi, _ := lookupFormat("http")
+		return fi, nil
+	}
 	if f := detectTests(sample); f != "" {
 		fi, _ := lookupFormat(f)
 		return fi, nil
@@ -95,8 +106,33 @@ func detect(sample []byte, want string) (formatInfo, error) {
 		fi, _ := lookupFormat("json")
 		return fi, nil
 	}
+	if looksDiff(sample) {
+		fi, _ := lookupFormat("diff")
+		return fi, nil
+	}
+	if looksListing(sample) {
+		fi, _ := lookupFormat("listing")
+		return fi, nil
+	}
 	fi, _ := lookupFormat("logs")
 	return fi, nil
+}
+
+// looksDiff reports a unified diff: a "diff --git" line, or "---" and
+// "+++" lines followed by a hunk header, near the start (after a commit's
+// header and message, for git show).
+func looksDiff(sample []byte) bool {
+	lines := bytes.SplitN(sample, []byte("\n"), 400)
+	for i, l := range lines {
+		l = bytes.TrimRight(l, "\r")
+		if bytes.HasPrefix(l, []byte("diff --git ")) {
+			return true
+		}
+		if bytes.HasPrefix(l, []byte("--- ")) && i+2 < len(lines) && bytes.HasPrefix(lines[i+1], []byte("+++ ")) && bytes.HasPrefix(lines[i+2], []byte("@@ -")) {
+			return true
+		}
+	}
+	return false
 }
 
 // FormatError reports an unknown --format value.

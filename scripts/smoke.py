@@ -36,6 +36,12 @@ FORMATS = {
     "junit-pytest.xml": "junit",
     "app.log": "logs",
     "api-response.json": "json",
+    "git-diff.txt": "diff",
+    "http-json.txt": "http",
+    "http-redirect.txt": "http",
+    "http-verbose-404.txt": "http",
+    "find-listing.txt": "listing",
+    "ls-recursive.txt": "listing",
 }
 # References as the text shows them: "[ref ID:sel]" in reports, and in JSON
 # outlines "ref": "ID:/pointer" or "(+N chars, ref ID:/pointer)".

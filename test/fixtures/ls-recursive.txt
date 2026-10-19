@@ -1,0 +1,344 @@
+crypto/tls:
+total 928
+-rw-r--r-- 1 root root  4398 Aug 27  2025 alert.go
+-rw-r--r-- 1 root root 10269 Aug 27  2025 auth.go
+-rw-r--r-- 1 root root  7259 Aug 27  2025 auth_test.go
+-rw-r--r-- 1 root root 20670 Aug 27  2025 bogo_config.json
+-rw-r--r-- 1 root root 15939 Aug 27  2025 bogo_shim_test.go
+-rw-r--r-- 1 root root  3511 Aug 27  2025 cache.go
+-rw-r--r-- 1 root root  2643 Aug 27  2025 cache_test.go
+-rw-r--r-- 1 root root 26397 Aug 27  2025 cipher_suites.go
+-rw-r--r-- 1 root root 63916 Aug 27  2025 common.go
+-rw-r--r-- 1 root root  3456 Aug 27  2025 common_string.go
+-rw-r--r-- 1 root root 53074 Aug 27  2025 conn.go
+-rw-r--r-- 1 root root 10844 Aug 27  2025 conn_test.go
+-rw-r--r-- 1 root root  4220 Aug 27  2025 defaults.go
+-rw-r--r-- 1 root root 19039 Aug 27  2025 ech.go
+-rw-r--r-- 1 root root  2019 Aug 27  2025 ech_test.go
+-rw-r--r-- 1 root root  8006 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root 20901 Aug 27  2025 fips_test.go
+drwxr-xr-x 2 root root  4096 Aug 27  2025 fipsonly
+-rw-r--r-- 1 root root  4947 Aug 27  2025 generate_cert.go
+-rw-r--r-- 1 root root 40454 Aug 27  2025 handshake_client.go
+-rw-r--r-- 1 root root 91704 Aug 27  2025 handshake_client_test.go
+-rw-r--r-- 1 root root 28327 Aug 27  2025 handshake_client_tls13.go
+-rw-r--r-- 1 root root 53313 Aug 27  2025 handshake_messages.go
+-rw-r--r-- 1 root root 16644 Aug 27  2025 handshake_messages_test.go
+-rw-r--r-- 1 root root 29712 Aug 27  2025 handshake_server.go
+-rw-r--r-- 1 root root 67459 Aug 27  2025 handshake_server_test.go
+-rw-r--r-- 1 root root 35542 Aug 27  2025 handshake_server_tls13.go
+-rw-r--r-- 1 root root 32928 Aug 27  2025 handshake_test.go
+-rw-r--r-- 1 root root   328 Aug 27  2025 handshake_unix_test.go
+drwxr-xr-x 3 root root  4096 Aug 27  2025 internal
+-rw-r--r-- 1 root root 12131 Aug 27  2025 key_agreement.go
+-rw-r--r-- 1 root root  2979 Aug 27  2025 key_schedule.go
+-rw-r--r-- 1 root root  5089 Aug 27  2025 key_schedule_test.go
+-rw-r--r-- 1 root root  2423 Aug 27  2025 link_test.go
+-rw-r--r-- 1 root root  9362 Aug 27  2025 prf.go
+-rw-r--r-- 1 root root  5843 Aug 27  2025 prf_test.go
+-rw-r--r-- 1 root root 15421 Aug 27  2025 quic.go
+-rw-r--r-- 1 root root 21137 Aug 27  2025 quic_test.go
+drwxr-xr-x 2 root root  8192 Aug 27  2025 testdata
+-rw-r--r-- 1 root root 12857 Aug 27  2025 ticket.go
+-rw-r--r-- 1 root root   287 Aug 27  2025 ticket_test.go
+-rw-r--r-- 1 root root 12515 Aug 27  2025 tls.go
+-rw-r--r-- 1 root root 66999 Aug 27  2025 tls_test.go
+
+crypto/tls/fipsonly:
+total 8
+-rw-r--r-- 1 root root 904 Aug 27  2025 fipsonly.go
+-rw-r--r-- 1 root root 377 Aug 27  2025 fipsonly_test.go
+
+crypto/tls/internal:
+total 4
+drwxr-xr-x 2 root root 4096 Aug 27  2025 fips140tls
+
+crypto/tls/internal/fips140tls:
+total 4
+-rw-r--r-- 1 root root 912 Aug 27  2025 fipstls.go
+
+crypto/tls/testdata:
+total 1092
+-rw-r--r-- 1 root root 10386 Aug 27  2025 Client-TLSv10-ClientCert-ECDSA-ECDSA
+-rw-r--r-- 1 root root 10701 Aug 27  2025 Client-TLSv10-ClientCert-ECDSA-RSA
+-rw-r--r-- 1 root root  8456 Aug 27  2025 Client-TLSv10-ClientCert-Ed25519
+-rw-r--r-- 1 root root 10297 Aug 27  2025 Client-TLSv10-ClientCert-RSA-ECDSA
+-rw-r--r-- 1 root root 10615 Aug 27  2025 Client-TLSv10-ClientCert-RSA-RSA
+-rw-r--r-- 1 root root  6984 Aug 27  2025 Client-TLSv10-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  7301 Aug 27  2025 Client-TLSv10-ECDHE-RSA-AES
+-rw-r--r-- 1 root root     0 Aug 27  2025 Client-TLSv10-Ed25519
+-rw-r--r-- 1 root root  7301 Aug 27  2025 Client-TLSv10-ExportKeyingMaterial
+-rw-r--r-- 1 root root  6508 Aug 27  2025 Client-TLSv10-RSA-RC4
+-rw-r--r-- 1 root root  7138 Aug 27  2025 Client-TLSv11-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  7454 Aug 27  2025 Client-TLSv11-ECDHE-RSA-AES
+-rw-r--r-- 1 root root     0 Aug 27  2025 Client-TLSv11-Ed25519
+-rw-r--r-- 1 root root  6508 Aug 27  2025 Client-TLSv11-RSA-RC4
+-rw-r--r-- 1 root root  6650 Aug 27  2025 Client-TLSv12-AES128-GCM-SHA256
+-rw-r--r-- 1 root root  7369 Aug 27  2025 Client-TLSv12-AES128-SHA256
+-rw-r--r-- 1 root root  6650 Aug 27  2025 Client-TLSv12-AES256-GCM-SHA384
+-rw-r--r-- 1 root root  7054 Aug 27  2025 Client-TLSv12-ALPN
+-rw-r--r-- 1 root root  6891 Aug 27  2025 Client-TLSv12-ALPN-NoMatch
+-rw-r--r-- 1 root root 10778 Aug 27  2025 Client-TLSv12-ClientCert-ECDSA-ECDSA
+-rw-r--r-- 1 root root 10756 Aug 27  2025 Client-TLSv12-ClientCert-ECDSA-RSA
+-rw-r--r-- 1 root root  9183 Aug 27  2025 Client-TLSv12-ClientCert-Ed25519
+-rw-r--r-- 1 root root 10606 Aug 27  2025 Client-TLSv12-ClientCert-RSA-AES256-GCM-SHA384
+-rw-r--r-- 1 root root 10692 Aug 27  2025 Client-TLSv12-ClientCert-RSA-ECDSA
+-rw-r--r-- 1 root root 10606 Aug 27  2025 Client-TLSv12-ClientCert-RSA-RSA
+-rw-r--r-- 1 root root 10371 Aug 27  2025 Client-TLSv12-ClientCert-RSA-RSAPKCS1v15
+-rw-r--r-- 1 root root 10993 Aug 27  2025 Client-TLSv12-ClientCert-RSA-RSAPSS
+-rw-r--r-- 1 root root  7139 Aug 27  2025 Client-TLSv12-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  6736 Aug 27  2025 Client-TLSv12-ECDHE-ECDSA-AES-GCM
+-rw-r--r-- 1 root root  7456 Aug 27  2025 Client-TLSv12-ECDHE-ECDSA-AES128-SHA256
+-rw-r--r-- 1 root root  6737 Aug 27  2025 Client-TLSv12-ECDHE-ECDSA-AES256-GCM-SHA384
+-rw-r--r-- 1 root root  6348 Aug 27  2025 Client-TLSv12-ECDHE-ECDSA-CHACHA20-POLY1305
+-rw-r--r-- 1 root root  7456 Aug 27  2025 Client-TLSv12-ECDHE-RSA-AES
+-rw-r--r-- 1 root root  7772 Aug 27  2025 Client-TLSv12-ECDHE-RSA-AES128-SHA256
+-rw-r--r-- 1 root root  6664 Aug 27  2025 Client-TLSv12-ECDHE-RSA-CHACHA20-POLY1305
+-rw-r--r-- 1 root root  5160 Aug 27  2025 Client-TLSv12-Ed25519
+-rw-r--r-- 1 root root  6895 Aug 27  2025 Client-TLSv12-ExportKeyingMaterial
+-rw-r--r-- 1 root root  7461 Aug 27  2025 Client-TLSv12-P256-ECDHE
+-rw-r--r-- 1 root root  6508 Aug 27  2025 Client-TLSv12-RSA-RC4
+-rw-r--r-- 1 root root 18818 Aug 27  2025 Client-TLSv12-RenegotiateOnce
+-rw-r--r-- 1 root root 26486 Aug 27  2025 Client-TLSv12-RenegotiateTwice
+-rw-r--r-- 1 root root 19055 Aug 27  2025 Client-TLSv12-RenegotiateTwiceRejected
+-rw-r--r-- 1 root root  7192 Aug 27  2025 Client-TLSv12-RenegotiationRejected
+-rw-r--r-- 1 root root  8709 Aug 27  2025 Client-TLSv12-SCT
+-rw-r--r-- 1 root root  6984 Aug 27  2025 Client-TLSv12-X25519-ECDHE
+-rw-r--r-- 1 root root  7012 Aug 27  2025 Client-TLSv13-AES128-SHA256
+-rw-r--r-- 1 root root  7170 Aug 27  2025 Client-TLSv13-AES256-SHA384
+-rw-r--r-- 1 root root  7171 Aug 27  2025 Client-TLSv13-ALPN
+-rw-r--r-- 1 root root  7012 Aug 27  2025 Client-TLSv13-CHACHA20-SHA256
+-rw-r--r-- 1 root root 10886 Aug 27  2025 Client-TLSv13-ClientCert-ECDSA-RSA
+-rw-r--r-- 1 root root  9534 Aug 27  2025 Client-TLSv13-ClientCert-Ed25519
+-rw-r--r-- 1 root root 10483 Aug 27  2025 Client-TLSv13-ClientCert-RSA-ECDSA
+-rw-r--r-- 1 root root 11198 Aug 27  2025 Client-TLSv13-ClientCert-RSA-RSAPSS
+-rw-r--r-- 1 root root  6696 Aug 27  2025 Client-TLSv13-ECDSA
+-rw-r--r-- 1 root root  5277 Aug 27  2025 Client-TLSv13-Ed25519
+-rw-r--r-- 1 root root  7012 Aug 27  2025 Client-TLSv13-ExportKeyingMaterial
+-rw-r--r-- 1 root root  9120 Aug 27  2025 Client-TLSv13-HelloRetryRequest
+-rw-r--r-- 1 root root  7755 Aug 27  2025 Client-TLSv13-KeyUpdate
+-rw-r--r-- 1 root root  7261 Aug 27  2025 Client-TLSv13-P256-ECDHE
+-rw-r--r-- 1 root root  6943 Aug 27  2025 Client-TLSv13-X25519-ECDHE
+-rw-r--r-- 1 root root  6006 Aug 27  2025 Server-TLSv10-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  7035 Aug 27  2025 Server-TLSv10-ExportKeyingMaterial
+-rw-r--r-- 1 root root  5546 Aug 27  2025 Server-TLSv10-RSA-3DES
+-rw-r--r-- 1 root root  5775 Aug 27  2025 Server-TLSv10-RSA-AES
+-rw-r--r-- 1 root root  5311 Aug 27  2025 Server-TLSv10-RSA-RC4
+-rw-r--r-- 1 root root   758 Aug 27  2025 Server-TLSv11-FallbackSCSV
+-rw-r--r-- 1 root root  5311 Aug 27  2025 Server-TLSv11-RSA-RC4
+-rw-r--r-- 1 root root  6957 Aug 27  2025 Server-TLSv12-ALPN
+-rw-r--r-- 1 root root  6890 Aug 27  2025 Server-TLSv12-ALPN-Fallback
+-rw-r--r-- 1 root root   985 Aug 27  2025 Server-TLSv12-ALPN-NoMatch
+-rw-r--r-- 1 root root  6881 Aug 27  2025 Server-TLSv12-ALPN-NotConfigured
+-rw-r--r-- 1 root root  9723 Aug 27  2025 Server-TLSv12-ClientAuthRequestedAndECDSAGiven
+-rw-r--r-- 1 root root  8371 Aug 27  2025 Server-TLSv12-ClientAuthRequestedAndEd25519Given
+-rw-r--r-- 1 root root  9636 Aug 27  2025 Server-TLSv12-ClientAuthRequestedAndGiven
+-rw-r--r-- 1 root root  9636 Aug 27  2025 Server-TLSv12-ClientAuthRequestedAndPKCS1v15Given
+-rw-r--r-- 1 root root  6473 Aug 27  2025 Server-TLSv12-ClientAuthRequestedNotGiven
+-rw-r--r-- 1 root root  6403 Aug 27  2025 Server-TLSv12-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  4352 Aug 27  2025 Server-TLSv12-Ed25519
+-rw-r--r-- 1 root root  7368 Aug 27  2025 Server-TLSv12-ExportKeyingMaterial
+-rw-r--r-- 1 root root  6880 Aug 27  2025 Server-TLSv12-IssueTicket
+-rw-r--r-- 1 root root  6880 Aug 27  2025 Server-TLSv12-IssueTicketPreDisable
+-rw-r--r-- 1 root root  6397 Aug 27  2025 Server-TLSv12-P256
+-rw-r--r-- 1 root root  5916 Aug 27  2025 Server-TLSv12-RSA-3DES
+-rw-r--r-- 1 root root  6232 Aug 27  2025 Server-TLSv12-RSA-AES
+-rw-r--r-- 1 root root  6182 Aug 27  2025 Server-TLSv12-RSA-AES-GCM
+-rw-r--r-- 1 root root  6182 Aug 27  2025 Server-TLSv12-RSA-AES256-GCM-SHA384
+-rw-r--r-- 1 root root  5615 Aug 27  2025 Server-TLSv12-RSA-RC4
+-rw-r--r-- 1 root root  5854 Aug 27  2025 Server-TLSv12-RSA-RSAPKCS1v15
+-rw-r--r-- 1 root root  5856 Aug 27  2025 Server-TLSv12-RSA-RSAPSS
+-rw-r--r-- 1 root root  4043 Aug 27  2025 Server-TLSv12-Resume
+-rw-r--r-- 1 root root  6952 Aug 27  2025 Server-TLSv12-ResumeDisabled
+-rw-r--r-- 1 root root  6315 Aug 27  2025 Server-TLSv12-SNI
+-rw-r--r-- 1 root root  6315 Aug 27  2025 Server-TLSv12-SNI-GetCertificate
+-rw-r--r-- 1 root root  6315 Aug 27  2025 Server-TLSv12-SNI-GetCertificateNotFound
+-rw-r--r-- 1 root root  6079 Aug 27  2025 Server-TLSv12-X25519
+-rw-r--r-- 1 root root  7456 Aug 27  2025 Server-TLSv13-AES128-SHA256
+-rw-r--r-- 1 root root  7693 Aug 27  2025 Server-TLSv13-AES256-SHA384
+-rw-r--r-- 1 root root  7682 Aug 27  2025 Server-TLSv13-ALPN
+-rw-r--r-- 1 root root  7615 Aug 27  2025 Server-TLSv13-ALPN-Fallback
+-rw-r--r-- 1 root root  1306 Aug 27  2025 Server-TLSv13-ALPN-NoMatch
+-rw-r--r-- 1 root root  7606 Aug 27  2025 Server-TLSv13-ALPN-NotConfigured
+-rw-r--r-- 1 root root  7456 Aug 27  2025 Server-TLSv13-CHACHA20-SHA256
+-rw-r--r-- 1 root root 14008 Aug 27  2025 Server-TLSv13-ClientAuthRequestedAndECDSAGiven
+-rw-r--r-- 1 root root 11545 Aug 27  2025 Server-TLSv13-ClientAuthRequestedAndEd25519Given
+-rw-r--r-- 1 root root 13759 Aug 27  2025 Server-TLSv13-ClientAuthRequestedAndGiven
+-rw-r--r-- 1 root root  7931 Aug 27  2025 Server-TLSv13-ClientAuthRequestedNotGiven
+-rw-r--r-- 1 root root  7140 Aug 27  2025 Server-TLSv13-ECDHE-ECDSA-AES
+-rw-r--r-- 1 root root  5721 Aug 27  2025 Server-TLSv13-Ed25519
+-rw-r--r-- 1 root root  7523 Aug 27  2025 Server-TLSv13-ExportKeyingMaterial
+-rw-r--r-- 1 root root  9382 Aug 27  2025 Server-TLSv13-HelloRetryRequest
+-rw-r--r-- 1 root root  7523 Aug 27  2025 Server-TLSv13-IssueTicket
+-rw-r--r-- 1 root root  7523 Aug 27  2025 Server-TLSv13-IssueTicketPreDisable
+-rw-r--r-- 1 root root  7768 Aug 27  2025 Server-TLSv13-KeySharePreference
+-rw-r--r-- 1 root root  7766 Aug 27  2025 Server-TLSv13-P256
+-rw-r--r-- 1 root root  7369 Aug 27  2025 Server-TLSv13-RSA-RSAPSS
+-rw-r--r-- 1 root root  1067 Aug 27  2025 Server-TLSv13-RSA-RSAPSS-TooSmall
+-rw-r--r-- 1 root root  4440 Aug 27  2025 Server-TLSv13-Resume
+-rw-r--r-- 1 root root  7089 Aug 27  2025 Server-TLSv13-Resume-HelloRetryRequest
+-rw-r--r-- 1 root root  7602 Aug 27  2025 Server-TLSv13-ResumeDisabled
+-rw-r--r-- 1 root root  7448 Aug 27  2025 Server-TLSv13-X25519
+-rw-r--r-- 1 root root   587 Aug 27  2025 example-cert.pem
+-rw-r--r-- 1 root root   227 Aug 27  2025 example-key.pem
+
+net/http:
+total 1904
+-rw-r--r-- 1 root root   3080 Aug 27  2025 alpn_test.go
+-rw-r--r-- 1 root root   1129 Aug 27  2025 async_test.go
+drwxr-xr-x 2 root root   4096 Aug 27  2025 cgi
+-rw-r--r-- 1 root root  34877 Aug 27  2025 client.go
+-rw-r--r-- 1 root root  66773 Aug 27  2025 client_test.go
+-rw-r--r-- 1 root root  49816 Aug 27  2025 clientserver_test.go
+-rw-r--r-- 1 root root   3117 Aug 27  2025 clone.go
+-rw-r--r-- 1 root root  14227 Aug 27  2025 cookie.go
+-rw-r--r-- 1 root root  26862 Aug 27  2025 cookie_test.go
+drwxr-xr-x 2 root root   4096 Aug 27  2025 cookiejar
+-rw-r--r-- 1 root root   3502 Aug 27  2025 doc.go
+-rw-r--r-- 1 root root   2160 Aug 27  2025 example_filesystem_test.go
+-rw-r--r-- 1 root root    560 Aug 27  2025 example_handle_test.go
+-rw-r--r-- 1 root root   6100 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root   8894 Aug 27  2025 export_test.go
+drwxr-xr-x 2 root root   4096 Aug 27  2025 fcgi
+-rw-r--r-- 1 root root   3659 Aug 27  2025 filetransport.go
+-rw-r--r-- 1 root root   2687 Aug 27  2025 filetransport_test.go
+-rw-r--r-- 1 root root  32895 Aug 27  2025 fs.go
+-rw-r--r-- 1 root root  52047 Aug 27  2025 fs_test.go
+-rw-r--r-- 1 root root 394136 Aug 27  2025 h2_bundle.go
+-rw-r--r-- 1 root root    812 Aug 27  2025 h2_error.go
+-rw-r--r-- 1 root root   1063 Aug 27  2025 h2_error_test.go
+-rw-r--r-- 1 root root   7832 Aug 27  2025 header.go
+-rw-r--r-- 1 root root   6196 Aug 27  2025 header_test.go
+-rw-r--r-- 1 root root   9516 Aug 27  2025 http.go
+-rw-r--r-- 1 root root   5835 Aug 27  2025 http_test.go
+drwxr-xr-x 2 root root   4096 Aug 27  2025 httptest
+drwxr-xr-x 2 root root   4096 Aug 27  2025 httptrace
+drwxr-xr-x 2 root root   4096 Aug 27  2025 httputil
+drwxr-xr-x 4 root root   4096 Aug 27  2025 internal
+-rw-r--r-- 1 root root    900 Aug 27  2025 jar.go
+-rw-r--r-- 1 root root   5060 Aug 27  2025 main_test.go
+-rw-r--r-- 1 root root   1719 Aug 27  2025 mapping.go
+-rw-r--r-- 1 root root   3018 Aug 27  2025 mapping_test.go
+-rw-r--r-- 1 root root    517 Aug 27  2025 method.go
+-rw-r--r-- 1 root root  10480 Aug 27  2025 netconn_test.go
+-rw-r--r-- 1 root root   1954 Aug 27  2025 omithttp2.go
+-rw-r--r-- 1 root root  15661 Aug 27  2025 pattern.go
+-rw-r--r-- 1 root root  15326 Aug 27  2025 pattern_test.go
+drwxr-xr-x 3 root root   4096 Aug 27  2025 pprof
+-rw-r--r-- 1 root root   1186 Aug 27  2025 proxy_test.go
+-rw-r--r-- 1 root root   2441 Aug 27  2025 range_test.go
+-rw-r--r-- 1 root root  10274 Aug 27  2025 readrequest_test.go
+-rw-r--r-- 1 root root  50492 Aug 27  2025 request.go
+-rw-r--r-- 1 root root  44983 Aug 27  2025 request_test.go
+-rw-r--r-- 1 root root  23864 Aug 27  2025 requestwrite_test.go
+-rw-r--r-- 1 root root  11362 Aug 27  2025 response.go
+-rw-r--r-- 1 root root  27064 Aug 27  2025 response_test.go
+-rw-r--r-- 1 root root   4267 Aug 27  2025 responsecontroller.go
+-rw-r--r-- 1 root root  10485 Aug 27  2025 responsecontroller_test.go
+-rw-r--r-- 1 root root   7055 Aug 27  2025 responsewrite_test.go
+-rw-r--r-- 1 root root    988 Aug 27  2025 roundtrip.go
+-rw-r--r-- 1 root root  12084 Aug 27  2025 roundtrip_js.go
+-rw-r--r-- 1 root root   4048 Aug 27  2025 routing_index.go
+-rw-r--r-- 1 root root   4108 Aug 27  2025 routing_index_test.go
+-rw-r--r-- 1 root root   7710 Aug 27  2025 routing_tree.go
+-rw-r--r-- 1 root root   7199 Aug 27  2025 routing_tree_test.go
+-rw-r--r-- 1 root root 210772 Aug 27  2025 serve_test.go
+-rw-r--r-- 1 root root   5920 Aug 27  2025 servemux121.go
+-rw-r--r-- 1 root root 130821 Aug 27  2025 server.go
+-rw-r--r-- 1 root root   7462 Aug 27  2025 server_test.go
+-rw-r--r-- 1 root root   8094 Aug 27  2025 sniff.go
+-rw-r--r-- 1 root root   9787 Aug 27  2025 sniff_test.go
+-rw-r--r-- 1 root root  13212 Aug 27  2025 socks_bundle.go
+-rw-r--r-- 1 root root   7629 Aug 27  2025 status.go
+drwxr-xr-x 2 root root   4096 Aug 27  2025 testdata
+-rw-r--r-- 1 root root  31864 Aug 27  2025 transfer.go
+-rw-r--r-- 1 root root   9352 Aug 27  2025 transfer_test.go
+-rw-r--r-- 1 root root  95498 Aug 27  2025 transport.go
+-rw-r--r-- 1 root root    362 Aug 27  2025 transport_default_other.go
+-rw-r--r-- 1 root root    364 Aug 27  2025 transport_default_wasm.go
+-rw-r--r-- 1 root root   6452 Aug 27  2025 transport_dial_test.go
+-rw-r--r-- 1 root root   6348 Aug 27  2025 transport_internal_test.go
+-rw-r--r-- 1 root root 209263 Aug 27  2025 transport_test.go
+-rw-r--r-- 1 root root   3299 Aug 27  2025 triv.go
+
+net/http/cgi:
+total 56
+-rw-r--r-- 1 root root  3009 Aug 27  2025 cgi_main.go
+-rw-r--r-- 1 root root  5672 Aug 27  2025 child.go
+-rw-r--r-- 1 root root  5371 Aug 27  2025 child_test.go
+-rw-r--r-- 1 root root 10623 Aug 27  2025 host.go
+-rw-r--r-- 1 root root 13631 Aug 27  2025 host_test.go
+-rw-r--r-- 1 root root  5661 Aug 27  2025 integration_test.go
+
+net/http/cookiejar:
+total 72
+-rw-r--r-- 1 root root   426 Aug 27  2025 dummy_publicsuffix_test.go
+-rw-r--r-- 1 root root  1487 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root 15358 Aug 27  2025 jar.go
+-rw-r--r-- 1 root root 34822 Aug 27  2025 jar_test.go
+-rw-r--r-- 1 root root  3461 Aug 27  2025 punycode.go
+-rw-r--r-- 1 root root  4742 Aug 27  2025 punycode_test.go
+
+net/http/fcgi:
+total 32
+-rw-r--r-- 1 root root 10503 Aug 27  2025 child.go
+-rw-r--r-- 1 root root  6041 Aug 27  2025 fcgi.go
+-rw-r--r-- 1 root root 10893 Aug 27  2025 fcgi_test.go
+
+net/http/httptest:
+total 56
+-rw-r--r-- 1 root root  2046 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root  2701 Aug 27  2025 httptest.go
+-rw-r--r-- 1 root root  4760 Aug 27  2025 httptest_test.go
+-rw-r--r-- 1 root root  7181 Aug 27  2025 recorder.go
+-rw-r--r-- 1 root root  9895 Aug 27  2025 recorder_test.go
+-rw-r--r-- 1 root root 10906 Aug 27  2025 server.go
+-rw-r--r-- 1 root root  7613 Aug 27  2025 server_test.go
+
+net/http/httptrace:
+total 20
+-rw-r--r-- 1 root root  712 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root 8300 Aug 27  2025 trace.go
+-rw-r--r-- 1 root root 1854 Aug 27  2025 trace_test.go
+
+net/http/httputil:
+total 132
+-rw-r--r-- 1 root root  9551 Aug 27  2025 dump.go
+-rw-r--r-- 1 root root 12828 Aug 27  2025 dump_test.go
+-rw-r--r-- 1 root root  3319 Aug 27  2025 example_test.go
+-rw-r--r-- 1 root root  1669 Aug 27  2025 httputil.go
+-rw-r--r-- 1 root root 11369 Aug 27  2025 persist.go
+-rw-r--r-- 1 root root 25495 Aug 27  2025 reverseproxy.go
+-rw-r--r-- 1 root root 55949 Aug 27  2025 reverseproxy_test.go
+
+net/http/internal:
+total 32
+drwxr-xr-x 2 root root 4096 Aug 27  2025 ascii
+-rw-r--r-- 1 root root 8479 Aug 27  2025 chunked.go
+-rw-r--r-- 1 root root 8838 Aug 27  2025 chunked_test.go
+drwxr-xr-x 2 root root 4096 Aug 27  2025 testcert
+
+net/http/internal/ascii:
+total 8
+-rw-r--r-- 1 root root 1256 Aug 27  2025 print.go
+-rw-r--r-- 1 root root 1796 Aug 27  2025 print_test.go
+
+net/http/internal/testcert:
+total 4
+-rw-r--r-- 1 root root 3702 Aug 27  2025 testcert.go
+
+net/http/pprof:
+total 32
+-rw-r--r-- 1 root root 14598 Aug 27  2025 pprof.go
+-rw-r--r-- 1 root root  9956 Aug 27  2025 pprof_test.go
+drwxr-xr-x 2 root root  4096 Aug 27  2025 testdata
+
+net/http/pprof/testdata:
+total 4
+-rw-r--r-- 1 root root 1246 Aug 27  2025 delta_mutex.go
+
+net/http/testdata:
+total 12
+-rw-r--r-- 1 root root 11 Aug 27  2025 file
+-rw-r--r-- 1 root root 22 Aug 27  2025 index.html
+-rw-r--r-- 1 root root  8 Aug 27  2025 style.css

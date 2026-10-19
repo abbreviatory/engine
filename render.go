@@ -33,12 +33,19 @@ func render(res *Result, groups []*group, summary []string, rules preserve, budg
 	}
 
 	head := []string{headerLine(res, refs)}
-	head = append(head, countSummary(res, groups)...)
-	for i, s := range summary {
-		if i == 3 {
-			break
+	if res.Family == FamilyListing || res.Family == FamilyHTTP {
+		// The listing's own counts.
+		for _, s := range summary {
+			head = append(head, cut(s, maxHead))
 		}
-		head = append(head, "runner: "+cut(s, maxHead))
+	} else {
+		head = append(head, countSummary(res, groups)...)
+		for i, s := range summary {
+			if i == 3 {
+				break
+			}
+			head = append(head, "runner: "+cut(s, maxHead))
+		}
 	}
 
 	tests := res.Family == FamilyTests
@@ -74,7 +81,12 @@ func render(res *Result, groups []*group, summary []string, rules preserve, budg
 		})
 	}
 	byCount(warn)
-	byCount(other)
+	if res.Family == FamilyHTTP {
+		// A response reads best in its own order: status, headers, body.
+		sort.SliceStable(other, func(i, j int) bool { return other[i].idx < other[j].idx })
+	} else {
+		byCount(other)
+	}
 	// Compared with earlier runs: new failures first, then flaky ones, then
 	// those failing before too. Without history every rank is 0.
 	byRank := func(gs []*group) {
@@ -169,6 +181,27 @@ func render(res *Result, groups []*group, summary []string, rules preserve, budg
 		}
 	}
 
+	// Pass 4, for HTTP: the shown groups' own detail (a JSON body's
+	// outline), in rounds.
+	if res.Family == FamilyHTTP {
+		for _, limit := range []int{6, 16, maxShowDetail} {
+			for i, g := range s.groups {
+				if !s.shown[i] || s.detail[i] >= len(g.ex.Detail) {
+					continue
+				}
+				want := min(limit, len(g.ex.Detail))
+				have := detailCost(g, s.detail[i])
+				for k := want; k > s.detail[i]; k-- {
+					if extra := detailCost(g, k) - have; extra <= room {
+						room -= extra
+						s.detail[i] = k
+						break
+					}
+				}
+			}
+		}
+	}
+
 	var out []string
 	out = append(out, head...)
 	overflow := false
@@ -250,7 +283,11 @@ func itemLine(s *section, g *group, ref func(string) string) string {
 	if s.key == "" && (g.kind == KindFail || g.kind == KindError || g.kind == KindWarn) {
 		b.WriteString(strings.ToUpper(g.kind.String()) + ": ")
 	}
-	b.WriteString(cut(g.ex.Head, maxHead))
+	head := g.ex.Head
+	if g.count > 1 && g.ex.GroupHead != "" {
+		head = g.ex.GroupHead
+	}
+	b.WriteString(cut(head, maxHead))
 	if g.note != "" {
 		b.WriteString(" (" + g.note + ")")
 	}

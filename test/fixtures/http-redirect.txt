@@ -1,0 +1,28 @@
+HTTP/1.0 301 Moved Permanently
+Server: SimpleHTTP/0.6 Python/3.13.16
+Date: Mon, 19 Oct 2026 03:50:31 GMT
+Location: /src/
+Content-Length: 0
+
+HTTP/1.0 200 OK
+Server: SimpleHTTP/0.6 Python/3.13.16
+Date: Mon, 19 Oct 2026 03:50:31 GMT
+Content-type: text/html; charset=utf-8
+Content-Length: 281
+
+<!DOCTYPE HTML>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Directory listing for /src/</title>
+</head>
+<body>
+<h1>Directory listing for /src/</h1>
+<hr>
+<ul>
+<li><a href="gosample/">gosample/</a></li>
+<li><a href="pysample/">pysample/</a></li>
+</ul>
+<hr>
+</body>
+</html>

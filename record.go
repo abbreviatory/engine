@@ -64,6 +64,14 @@ type Record struct {
 	// NoHistory keeps a passing test out of the grouper's list for run
 	// history, because its adapter reports it separately.
 	NoHistory bool
+	// GroupKey, when set, is the grouping identity instead of the ID, head
+	// and detail: two records with the same kind and GroupKey are one group
+	// (the same change in several files of a diff, the files of one type in
+	// one directory of a listing).
+	GroupKey string
+	// GroupHead is shown for a group of more than one record instead of the
+	// first record's head, such as "net/http/*.go".
+	GroupHead string
 }
 
 func (r *Record) addLine(n int64) {
@@ -121,6 +129,10 @@ func sortRanges(rs []Range) {
 func fingerprint(r *Record) string {
 	h := fnv.New64a()
 	h.Write([]byte{byte(r.Kind)})
+	if r.GroupKey != "" {
+		h.Write([]byte("\x00key\x00" + r.GroupKey))
+		return string(h.Sum(nil))
+	}
 	h.Write([]byte(r.ID))
 	h.Write([]byte{0})
 	h.Write([]byte(normalize(r.Head)))

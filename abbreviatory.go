@@ -188,6 +188,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	var lineSrc io.Reader = in
 	unnamed := false // the output doesn't name the tests that passed
 	var ranPkgs []string
+	var diffFiles []diffFile
 
 	if fi.whole {
 		limit := maxWhole
@@ -264,6 +265,9 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 		if u, ok := ad.(interface{ ranPackages() []string }); ok {
 			ranPkgs = u.ranPackages()
 		}
+		if da, ok := ad.(*diffAdapter); ok {
+			diffFiles = da.files
+		}
 	}
 	// Drain anything a whole-format parser didn't read, so the hash, the
 	// count and the sink cover the entire input.
@@ -293,7 +297,11 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 			text, overflow, err = renderJSON(res, doc, b, refs)
 			return text, overflow, false, err
 		}
-		text, overflow, err = render(res, groups, summary, rules, b, refs)
+		if res.Family == FamilyDiff {
+			text, overflow, err = renderDiff(res, groups, diffFiles, summary, rules, b, refs)
+		} else {
+			text, overflow, err = render(res, groups, summary, rules, b, refs)
+		}
 		if int64(len(small)) == res.InputLines && res.InputLines > 0 {
 			// The input is small: when showing it whole is no longer than
 			// the reduction, show it whole.
