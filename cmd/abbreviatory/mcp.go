@@ -50,7 +50,7 @@ func cmdMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fs.Usage()
 		return 2
 	}
-	s := &mcpServer{c: core{*dir}, out: stdout, running: map[string]chan struct{}{}}
+	s := &mcpServer{c: core{*dir}, out: stdout, running: map[string]*mcpCall{}}
 	// Stopped by a signal (a client shutting the server down): stop the
 	// commands still running, with what they started, before going.
 	sigs := make(chan os.Signal, 1)
@@ -73,8 +73,24 @@ type mcpServer struct {
 	c       core
 	out     io.Writer
 	mu      sync.Mutex // guards out and running
-	running map[string]chan struct{}
+	running map[string]*mcpCall
 	wg      sync.WaitGroup
+}
+
+// mcpCall is a tools/call in progress. Closing stop stops its command; a
+// call the client cancelled gets no answer, one stopped because the server
+// is stopping still does.
+type mcpCall struct {
+	stop      chan struct{}
+	stopped   bool
+	cancelled bool
+}
+
+func (c *mcpCall) halt() {
+	if !c.stopped {
+		c.stopped = true
+		close(c.stop)
+	}
 }
 
 type rpcMessage struct {
@@ -113,9 +129,8 @@ func (s *mcpServer) serve(in io.Reader) error {
 // SIGKILL after 5 seconds) and waits for them, at most 8 seconds.
 func (s *mcpServer) shutdown() {
 	s.mu.Lock()
-	for id, c := range s.running {
-		close(c)
-		delete(s.running, id)
+	for _, c := range s.running {
+		c.halt()
 	}
 	s.mu.Unlock()
 	done := make(chan struct{})
@@ -204,8 +219,8 @@ func (s *mcpServer) handle(line []byte) {
 		json.Unmarshal(m.Params, &p)
 		s.mu.Lock()
 		if c, ok := s.running[string(p.RequestID)]; ok {
-			close(c)
-			delete(s.running, string(p.RequestID))
+			c.cancelled = true
+			c.halt()
 		}
 		s.mu.Unlock()
 		return
@@ -236,20 +251,22 @@ func (s *mcpServer) handle(line []byte) {
 	case "tools/list":
 		s.reply(m.ID, map[string]any{"tools": mcpTools()})
 	case "tools/call":
-		cancel := make(chan struct{})
+		call := &mcpCall{stop: make(chan struct{})}
 		s.mu.Lock()
-		s.running[string(m.ID)] = cancel
+		s.running[string(m.ID)] = call
 		s.mu.Unlock()
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
-			result, rerr := s.call(m.Params, cancel)
+			result, rerr := s.call(m.Params, call.stop)
 			s.mu.Lock()
-			_, live := s.running[string(m.ID)]
-			delete(s.running, string(m.ID))
+			cancelled := call.cancelled
+			if s.running[string(m.ID)] == call {
+				delete(s.running, string(m.ID))
+			}
 			s.mu.Unlock()
-			if !live {
-				return // cancelled: no answer is expected
+			if cancelled {
+				return // the client cancelled it: no answer is expected
 			}
 			if rerr != nil {
 				s.fail(m.ID, rerr.Code, rerr.Message)

@@ -128,7 +128,8 @@ The options are `format`, `budget`, `preserve`, `keep` (an array), `full` and
 own; at the time limit, when the client cancels the request
 (`notifications/cancelled`), or when the server stops (its input ends, or it
 gets SIGINT or SIGTERM), the group gets SIGTERM and, 5 seconds later,
-SIGKILL. On Windows the command's process tree is ended with `taskkill /T`.
+SIGKILL. A request the client cancelled gets no answer; one stopped because
+the server is stopping is answered with what the command printed. On Windows the command's process tree is ended with `taskkill /T`.
 A problem with the work (a command not found, binary output, a bad option)
 comes back as a result with `isError` set; an unknown tool or method is a
 protocol error, a batch or anything but a JSON object an invalid request,

@@ -117,7 +117,7 @@ func newFrontEnds(t *testing.T) *frontEnds {
 	f := &frontEnds{t: t, cliDir: t.TempDir(), mcpDir: t.TempDir(), token: "s3cret"}
 	f.srv = httptest.NewServer(newHandler(core{t.TempDir()}, f.token, 1<<30))
 	t.Cleanup(f.srv.Close)
-	f.mcp = &mcpServer{c: core{f.mcpDir}, out: io.Discard, running: map[string]chan struct{}{}}
+	f.mcp = &mcpServer{c: core{f.mcpDir}, out: io.Discard, running: map[string]*mcpCall{}}
 	return f
 }
 

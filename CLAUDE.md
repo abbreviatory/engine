@@ -86,6 +86,16 @@ v0.3.0 adds the front ends:
   bad references and unreadable input).
 - `mcp.go`: JSON-RPC over stdio, tools reduce, run, expand, history; each
   tools/call in its own goroutine; notifications/cancelled stops a run.
+- An independent review of 0.3 found: no Host/Origin check without a token
+  (DNS rebinding and cross-site requests could read originals and write
+  runs), MCP leaving running commands behind on shutdown, expand loading
+  whole originals (now `ExpandTo`/`Store.ExpandTo` stream), Windows run
+  stopping only the direct process (now taskkill /T), plain-text 404/405,
+  case-sensitive Bearer, `/runs/` with an empty key, JSON-RPC batches. All
+  fixed with tests; serve also limits concurrent heavy requests and has
+  read and idle timeouts. On MCP shutdown, running commands are stopped but
+  every request is still answered; only a client's own cancel drops the
+  answer (`mcpCall`).
 - `parity_test.go`: the 0.3 bar, every fixture through the CLI, HTTP and
   MCP with five option sets, every reference expanded, histories built
   through each; all the same. Smaller matrix under -short and -race.

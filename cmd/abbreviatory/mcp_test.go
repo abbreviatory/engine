@@ -236,6 +236,7 @@ func TestMCPMessagesAndShutdown(t *testing.T) {
 	s.send(`{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run","arguments":{"command":["sh","-c","sleep 30 & echo $! > ` + marker + `; wait"],"no_history":true}}}`)
 	time.Sleep(500 * time.Millisecond)
 	start := time.Now()
+	go io.Copy(io.Discard, s.out) // the stopped run is still answered
 	s.in.Close()
 	select {
 	case <-s.done:
