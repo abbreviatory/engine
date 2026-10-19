@@ -1,0 +1,6 @@
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/errors.go
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/stack.go
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/go113.go
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/LICENSE
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/README.md
+/root/go/pkg/mod/github.com/pkg/errors@v0.9.1/format_test.go

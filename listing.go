@@ -156,11 +156,14 @@ func pathLike(t string) bool {
 	if strings.Contains(t, ": ") || strings.Contains(t, "::") {
 		return false
 	}
-	if strings.ContainsAny(t, "=@#") {
-		return false // pip freeze, version pins, comments
+	if strings.Contains(t, "==") || t[0] == '#' {
+		return false // pip freeze, comments
 	}
 	if strings.Contains(t, "/") {
 		return true
+	}
+	if strings.ContainsAny(t, "=@#") {
+		return false // version pins
 	}
 	// A bare name needs a plausible extension: a few characters with a
 	// letter, not a version number.

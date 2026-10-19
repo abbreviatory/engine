@@ -136,3 +136,38 @@ func TestReview04HTTPHistory(t *testing.T) {
 		}
 	}
 }
+
+// Second pass: a combined hunk that ends in deletions, paths with "@", and
+// notes on groups known by their error fields.
+func TestReview04SecondPass(t *testing.T) {
+	d := newDiff()
+	other := 0
+	for i, l := range strings.Split(strings.TrimRight(string(review04(t, "cc2.diff")), "\n"), "\n") {
+		d.line(int64(i+1), l, func(r Record) {
+			if r.ID == "" {
+				other++
+			}
+		})
+	}
+	d.finish(func(Record) {})
+	if f := d.files[0]; f.path != "src/main.go" || f.adds != 2 || f.dels != 2 || f.hunks != 2 || other != 0 {
+		t.Errorf("combined hunks miscounted: %+v, %d loose lines", f, other)
+	}
+	var res *Result
+	for _, name := range []string{"find-scoped.txt", "gomod.txt"} {
+		if res := review04Text(t, name, 512); res.Format != "listing" {
+			t.Errorf("%s detected as %s", name, res.Format)
+		}
+	}
+	first, err := Reduce(bytes.NewReader(review04(t, "k1.txt")), Options{Track: true, Budget: 1500})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err = Reduce(bytes.NewReader(review04(t, "k2.txt")), Options{Track: true, Budget: 1500, History: []Run{*first.Run}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Text, "(new)") {
+		t.Errorf("the group with the new error field has no note:\n%s", res.Text)
+	}
+}

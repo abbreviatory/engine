@@ -598,14 +598,33 @@ func noteGroups(d *Delta, cur *Run, groups []*group, tests bool) {
 		if g.more || (g.kind != KindFail && g.kind != KindError) {
 			continue
 		}
-		k, _ := groupKey(g, tests)
-		if c, ok := class[k]; ok {
-			g.rank, g.note = c, note[k]
+		keys := []string{}
+		if len(g.ex.Items) > 0 {
+			// Known by its error fields: the most notable of them counts.
+			for _, pv := range innermostItems(g.ex.Items) {
+				p, v, _ := strings.Cut(pv, "\x00")
+				keys = append(keys, hashKey("e\x00j\x00"+normalize(p)+"\x00"+normalize(cut(v, maxHead))))
+			}
+		} else {
+			k, _ := groupKey(g, tests)
+			keys = append(keys, k)
+		}
+		best := -1
+		for _, k := range keys {
+			if c, ok := class[k]; ok && (best < 0 || c < g.rank) {
+				best, g.rank, g.note = c, c, note[k]
+			}
+		}
+		if best >= 0 {
 			continue
 		}
 		g.rank = 2
+		streak := 0
+		for _, k := range keys {
+			streak = max(streak, cur.Bad[k].Streak)
+		}
 		if d.Since > 0 {
-			if s := cur.Bad[k].Streak; s > 1 {
+			if s := streak; s > 1 {
 				if tests {
 					g.note = "failing for " + strconv.Itoa(s) + " runs"
 				} else {

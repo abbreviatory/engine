@@ -33,6 +33,7 @@ type diffAdapter struct {
 	hunkKeep []string
 	hunkSum  hash.Hash // all of the hunk's changed lines, for its grouping identity
 	parents  int       // prefix columns: 1, or one per parent in a combined diff
+	ccOld    []int64   // a combined hunk's lines left of each parent
 	oldLeft  int64
 	newLeft  int64
 	added    []string // the hunk's added lines, to check them
@@ -46,6 +47,7 @@ var (
 	hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$`)
 	// A combined diff (diff --cc, a merge): one "-" range per parent.
 	ccHeader  = regexp.MustCompile(`^(@{3,}) (?:-\d+(?:,\d+)? )+\+\d+(?:,(\d+))? @{3,}`)
+	ccRange   = regexp.MustCompile(` -\d+(?:,(\d+))?`)
 	gitDiffRe = regexp.MustCompile(`^diff --git ("?)a/(.*?)("?) ("?)b/(.*?)("?)$`)
 	commitRe  = regexp.MustCompile(`^commit ([0-9a-f]{7,64})\b`)
 )
@@ -75,7 +77,11 @@ func generatedFile(p string) bool {
 func (d *diffAdapter) line(n int64, text string, emit func(Record)) {
 	// Inside a hunk, its lines belong to it until its counts run out.
 	if d.hunk != nil {
-		if d.oldLeft > 0 || d.newLeft > 0 || strings.HasPrefix(text, "\\") {
+		// A hunk or file header can't be a hunk line (those start with a
+		// space, "+", "-" or "\\"): wrong counts end the hunk there.
+		next := strings.HasPrefix(text, "diff --git ") || strings.HasPrefix(text, "diff --cc ") || strings.HasPrefix(text, "diff --combined ") ||
+			strings.HasPrefix(text, "@@") && (hunkHeader.MatchString(text) || ccHeader.MatchString(text))
+		if !next && (d.oldLeft > 0 || d.newLeft > 0 || strings.HasPrefix(text, "\\")) {
 			d.hunkLine(n, text)
 			return
 		}
@@ -271,10 +277,23 @@ func (d *diffAdapter) startHunk(n int64, text string, emit func(Record)) {
 	if c := ccHeader.FindStringSubmatch(text); c != nil {
 		// Combined: count only the result's lines.
 		d.parents = len(c[1]) - 1
-		d.oldLeft, d.newLeft = 0, 1
+		d.newLeft = 1
 		if c[2] != "" {
 			d.newLeft, _ = strconv.ParseInt(c[2], 10, 64)
 		}
+		d.ccOld = d.ccOld[:0]
+		for _, r := range ccRange.FindAllStringSubmatch(c[0], -1) {
+			k := int64(1)
+			if r[1] != "" {
+				k, _ = strconv.ParseInt(r[1], 10, 64)
+			}
+			d.ccOld = append(d.ccOld, k)
+		}
+		for len(d.ccOld) < d.parents {
+			d.ccOld = append(d.ccOld, 0)
+		}
+		d.ccOld = d.ccOld[:d.parents]
+		d.sumOld()
 	} else if m != nil {
 		if m[2] != "" {
 			d.oldLeft, _ = strconv.ParseInt(m[2], 10, 64)
@@ -325,18 +344,38 @@ func (d *diffAdapter) hunkLine(n int64, text string) {
 	}
 }
 
+// sumOld sets oldLeft to the lines still due from any parent.
+func (d *diffAdapter) sumOld() {
+	d.oldLeft = 0
+	for _, k := range d.ccOld {
+		if k > 0 {
+			d.oldLeft += k
+		}
+	}
+}
+
 // ccLine counts a line of a combined hunk: one prefix column per parent.
 func (d *diffAdapter) ccLine(text string) {
 	if text[0] == '\\' {
 		return
 	}
 	if len(text) < d.parents || strings.Trim(text[:d.parents], " +-") != "" {
-		d.newLeft = 0 // not a hunk line: the counts were wrong
+		// Not a hunk line: the counts were wrong.
+		d.newLeft, d.oldLeft = 0, 0
 		return
 	}
 	cols := text[:d.parents]
+	// A line some parent removed is in those parents only; any other line
+	// is in the result, and in each parent whose column is blank.
+	removed := strings.Contains(cols, "-")
+	for i := 0; i < d.parents; i++ {
+		if removed && cols[i] == '-' || !removed && cols[i] == ' ' {
+			d.ccOld[i]--
+		}
+	}
+	d.sumOld()
 	switch {
-	case strings.Contains(cols, "-"):
+	case removed:
 		d.cur.dels++
 		d.keepLine(text)
 	case strings.Contains(cols, "+"):
