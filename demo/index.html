@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Try Abbreviatory in Your Browser</title>
+<meta name="description" content="Reduce a test run, a log or a JSON document in your browser with Abbreviatory, compiled to WebAssembly. Nothing you paste leaves the page.">
+<style>
+:root {
+  --navy: #1f3a5f; --teal: #0e7c86; --teal-bg: #e8f4f5; --ink: #17202a; --gray: #5d6b7c;
+  --line: #cbd5e1; --light: #f1f5f9; --red: #b8401f; --amber: #9a6a00; --white: #fff;
+  --mono: ui-monospace, SFMono-Regular, "DejaVu Sans Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--white); }
+a { color: var(--teal); }
+header.top { border-bottom: 1px solid var(--line); }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px; }
+header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
+.brand { font-weight: 700; color: var(--navy); text-decoration: none; font-size: 19px; }
+nav a { margin-left: 18px; color: var(--gray); text-decoration: none; font-size: 15px; }
+nav a:hover { color: var(--teal); }
+h1 { font-size: 30px; line-height: 1.2; margin: 32px 0 8px; color: var(--navy); }
+.lede { color: var(--gray); margin: 0 0 22px; max-width: 760px; }
+.controls { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: end; padding: 16px; background: var(--light); border: 1px solid var(--line); border-radius: 12px; }
+.controls label { display: flex; flex-direction: column; font-size: 13px; color: var(--gray); gap: 4px; }
+select, input[type=number] { font: inherit; font-size: 15px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--white); color: var(--ink); }
+input[type=range] { width: 180px; accent-color: var(--teal); }
+button { font: inherit; cursor: pointer; }
+.go { background: var(--navy); color: var(--white); border: 0; border-radius: 8px; padding: 9px 22px; font-weight: 600; }
+.go:hover { background: #2b4d7a; }
+.go:disabled { opacity: .5; cursor: wait; }
+.panes { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+.pane h2 { font-size: 15px; margin: 0 0 6px; color: var(--navy); display: flex; justify-content: space-between; gap: 12px; }
+.pane h2 small { font-weight: 400; color: var(--gray); }
+textarea, pre.out { width: 100%; height: 560px; margin: 0; font: 12.5px/1.45 var(--mono); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+textarea { resize: vertical; white-space: pre; overflow: auto; color: var(--ink); }
+pre.out { overflow: auto; background: #fbfcfd; white-space: pre-wrap; word-break: break-word; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; min-height: 28px; }
+.chip { font-size: 13px; padding: 3px 10px; border-radius: 99px; background: var(--teal-bg); color: var(--teal); }
+.chip.big { background: var(--navy); color: var(--white); font-weight: 600; }
+.ref { font: inherit; color: var(--teal); background: none; border: 0; padding: 0; text-decoration: underline dotted; }
+.ref:hover { color: var(--navy); }
+.l-fail { color: var(--red); font-weight: 600; }
+.l-warn { color: var(--amber); }
+.l-delta { color: var(--navy); font-weight: 600; }
+.l-new { color: var(--red); }
+.l-fixed { color: var(--teal); }
+.expanded { margin-top: 20px; display: none; }
+.expanded pre { max-height: 380px; overflow: auto; font: 12.5px/1.45 var(--mono); background: var(--light); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 6px 0 0; white-space: pre; }
+.runs { margin-top: 28px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; }
+.runs h2 { margin: 0 0 6px; font-size: 19px; color: var(--navy); }
+.runs p { margin: 0 0 14px; color: var(--gray); }
+.steps { display: flex; flex-wrap: wrap; gap: 10px; }
+.step { background: var(--white); border: 1px solid var(--teal); color: var(--teal); border-radius: 8px; padding: 8px 14px; }
+.step:hover { background: var(--teal-bg); }
+.step.done { background: var(--teal); color: var(--white); }
+.plain { background: none; border: 0; color: var(--gray); text-decoration: underline; padding: 8px 4px; }
+.err { color: var(--red); }
+footer { margin: 40px 0 30px; color: var(--gray); font-size: 14px; }
+.loading { color: var(--gray); }
+@media (max-width: 860px) {
+  .panes { grid-template-columns: 1fr; }
+  textarea, pre.out { height: 380px; }
+  nav a { margin-left: 10px; }
+  nav a.hide-s { display: none; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/">Abbreviatory</a>
+  <nav><a href="/what-context-reduction-is-and-why-abbreviatory-does-it-without-a-language-model/" class="hide-s">What It Is</a><a href="/quick-start/">Quick Start</a><a href="/reference/" class="hide-s">Reference</a><a href="/download/">Download</a></nav>
+</div></header>
+
+<main class="wrap">
+  <h1>Try Abbreviatory in Your Browser</h1>
+  <p class="lede">Pick a sample or paste your own test run, log or JSON, and reduce it. The engine runs right here, compiled to WebAssembly, the same code as the <a href="/download/">command line tool</a>. Nothing you paste leaves this page. Click any <code>[ref …]</code> in the report to see the original lines it stands for.</p>
+
+  <div class="controls">
+    <label>Sample
+      <select id="sample">
+        <option value="gotest-verbose.txt" data-format="go test -v">go test -v, 2,453 lines</option>
+        <option value="pytest-verbose.txt">pytest -v, 1,072 lines</option>
+        <option value="junit-pytest.xml">JUnit XML report</option>
+        <option value="app.log">Application log, 12,000 lines</option>
+        <option value="api-response.json">API response, JSON</option>
+        <option value="">Paste your own</option>
+      </select>
+    </label>
+    <label><span>Budget: <span id="budgetValue">4,096</span> bytes</span>
+      <input type="range" id="budget" min="512" max="16384" step="256" value="4096">
+    </label>
+    <label>Format
+      <select id="format">
+        <option value="auto">auto (detect)</option>
+        <option value="test-output">test output</option>
+        <option value="logs">log</option>
+        <option value="json">JSON</option>
+      </select>
+    </label>
+    <button class="go" id="go" disabled>Loading the engine…</button>
+  </div>
+
+  <div class="panes">
+    <section class="pane">
+      <h2>Input <small id="inStats"></small></h2>
+      <textarea id="input" spellcheck="false" placeholder="Paste a test run, a log or a JSON document here."></textarea>
+    </section>
+    <section class="pane">
+      <h2>Report <small id="engine" class="loading">loading…</small></h2>
+      <div class="stats" id="stats"></div>
+      <pre class="out" id="out"></pre>
+    </section>
+  </div>
+
+  <section class="expanded" id="expanded">
+    <h2 style="font-size:15px;color:var(--navy);margin:0">Expanded <code id="expRef"></code> <small id="expStats" style="color:var(--gray);font-weight:400"></small></h2>
+    <pre id="expOut"></pre>
+  </section>
+
+  <section class="runs">
+    <h2>Compare Two Runs</h2>
+    <p>With a history, each report starts with what changed since the last run. Here are two runs of the same go test suite: between them one test started failing and another got fixed. Reduce them in order, then reduce the second one again.</p>
+    <div class="steps">
+      <button class="step" data-step="1">1. Reduce the earlier run</button>
+      <button class="step" data-step="2">2. Reduce the later run</button>
+      <button class="step" data-step="3">3. The later run again</button>
+      <button class="plain" id="forget">Start over</button>
+    </div>
+  </section>
+
+  <footer>Abbreviatory <span id="ver"></span>, open source under Apache 2.0. The engine is the Go code from <a href="https://github.com/abbreviatory/engine">github.com/abbreviatory/engine</a>, compiled to WebAssembly. The samples are the project's test fixtures.</footer>
+</main>
+
+<script src="wasm_exec.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const samples = {};
+let ready = false;
+
+function fmtBytes(n) {
+  if (n < 1000) return n + " B";
+  if (n < 1e6) return (n / 1000).toFixed(1) + " kB";
+  return (n / 1e6).toFixed(1) + " MB";
+}
+function group3(n) { return n.toLocaleString("en-US"); }
+function esc(s) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+async function loadSample(name) {
+  if (!name) return "";
+  if (!samples[name]) {
+    const r = await fetch("samples/" + name);
+    if (!r.ok) throw new Error("couldn't load the sample " + name);
+    samples[name] = await r.text();
+  }
+  return samples[name];
+}
+
+function showInput(text) {
+  $("input").value = text;
+  updateInStats();
+}
+function updateInStats() {
+  const t = $("input").value;
+  const lines = t ? t.split("\n").length - (t.endsWith("\n") ? 1 : 0) : 0;
+  $("inStats").textContent = t ? group3(lines) + " lines, " + fmtBytes(new TextEncoder().encode(t).length) : "";
+}
+
+// The report as HTML: references become buttons, sections get colour.
+function renderReport(text) {
+  const refRe = /\[ref ([0-9a-f]{12})(?::([^\]]+))?\]|(, ref )([0-9a-f]{12})|("ref": ")([0-9a-f]{12}:[^"]+)(")/g;
+  return text.split("\n").map((line) => {
+    let cls = "";
+    if (/^(FAILED|ERRORS)\b/.test(line)) cls = "l-fail";
+    else if (/^WARNINGS\b/.test(line)) cls = "l-warn";
+    else if (/^run \d+/.test(line)) cls = "l-delta";
+    else if (/^new: /.test(line)) cls = "l-new";
+    else if (/^(fixed|gone): /.test(line)) cls = "l-fixed";
+    let out = "", last = 0, m;
+    refRe.lastIndex = 0;
+    while ((m = refRe.exec(line))) {
+      out += esc(line.slice(last, m.index));
+      if (m[1]) {
+        const ref = m[1] + (m[2] ? ":" + m[2] : "");
+        out += '<button class="ref" data-ref="' + esc(ref) + '">' + esc(m[0]) + "</button>";
+      } else if (m[4]) {
+        out += esc(m[3]) + '<button class="ref" data-ref="' + m[4] + '">' + m[4] + "</button>";
+      } else {
+        out += esc(m[5]) + '<button class="ref" data-ref="' + esc(m[6]) + '">' + esc(m[6]) + "</button>" + esc(m[7]);
+      }
+      last = m.index + m[0].length;
+    }
+    out += esc(line.slice(last));
+    return cls ? '<span class="' + cls + '">' + out + "</span>" : out;
+  }).join("\n");
+}
+
+function reduceText(text, extra) {
+  const opts = Object.assign({ budget: +$("budget").value, format: $("format").value }, extra || {});
+  const raw = abbreviatory.reduce(text, JSON.stringify(opts));
+  if (typeof raw !== "string") throw new Error(raw.error);
+  return JSON.parse(raw);
+}
+
+function show(res) {
+  $("out").innerHTML = renderReport(res.text);
+  const out = new TextEncoder().encode(res.text).length;
+  const pct = res.input_bytes ? (100 * out / res.input_bytes) : 0;
+  const chips = [
+    '<span class="chip big">' + fmtBytes(res.input_bytes) + " → " + fmtBytes(out) + "</span>",
+    '<span class="chip">' + (pct < 1 ? pct.toFixed(2) : pct < 10 ? pct.toFixed(1) : Math.round(pct)) + "% of the input</span>",
+    '<span class="chip">' + esc(res.format) + "</span>",
+    '<span class="chip">' + res.ms.toFixed(0) + " ms</span>",
+  ];
+  if (res.run) chips.push('<span class="chip">run ' + res.run + "</span>");
+  $("stats").innerHTML = chips.join("");
+  $("expanded").style.display = "none";
+}
+
+function fail(err) {
+  $("stats").innerHTML = "";
+  $("out").innerHTML = '<span class="err">' + esc(String(err.message || err)) + "</span>";
+}
+
+function go() {
+  try {
+    const text = $("input").value;
+    if (!text.trim()) { fail("Paste something to reduce first."); return; }
+    show(reduceText(text));
+  } catch (e) { fail(e); }
+}
+
+$("out").addEventListener("click", (ev) => {
+  const b = ev.target.closest(".ref");
+  if (!b) return;
+  const got = abbreviatory.expand(b.dataset.ref);
+  $("expanded").style.display = "block";
+  $("expRef").textContent = b.dataset.ref;
+  if (typeof got !== "string") {
+    $("expOut").innerHTML = '<span class="err">' + esc(got.error) + "</span>";
+    $("expStats").textContent = "";
+  } else {
+    const shown = got.length > 400000 ? got.slice(0, 400000) + "\n… (the rest left out of this page)" : got;
+    $("expOut").textContent = shown;
+    const n = got.split("\n").length - (got.endsWith("\n") ? 1 : 0);
+    $("expStats").textContent = group3(n) + " original lines, " + fmtBytes(new TextEncoder().encode(got).length);
+  }
+  $("expanded").scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+$("budget").addEventListener("input", () => { $("budgetValue").textContent = group3(+$("budget").value); });
+$("budget").addEventListener("change", () => { if (ready && $("input").value.trim()) go(); });
+$("format").addEventListener("change", () => { if (ready && $("input").value.trim()) go(); });
+$("input").addEventListener("input", updateInStats);
+$("go").addEventListener("click", go);
+$("sample").addEventListener("change", async () => {
+  try {
+    const name = $("sample").value;
+    showInput(await loadSample(name));
+    if (name && ready) go(); else { $("out").textContent = ""; $("stats").innerHTML = ""; }
+  } catch (e) { fail(e); }
+});
+
+const runFiles = { 1: "gotest-run1.txt", 2: "gotest-verbose.txt", 3: "gotest-verbose.txt" };
+document.querySelectorAll(".step").forEach((b) => b.addEventListener("click", async () => {
+  if (!ready) return;
+  try {
+    const step = +b.dataset.step;
+    if (step === 1) abbreviatory.forget(); // the earlier run starts the comparison over
+    const text = await loadSample(runFiles[step]);
+    showInput(text);
+    $("sample").value = step === 1 ? "" : "gotest-verbose.txt";
+    show(reduceText(text, { key: "demo" }));
+    document.querySelectorAll(".step").forEach((s) => s.classList.toggle("done", +s.dataset.step <= step));
+    $("out").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) { fail(e); }
+}));
+$("forget").addEventListener("click", () => {
+  if (ready) abbreviatory.forget();
+  document.querySelectorAll(".step").forEach((s) => s.classList.remove("done"));
+});
+
+window.abbreviatoryReady = () => {
+  ready = true;
+  $("go").disabled = false;
+  $("go").textContent = "Reduce";
+  $("engine").textContent = "engine " + abbreviatory.version + ", in your browser";
+  $("engine").classList.remove("loading");
+  $("ver").textContent = abbreviatory.version;
+  if ($("input").value.trim()) go();
+};
+
+(async () => {
+  try {
+    showInput(await loadSample($("sample").value));
+  } catch (e) { fail(e); }
+  const goRuntime = new Go();
+  let result;
+  try {
+    result = await WebAssembly.instantiateStreaming(fetch("abbreviatory.wasm"), goRuntime.importObject);
+  } catch (e) {
+    // A server that doesn't send application/wasm: load it the slower way.
+    const bytes = await (await fetch("abbreviatory.wasm")).arrayBuffer();
+    result = await WebAssembly.instantiate(bytes, goRuntime.importObject);
+  }
+  goRuntime.run(result.instance);
+})().catch((e) => {
+  $("engine").textContent = "the engine couldn't load: " + e.message;
+  $("go").textContent = "Unavailable";
+});
+</script>
+</body>
+</html>
