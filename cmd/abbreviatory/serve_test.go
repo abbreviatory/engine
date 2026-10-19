@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"runtime"
@@ -243,5 +244,42 @@ func TestHTTPDetails(t *testing.T) {
 	code, _, part := get("GET", "/expand/"+v["ref"].(string)+":L200001", "Bearer tok", nil)
 	if code != 200 || part != "x ERROR end\n" {
 		t.Fatalf("last line: %d %q", code, part)
+	}
+}
+
+// Review of 0.3, second pass: slow uploads hold up nobody, and a JSON
+// pointer reference expands with its slashes as they are.
+func TestHTTPSlowUploadsAndPointers(t *testing.T) {
+	srv := httptest.NewServer(newHandler(core{t.TempDir()}, "", 1<<20))
+	defer srv.Close()
+	host := strings.TrimPrefix(srv.URL, "http://")
+	for i := 0; i < runtime.NumCPU()+2; i++ {
+		conn, err := net.Dial("tcp", host)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer conn.Close()
+		io.WriteString(conn, "POST /reduce HTTP/1.1\r\nHost: "+host+"\r\nContent-Length: 1000000\r\n\r\n0123456789")
+	}
+	time.Sleep(200 * time.Millisecond)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Post(srv.URL+"/reduce?format=json", "application/octet-stream", strings.NewReader(`{"items": [{"id": 1, "error": "boom"}]}`))
+	if err != nil {
+		t.Fatalf("held up by slow uploads: %v", err)
+	}
+	var v map[string]any
+	json.NewDecoder(resp.Body).Decode(&v)
+	resp.Body.Close()
+	ref, _ := v["ref"].(string)
+	for _, path := range []string{"/expand/" + ref + ":/items/0/error", "/expand/" + ref + ":%2Fitems%2F0%2Ferror"} {
+		resp, err := client.Get(srv.URL + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 || string(body) != "\"boom\"\n" {
+			t.Fatalf("%s: %d %q", path, resp.StatusCode, body)
+		}
 	}
 }

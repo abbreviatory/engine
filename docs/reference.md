@@ -90,7 +90,7 @@ history).
 | Request | Answer |
 |---|---|
 | `POST /reduce` | The body is the input. Query parameters: `format`, `budget`, `preserve` (present and empty for nothing), `keep` (repeatable), `key`, `full`, `no_store`, and `command` and `exit` to record with the run. The answer is the JSON of `reduce -json`; with `Accept: text/plain` the report alone, warnings in `Abbreviatory-Warning` headers |
-| `GET /expand/{ref}` | The original bytes, as `application/octet-stream` |
+| `GET /expand/{ref}` | The original bytes, as `application/octet-stream`; a JSON pointer's slashes may stay as they are |
 | `GET /runs` | The histories, as `history -json` lists them (or as text with `Accept: text/plain`) |
 | `GET /runs/{key}` | One history's runs; the key percent-encoded, a part of it matching one key works |
 | `GET /healthz` | `{"status": "ok", "version": "..."}` |
@@ -101,11 +101,12 @@ the store, no history matching, or no such endpoint), 405, 413 (a body past
 `-max-body`), 422 (input it can't read: binary data, a JSON document that
 doesn't parse, a budget too small for this input) or 500. Expansions stream
 from the store, so memory doesn't grow with the original (a JSON pointer
-reads its document whole). At most as many reductions and expansions as the
-machine has CPUs (at least 2) run at once; others wait their turn. A request
-may take 30 minutes to send its body, and an idle connection is closed after
-2 minutes. A reduction with a key reads the body to a temporary file first,
-so the history's lock isn't held while it uploads. A SIGINT or SIGTERM stops
+reads its document whole); a JSON pointer in a reference may keep its
+slashes or have them percent-encoded. A reduction reads its body to a
+temporary file first, then waits for a turn: at most as many reductions as
+the machine has CPUs (at least 2) run at once, and a slow upload holds up
+nobody. A request may take 30 minutes to send its body, and an idle
+connection is closed after 2 minutes. A SIGINT or SIGTERM stops
 the service, letting requests in progress finish for up to 30 seconds.
 
 ### mcp

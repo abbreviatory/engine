@@ -92,8 +92,11 @@ v0.3.0 adds the front ends:
   whole originals (now `ExpandTo`/`Store.ExpandTo` stream), Windows run
   stopping only the direct process (now taskkill /T), plain-text 404/405,
   case-sensitive Bearer, `/runs/` with an empty key, JSON-RPC batches. All
-  fixed with tests; serve also limits concurrent heavy requests and has
-  read and idle timeouts. On MCP shutdown, running commands are stopped but
+  fixed with tests; serve also limits concurrent reductions (a slot is taken
+  only after the body is spooled, so slow uploads block nobody) and has read
+  and idle timeouts. A second pass also fixed the forced kill 5 s after a
+  stop hitting a reused PID (single process and Windows), and JSON pointer
+  refs with raw slashes (/expand/{ref...}). On MCP shutdown, running commands are stopped but
   every request is still answered; only a client's own cancel drops the
   answer (`mcpCall`).
 - `parity_test.go`: the 0.3 bar, every fixture through the CLI, HTTP and

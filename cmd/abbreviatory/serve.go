@@ -115,29 +115,33 @@ func isLoopback(addr string) bool {
 // page in the user's browser could send it: a request for another host name
 // (DNS rebinding) or with a foreign Origin (a cross-site form or fetch).
 func newHandler(c core, token string, maxBody int64) http.Handler {
-	// Reductions and expansions take memory and CPU; a few at a time.
+	// Reductions take memory and CPU: a few at a time. A slot is only taken
+	// once the body has arrived, so a slow upload holds up nobody else.
+	// (Expansions stream and need no slot.)
 	heavy := make(chan struct{}, max(2, runtime.NumCPU()))
-	limited := func(h http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			select {
-			case heavy <- struct{}{}:
-				defer func() { <-heavy }()
-				h(w, r)
-			case <-r.Context().Done():
-			}
-		}
-	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		replyJSON(w, http.StatusOK, map[string]any{"status": "ok", "version": abbreviatory.Version})
 	})
-	mux.HandleFunc("POST /reduce", limited(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /reduce", func(w http.ResponseWriter, r *http.Request) {
 		q, err := requestFromQuery(r)
 		if err != nil {
 			replyError(w, err)
 			return
 		}
-		body := http.MaxBytesReader(w, r.Body, maxBody)
+		body, err := spoolInput(http.MaxBytesReader(w, r.Body, maxBody))
+		if err != nil {
+			replyError(w, err)
+			return
+		}
+		defer os.Remove(body.Name())
+		defer body.Close()
+		select {
+		case heavy <- struct{}{}:
+			defer func() { <-heavy }()
+		case <-r.Context().Done():
+			return
+		}
 		o, err := c.reduce(body, q, r.Context().Done())
 		if err != nil {
 			replyError(w, err)
@@ -152,8 +156,9 @@ func newHandler(c core, token string, maxBody int64) http.Handler {
 			return
 		}
 		replyJSON(w, http.StatusOK, o.JSON())
-	}))
-	mux.HandleFunc("GET /expand/{ref}", limited(func(w http.ResponseWriter, r *http.Request) {
+	})
+	// {ref...}: a JSON pointer reference has slashes, encoded or not.
+	mux.HandleFunc("GET /expand/{ref...}", func(w http.ResponseWriter, r *http.Request) {
 		lw := &lazyWriter{w: w}
 		if err := c.expand(lw, r.PathValue("ref")); err != nil && !lw.started {
 			replyError(w, err)
@@ -162,7 +167,7 @@ func newHandler(c core, token string, maxBody int64) http.Handler {
 		if !lw.started {
 			lw.start() // an empty part
 		}
-	}))
+	})
 	runs := func(w http.ResponseWriter, r *http.Request) {
 		key := r.PathValue("key")
 		if key == "" {

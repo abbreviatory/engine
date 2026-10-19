@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -521,12 +522,20 @@ func execute(argv []string, x execOpts) (*executed, error) {
 			}
 		}()
 	}
+	// The second, forceful step of stopping a single process is skipped once
+	// it has exited: its process ID may already belong to something else.
+	var exited atomic.Bool
 	stop := func() {
 		if x.Group {
 			if stopGroup(cmd, false) != nil {
 				stopGroup(cmd, true)
 				return
 			}
+			if runtime.GOOS == "windows" {
+				return // taskkill /F has ended the tree already
+			}
+			// The group's ID stays taken while any of it runs, so this also
+			// reaches what the command left behind ignoring SIGTERM.
 			time.AfterFunc(5*time.Second, func() { stopGroup(cmd, true) })
 			return
 		}
@@ -534,7 +543,11 @@ func execute(argv []string, x execOpts) (*executed, error) {
 			cmd.Process.Kill()
 			return
 		}
-		time.AfterFunc(5*time.Second, func() { cmd.Process.Kill() })
+		time.AfterFunc(5*time.Second, func() {
+			if !exited.Load() {
+				cmd.Process.Kill()
+			}
+		})
 	}
 	if x.Cancel != nil {
 		finished := make(chan struct{})
@@ -576,6 +589,7 @@ func execute(argv []string, x execOpts) (*executed, error) {
 		copied <- err
 	}()
 	waitErr := cmd.Wait()
+	exited.Store(true)
 	e.Status = exitOf(cmd, 1)
 	if x.Forward {
 		signal.Stop(sigs)
