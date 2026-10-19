@@ -1,0 +1,4 @@
+project
+├── a.txt
+└── lib
+    └── deep

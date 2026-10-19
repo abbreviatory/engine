@@ -125,7 +125,7 @@ func looksDiff(sample []byte) bool {
 	lines := bytes.SplitN(sample, []byte("\n"), 400)
 	for i, l := range lines {
 		l = bytes.TrimRight(l, "\r")
-		if bytes.HasPrefix(l, []byte("diff --git ")) {
+		if bytes.HasPrefix(l, []byte("diff --git ")) || bytes.HasPrefix(l, []byte("diff --cc ")) || bytes.HasPrefix(l, []byte("diff --combined ")) {
 			return true
 		}
 		if bytes.HasPrefix(l, []byte("--- ")) && i+2 < len(lines) && bytes.HasPrefix(lines[i+1], []byte("+++ ")) && bytes.HasPrefix(lines[i+2], []byte("@@ -")) {

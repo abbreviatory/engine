@@ -72,6 +72,10 @@ type Record struct {
 	// GroupHead is shown for a group of more than one record instead of the
 	// first record's head, such as "net/http/*.go".
 	GroupHead string
+	// Items, when set, are the record's identities for run history instead
+	// of its group, each a JSON pointer and value joined by a zero byte: the
+	// error fields of an HTTP JSON body that share lines.
+	Items []string
 }
 
 func (r *Record) addLine(n int64) {

@@ -19,6 +19,9 @@ import (
 var (
 	statusRe = regexp.MustCompile(`^(?:< )?HTTP/\d(?:\.\d)? ([1-5]\d\d)(?: (.*))?$`)
 	headerRe = regexp.MustCompile(`^([!#$%&'*+.^_` + "`" + `|~0-9A-Za-z-]+):\s*(.*)$`)
+	// curl -v's notes that can turn up after the body has started.
+	curlNote = regexp.MustCompile(`^\* (?:Connection #|Closing connection|Connected to|  Trying|HTTP|TLS|SSL|ALPN|Request completely sent|Issue another request|Ignoring the response-body|Leftovers after chunking|Mark bundle|Re-using|Found bundle|Connection died|Recv failure|Send failure|transfer closed|OpenSSL|Failed|Couldn't|Could not)`)
+	reqLine  = regexp.MustCompile(`^> [A-Z]+ \S+ HTTP/[\d.]+$`)
 	curlErr  = regexp.MustCompile(`(?i)^(?:curl: \(\d+\)|\* (?:.*\b(?:could not|couldn't|failed|failure|error|timed out|refused|unable|reset|not resolve)\b))`)
 )
 
@@ -55,6 +58,7 @@ type httpAdapter struct {
 	buf      []string // a JSON body's lines, until it ends
 	bufFrom  int64
 	bufSize  int
+	blank    bool // the line before was blank
 }
 
 func newHTTP() *httpAdapter { return &httpAdapter{} }
@@ -72,7 +76,11 @@ func (a *httpAdapter) note(n int64, text, key, head string, emit func(Record)) {
 
 func (a *httpAdapter) line(n int64, text string, emit func(Record)) {
 	t := strings.TrimRight(text, " \t")
-	if m := statusRe.FindStringSubmatch(t); m != nil {
+	prevBlank := a.blank
+	a.blank = strings.TrimPrefix(t, "<") == ""
+	// In a body, a status line starts a new response only after a blank
+	// line or one of curl's notes, as it would in a redirect chain.
+	if m := statusRe.FindStringSubmatch(t); m != nil && (a.state != httpBody || prevBlank || strings.HasPrefix(t, "< ")) {
 		a.endBody(emit)
 		code, _ := strconv.Atoi(m[1])
 		a.resps = append(a.resps, httpResp{code: code, reason: m[2]})
@@ -83,7 +91,8 @@ func (a *httpAdapter) line(n int64, text string, emit func(Record)) {
 			a.errs++
 		}
 		head := strings.TrimPrefix(t, "< ")
-		emit(Record{Kind: kind, ID: "status:" + strconv.Itoa(len(a.resps)), Head: head, Lines: []Range{{n, n}}})
+		// Known by its code and reason, not by where it is in a chain.
+		emit(Record{Kind: kind, Head: head, GroupKey: "status\x00" + m[1] + " " + m[2], GroupHead: head, Lines: []Range{{n, n}}})
 		return
 	}
 	if strings.HasPrefix(t, "curl: (") {
@@ -91,7 +100,25 @@ func (a *httpAdapter) line(n int64, text string, emit func(Record)) {
 		emit(Record{Kind: KindError, Head: t, Lines: []Range{{n, n}}})
 		return
 	}
-	if a.verbose || a.state == httpNone {
+	if a.verbose && a.state == httpBody {
+		// Inside a body only curl's own notes are taken out of it.
+		if reqLine.MatchString(t) {
+			// curl -L -v: the next request of a redirect chain.
+			a.endBody(emit)
+			f := strings.Fields(t)
+			emit(Record{Kind: KindInfo, ID: "request", Head: "request: " + f[1] + " " + f[2], Lines: []Range{{n, n}}})
+			return
+		}
+		if strings.HasPrefix(t, "{ [") || strings.HasPrefix(t, "} [") || curlNote.MatchString(t) {
+			if curlErr.MatchString(t) {
+				emit(Record{Kind: KindError, Head: t, Lines: []Range{{n, n}}})
+				return
+			}
+			a.note(n, t, "curl", "(curl connection notes)", emit)
+			a.blank = prevBlank
+			return
+		}
+	} else if a.verbose || a.state == httpNone {
 		switch {
 		case strings.HasPrefix(t, "* ") || t == "*":
 			a.verbose = true
@@ -258,6 +285,7 @@ func (a *httpAdapter) jsonRecords(emit func(Record)) bool {
 		from, to int64
 		ptrs     []string
 		heads    []string
+		items    []string
 	}
 	var cs []cluster
 	for _, p := range doc.errors {
@@ -272,9 +300,10 @@ func (a *httpAdapter) jsonRecords(emit func(Record)) bool {
 			cs[k].to = max(cs[k].to, to)
 			cs[k].ptrs = append(cs[k].ptrs, p)
 			cs[k].heads = append(cs[k].heads, head)
+			cs[k].items = append(cs[k].items, p+"\x00"+val)
 			continue
 		}
-		cs = append(cs, cluster{from: from, to: to, ptrs: []string{p}, heads: []string{head}})
+		cs = append(cs, cluster{from: from, to: to, ptrs: []string{p}, heads: []string{head}, items: []string{p + "\x00" + val}})
 	}
 	// The body's other lines.
 	var rest []Range
@@ -290,7 +319,14 @@ func (a *httpAdapter) jsonRecords(emit func(Record)) bool {
 		rest = append(rest, Range{next, last})
 	}
 	for _, c := range cs {
-		r := Record{Kind: KindError, ID: "jsonerr:" + c.ptrs[0], Head: c.heads[0], Lines: []Range{{c.from, c.to}}}
+		// Grouped by its fields' pointers (array positions aside) and values;
+		// history knows each field on its own.
+		var key []string
+		for _, it := range c.items {
+			p, v, _ := strings.Cut(it, "\x00")
+			key = append(key, normalize(p)+"\x00"+normalize(cut(v, maxHead)))
+		}
+		r := Record{Kind: KindError, Head: c.heads[0], GroupKey: "jsonerr\x00" + strings.Join(key, "\x01"), Items: c.items, Lines: []Range{{c.from, c.to}}}
 		if len(c.heads) > 1 {
 			r.Head += " (and " + plural(int64(len(c.heads)-1), "more error field", "more error fields") + ")"
 			for _, h := range c.heads[1:] {

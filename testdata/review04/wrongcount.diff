@@ -1,0 +1,16 @@
+diff --git a/a.go b/a.go
+--- a/a.go
++++ b/a.go
+@@ -1,2 +1,2 @@
+-x
++y
+ context1
+ context2
+ context3
+ERROR this line is not part of the hunk
+diff --git a/b.go b/b.go
+--- a/b.go
++++ b/b.go
+@@ -1 +1 @@
+-p
++q

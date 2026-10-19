@@ -123,6 +123,44 @@ type item struct {
 	pkg  string // its package
 }
 
+// innermost drops error fields that hold other error fields ("errors": [{"error": ...}]):
+// their value changes whenever one inside does, so history follows the
+// inner ones.
+func innermost(ptrs []string) []string {
+	var out []string
+	for i, p := range ptrs {
+		outer := false
+		for j, q := range ptrs {
+			if i != j && strings.HasPrefix(q, p+"/") {
+				outer = true
+				break
+			}
+		}
+		if !outer {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func innermostItems(items []string) []string {
+	ptrs := make([]string, len(items))
+	for i, it := range items {
+		ptrs[i], _, _ = strings.Cut(it, "\x00")
+	}
+	keep := map[string]bool{}
+	for _, p := range innermost(ptrs) {
+		keep[p] = true
+	}
+	var out []string
+	for i, it := range items {
+		if keep[ptrs[i]] {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
 func hashKey(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:8])
@@ -138,7 +176,7 @@ func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDo
 		if !rules.errors {
 			return nil, good
 		}
-		for _, p := range doc.errors {
+		for _, p := range innermost(doc.errors) {
 			n, err := doc.lookup(p)
 			if err != nil {
 				continue
@@ -158,6 +196,20 @@ func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDo
 			continue
 		}
 		if (g.kind == KindFail && rules.failures) || (g.kind == KindError && rules.errors) {
+			if len(g.ex.Items) > 0 {
+				// Error fields known by pointer and value, as in a JSON
+				// document.
+				for _, pv := range innermostItems(g.ex.Items) {
+					p, v, _ := strings.Cut(pv, "\x00")
+					k := hashKey("e\x00j\x00" + normalize(p) + "\x00" + normalize(cut(v, maxHead)))
+					if seen[k] {
+						continue
+					}
+					seen[k] = true
+					bad = append(bad, item{key: k, head: p + ": " + v, sel: "g" + strconv.Itoa(g.idx)})
+				}
+				continue
+			}
 			k, test := groupKey(g, tests)
 			if seen[k] {
 				continue

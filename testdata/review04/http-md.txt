@@ -1,0 +1,11 @@
+* Connected
+> GET /readme HTTP/1.1
+> Host: x
+>
+< HTTP/1.1 200 OK
+< Content-Type: text/markdown
+<
+# Readme
+> quoted note: ERROR handling is important
+* bullet one
+* bullet two failed

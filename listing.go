@@ -32,6 +32,9 @@ type listingAdapter struct {
 	largest     []listEntry
 	du          bool  // du rows: directory sizes include what's in them
 	duMax       int64 // the largest du row, usually the total
+	treeDirs    int64 // tree's own count, when it printed one
+	treeFiles   int64
+	treeCount   bool
 }
 
 func newListing() *listingAdapter {
@@ -75,6 +78,14 @@ func (a *listingAdapter) line(n int64, text string, emit func(Record)) {
 		a.meta(n, text, emit)
 		return
 	case treeSummary(t):
+		if m := treeCountRe.FindStringSubmatch(t); m != nil {
+			// tree knows which entries are directories; its count wins.
+			d, _ := strconv.ParseInt(m[1], 10, 64)
+			f, _ := strconv.ParseInt(m[2], 10, 64)
+			a.treeDirs += d
+			a.treeFiles += f
+			a.treeCount = true
+		}
 		a.meta(n, text, emit)
 		return
 	}
@@ -130,9 +141,12 @@ func isDigits(s string) bool {
 	return true
 }
 
-func treeSummary(t string) bool {
-	return regexp.MustCompile(`^\d+ director(y|ies)(, \d+ files?)?$`).MatchString(t)
-}
+var (
+	treeSumRe   = regexp.MustCompile(`^\d+ director(y|ies)(, \d+ files?)?$`)
+	treeCountRe = regexp.MustCompile(`^(\d+) director(?:y|ies)(?:, (\d+) files?)?$`)
+)
+
+func treeSummary(t string) bool { return treeSumRe.MatchString(t) }
 
 // pathLike reports a line that is a path, as find and fd print them.
 func pathLike(t string) bool {
@@ -142,7 +156,20 @@ func pathLike(t string) bool {
 	if strings.Contains(t, ": ") || strings.Contains(t, "::") {
 		return false
 	}
-	return strings.Contains(t, "/") || (strings.Contains(t, ".") && !strings.Contains(t, " "))
+	if strings.ContainsAny(t, "=@#") {
+		return false // pip freeze, version pins, comments
+	}
+	if strings.Contains(t, "/") {
+		return true
+	}
+	// A bare name needs a plausible extension: a few characters with a
+	// letter, not a version number.
+	i := strings.LastIndexByte(t, '.')
+	if i <= 0 || i == len(t)-1 || strings.Contains(t, " ") {
+		return false
+	}
+	ext := t[i+1:]
+	return len(ext) <= 10 && strings.IndexFunc(ext, func(r rune) bool { return r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' }) >= 0
 }
 
 func cleanListPath(p string) string {
@@ -278,6 +305,9 @@ func (a *listingAdapter) finish(emit func(Record)) []string {
 	dirs := int64(len(a.dirSet))
 	if a.dirs > dirs {
 		dirs = a.dirs
+	}
+	if a.treeCount {
+		dirs, a.files = a.treeDirs, a.treeFiles
 	}
 	s := "listing: " + plural(a.files, "file", "files") + " in " + plural(dirs, "directory", "directories")
 	if len(a.dirSet) >= maxDirSet {

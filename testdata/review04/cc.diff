@@ -1,0 +1,12 @@
+diff --cc src/main.go
+index 1111111,2222222..3333333
+--- a/src/main.go
++++ b/src/main.go
+@@@ -1,5 -1,5 +1,6 @@@
+  package main
+  
+- import "fmt"
+ -import "log"
+++import "os"
+++	log.Error("failed to open config: permission denied")
+  func main() {

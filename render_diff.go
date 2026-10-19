@@ -30,7 +30,7 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 			skip[f.path] = true
 		}
 	}
-	var fail, errs, kept, warn, commits, hunks []*group
+	var fail, errs, kept, warn, commits, hunks, other []*group
 	skipped := 0
 	for _, g := range groups {
 		switch {
@@ -51,7 +51,19 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 				continue
 			}
 			hunks = append(hunks, g)
+		case strings.HasPrefix(g.ex.ID, "file:"):
+			// Listed under FILES.
+		default:
+			// Lines between files that aren't part of the diff ("Only in"
+			// from diff -r, a commit's stat lines, a log around it).
+			other = append(other, g)
 		}
+	}
+	otherSec := &section{key: "", title: "OTHER", groups: other}
+	otherShown := make([]bool, len(other))
+	var otherLines int64
+	for _, g := range other {
+		otherLines += g.lines
 	}
 	secs := []*section{
 		{key: "fail", title: "FAILED", noun: "failures", preserved: true, groups: fail},
@@ -71,7 +83,14 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 
 	extra := func(worst bool) []string {
 		var out []string
-		var nc, nf, nh int
+		var nc, nf, nh, no int
+		var nl int64
+		for i, g := range other {
+			if worst || !otherShown[i] {
+				no++
+				nl += g.lines
+			}
+		}
 		for i := range commits {
 			if worst || !commitShown[i] {
 				nc++
@@ -92,6 +111,9 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 		}
 		if nf > 0 {
 			out = append(out, "not shown: "+group3(int64(nf))+" of "+group3(int64(len(files)))+" files"+ref(""))
+		}
+		if no > 0 {
+			out = append(out, "not shown: "+group3(int64(no))+" of "+group3(int64(len(other)))+" other kinds ("+plural(nl, "line", "lines")+")"+ref(""))
 		}
 		if nh > 0 || skipped > 0 {
 			s := "not shown: " + group3(int64(nh)) + " of " + group3(int64(len(hunks))) + " changes"
@@ -206,6 +228,18 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 			}
 		}
 	}
+	// 5. Other lines, while they fit.
+	otherTitle := "OTHER (" + plural(int64(len(other)), "kind", "kinds") + ", " + plural(otherLines, "line", "lines") + "):"
+	anyOther := false
+	for i, g := range other {
+		cost := len(itemLine(otherSec, g, ref)) + 1
+		if !anyOther {
+			cost += len(otherTitle) + 1
+		}
+		if take(cost) {
+			otherShown[i], anyOther = true, true
+		}
+	}
 
 	var out []string
 	out = append(out, head...)
@@ -245,6 +279,14 @@ func renderDiff(res *Result, groups []*group, files []diffFile, summary []string
 			if hunkShown[i] {
 				out = append(out, hunkLine(g, ref))
 				out = append(out, detailLines(g, hunkDetail[i])...)
+			}
+		}
+	}
+	if anyOther {
+		out = append(out, otherTitle)
+		for i, g := range other {
+			if otherShown[i] {
+				out = append(out, itemLine(otherSec, g, ref))
 			}
 		}
 	}

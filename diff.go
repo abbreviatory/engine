@@ -1,6 +1,9 @@
 package abbreviatory
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"hash"
 	"path"
 	"regexp"
 	"strconv"
@@ -28,6 +31,8 @@ type diffAdapter struct {
 	header   *Record // the file's header lines, until its first hunk
 	hunk     *Record // the hunk being read
 	hunkKeep []string
+	hunkSum  hash.Hash // all of the hunk's changed lines, for its grouping identity
+	parents  int       // prefix columns: 1, or one per parent in a combined diff
 	oldLeft  int64
 	newLeft  int64
 	added    []string // the hunk's added lines, to check them
@@ -39,8 +44,10 @@ func newDiff() *diffAdapter { return &diffAdapter{} }
 
 var (
 	hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$`)
-	gitDiffRe  = regexp.MustCompile(`^diff --git ("?)a/(.*?)("?) ("?)b/(.*?)("?)$`)
-	commitRe   = regexp.MustCompile(`^commit ([0-9a-f]{7,64})\b`)
+	// A combined diff (diff --cc, a merge): one "-" range per parent.
+	ccHeader  = regexp.MustCompile(`^(@{3,}) (?:-\d+(?:,\d+)? )+\+\d+(?:,(\d+))? @{3,}`)
+	gitDiffRe = regexp.MustCompile(`^diff --git ("?)a/(.*?)("?) ("?)b/(.*?)("?)$`)
+	commitRe  = regexp.MustCompile(`^commit ([0-9a-f]{7,64})\b`)
 )
 
 // generatedFile reports files a diff reader rarely wants line by line: lock
@@ -79,7 +86,7 @@ func (d *diffAdapter) line(n int64, text string, emit func(Record)) {
 		d.endFile(emit)
 		d.startFile(n, text)
 		return
-	case strings.HasPrefix(text, "@@ ") && d.cur != nil:
+	case strings.HasPrefix(text, "@@") && d.cur != nil && (hunkHeader.MatchString(text) || ccHeader.MatchString(text)):
 		d.startHunk(n, text, emit)
 		return
 	}
@@ -260,7 +267,15 @@ func (d *diffAdapter) startHunk(n int64, text string, emit func(Record)) {
 	f.end = n
 	m := hunkHeader.FindStringSubmatch(text)
 	d.oldLeft, d.newLeft = 1, 1
-	if m != nil {
+	d.parents = 1
+	if c := ccHeader.FindStringSubmatch(text); c != nil {
+		// Combined: count only the result's lines.
+		d.parents = len(c[1]) - 1
+		d.oldLeft, d.newLeft = 0, 1
+		if c[2] != "" {
+			d.newLeft, _ = strconv.ParseInt(c[2], 10, 64)
+		}
+	} else if m != nil {
 		if m[2] != "" {
 			d.oldLeft, _ = strconv.ParseInt(m[2], 10, 64)
 		}
@@ -271,6 +286,10 @@ func (d *diffAdapter) startHunk(n int64, text string, emit func(Record)) {
 	d.hunk = &Record{Kind: KindInfo, ID: "hunk:" + f.path, Head: f.path + " " + strings.TrimRight(text, " \t"), Lines: []Range{{n, n}}}
 	d.hunkKeep = d.hunkKeep[:0]
 	d.added = d.added[:0]
+	if d.hunkSum == nil {
+		d.hunkSum = sha256.New()
+	}
+	d.hunkSum.Reset()
 }
 
 func (d *diffAdapter) hunkLine(n int64, text string) {
@@ -279,6 +298,10 @@ func (d *diffAdapter) hunkLine(n int64, text string) {
 	if text == "" {
 		// An empty context line some tools write without its space.
 		text = " "
+	}
+	if d.parents > 1 {
+		d.ccLine(text)
+		return
 	}
 	switch text[0] {
 	case ' ':
@@ -302,7 +325,35 @@ func (d *diffAdapter) hunkLine(n int64, text string) {
 	}
 }
 
+// ccLine counts a line of a combined hunk: one prefix column per parent.
+func (d *diffAdapter) ccLine(text string) {
+	if text[0] == '\\' {
+		return
+	}
+	if len(text) < d.parents || strings.Trim(text[:d.parents], " +-") != "" {
+		d.newLeft = 0 // not a hunk line: the counts were wrong
+		return
+	}
+	cols := text[:d.parents]
+	switch {
+	case strings.Contains(cols, "-"):
+		d.cur.dels++
+		d.keepLine(text)
+	case strings.Contains(cols, "+"):
+		d.newLeft--
+		d.cur.adds++
+		d.keepLine(text)
+		if len(d.added) < 4096 {
+			d.added = append(d.added, text[d.parents:])
+		}
+	default:
+		d.newLeft--
+	}
+}
+
 func (d *diffAdapter) keepLine(text string) {
+	d.hunkSum.Write([]byte(text))
+	d.hunkSum.Write([]byte{0})
 	if len(d.hunkKeep) < maxDetail {
 		d.hunkKeep = append(d.hunkKeep, strings.TrimRight(text, "\r"))
 	}
@@ -330,7 +381,12 @@ func (d *diffAdapter) endHunk(emit func(Record)) {
 		h.Kind = KindError
 	}
 	// The same change in several places is one group.
-	h.GroupKey = "hunk\x00" + strings.Join(d.hunkKeep, "\n")
+	// The identity covers every changed line, not only those kept, and a
+	// generated file's change never groups with another file's.
+	h.GroupKey = "hunk\x00" + hex.EncodeToString(d.hunkSum.Sum(nil))
+	if generatedFile(d.cur.path) || d.cur.binary {
+		h.GroupKey = "gen\x00" + h.GroupKey
+	}
 	emit(*h)
 }
 

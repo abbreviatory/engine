@@ -395,8 +395,10 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   aren't tracked. A test is known by its name, anything else by its text
   with numbers and IDs aside, so a log error whose wording changes counts as
   a new one, and the same error with a different stack trace too.
-- In a JSON document, error fields are compared by their path and value with
-  array positions aside, so the same error at two positions counts once.
+- In a JSON document (and an HTTP response's JSON body), error fields are
+  compared by their path and value with array positions aside, so the same
+  error at two positions counts once. A field that holds other error fields
+  (`"errors": [{"error": ...}]`) is followed through the ones inside it.
 - When the output doesn't name passing tests (go test or pytest without
   `-v`), a failing test that disappears counts as fixed, even if it was
   deleted or not run. With `-v` or `-json` it counts as not run. For go

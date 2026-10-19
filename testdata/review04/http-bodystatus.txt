@@ -1,0 +1,6 @@
+HTTP/1.1 200 OK
+Content-Type: text/plain
+
+here is a log we fetched:
+HTTP/1.1 500 Internal Server Error
+upstream said no
