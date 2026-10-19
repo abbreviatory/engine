@@ -312,7 +312,7 @@ generated application log and API response. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 and v0.2.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 74 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0, v0.2.0 and v0.3.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 87 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
@@ -329,7 +329,7 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 
 The last one is small enough that the whole input fits the budget, so it is shown whole with a one-line header.
 
-A generated log of 1,107 MB (12.5 million lines) streamed through in 31.3 seconds with a peak heap of 14.1 MB
+A generated log of 1,107 MB (12.5 million lines) streamed through in 39.8 seconds with a peak heap of 16.7 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in
@@ -345,6 +345,12 @@ random budget. For every run the reported new, fixed, not run, still
 failing and flaky items, the streaks, the "no change" line and the notes in
 the report matched what was worked out separately from the known statuses
 ([delta.txt](test/results/delta.txt)).
+
+The command line, the MCP server and the HTTP service were checked against each
+other on every fixture with five sets of options: 40 reports, all 424
+references in them expanded through each, and run histories built through
+each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
+[tests.txt](test/results/tests.txt)).
 
 ## Limits in v0.3.0
 

@@ -1,8 +1,8 @@
 # Every test with the race detector
-# recorded 2026-10-19 03:13 UTC at 243779d, Abbreviatory 0.3.0, go1.24.7 linux/amd64
+# recorded 2026-10-19 03:25 UTC at dd276f1, Abbreviatory 0.3.0, go1.24.7 linux/amd64
 # Linux 6.18.44-fc-v139, Intel(R) Xeon(R) Processor @ 2.80GHz, 2 CPUs
 # command: go test -race -count=1 ./...
 
-ok  	github.com/abbreviatory/engine	319.410s
-ok  	github.com/abbreviatory/engine/cmd/abbreviatory	182.760s
-ok  	github.com/abbreviatory/engine/store	2.170s
+ok  	github.com/abbreviatory/engine	306.952s
+ok  	github.com/abbreviatory/engine/cmd/abbreviatory	172.437s
+ok  	github.com/abbreviatory/engine/store	2.195s
