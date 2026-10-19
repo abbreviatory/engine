@@ -21,7 +21,7 @@ import (
 )
 
 // Version is the release version. Raising it on main releases it.
-const Version = "0.3.0"
+const Version = "0.4.0"
 
 // DefaultBudget is the output size in bytes when none is given.
 const DefaultBudget = 4096

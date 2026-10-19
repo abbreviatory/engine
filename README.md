@@ -321,7 +321,9 @@ Every number here comes from [test/results](test/results), written by
 
 The fixtures are real output: go test and pytest runs of the small samples in
 `test/fixtures/src` (they fail on purpose), pytest's JUnit report, plus a
-generated application log and API response. On every fixture, at budgets from
+generated application log and API response, a `git diff` of this repository,
+three curl responses from a local server, and a `find` and an `ls -lR` of Go's
+source tree. On every fixture, at budgets from
 256 bytes to 16 kB, with several preserve settings and keep rules,
 [promise_test.go](promise_test.go) checks that:
 
@@ -332,7 +334,7 @@ generated application log and API response. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0, v0.2.0 and v0.3.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go)). In all, 87 Go tests pass (with 59 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.10GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0, v0.2.0, v0.3.0 and v0.4.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go), [review04_test.go](review04_test.go)). In all, 105 Go tests pass (with 101 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.80GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
@@ -340,16 +342,22 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 |---|---|---|---|---|---|
 | app.log | generated application log | 5,630,070 | 63,369 | 3,075 | 0.05% |
 | gotest-json.txt | go test -json | 808,325 | 4,880 | 2,383 | 0.29% |
+| http-json.txt | curl -i of a JSON API response | 719,565 | 37,534 | 1,754 | 0.24% |
 | api-response.json | generated API response | 719,368 | 37,527 | 3,185 | 0.44% |
+| find-listing.txt | find over Go's source tree | 454,602 | 10,703 | 4,060 | 0.89% |
+| git-diff.txt | git diff between v0.2.0 and v0.3.0 | 190,108 | 5,286 | 4,029 | 2.1% |
 | gotest-verbose.txt | go test -v | 100,652 | 2,453 | 2,452 | 2.4% |
 | junit-pytest.xml | pytest's JUnit report | 82,024 | 117 | 3,961 | 4.8% |
 | pytest-verbose.txt | pytest -v | 79,443 | 1,072 | 3,893 | 4.9% |
+| ls-recursive.txt | ls -lR of two Go packages | 18,879 | 344 | 1,833 | 9.7% |
 | pytest-short.txt | pytest | 7,479 | 169 | 3,898 | 52% |
 | gotest-short.txt | go test | 1,735 | 35 | 1,815 | shown whole |
+| http-verbose-404.txt | curl -v of a 404 | 788 | 30 | 854 | shown whole |
+| http-redirect.txt | curl -i through a redirect | 583 | 28 | 649 | shown whole |
 
-The last one is small enough that the whole input fits the budget, so it is shown whole with a one-line header.
+The last three are small enough that the whole input fits the budget, so they are shown whole with a one-line header.
 
-A generated log of 1,107 MB (12.5 million lines) streamed through in 39.8 seconds with a peak heap of 16.7 MB
+A generated log of 1,107 MB (12.5 million lines) streamed through in 181.8 seconds with a peak heap of 10.9 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in

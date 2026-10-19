@@ -1,0 +1,66 @@
+[abbreviatory] diff, 5,286 lines (190.1 kB), ref 7cbef4a2c990
+diff: 32 files changed, +3,877 -663 (14 added)
+FILES (32):
+- M .github/workflows/test.yml (+8 -1) [ref 7cbef4a2c990:L1-27]
+- M CLAUDE.md (+41 -9) [ref 7cbef4a2c990:L28-114]
+- M README.md (+75 -4) [ref 7cbef4a2c990:L115-239]
+- M RELEASING.md (+3 -1) [ref 7cbef4a2c990:L240-254]
+- M abbreviatory.go (+10 -1) [ref 7cbef4a2c990:L255-283]
+- A cmd/abbreviatory-wasm/main.go (+186 -0) [ref 7cbef4a2c990:L284-475]
+- A cmd/abbreviatory/core.go (+694 -0) [ref 7cbef4a2c990:L476-1175]
+- M cmd/abbreviatory/main.go (+112 -497) [ref 7cbef4a2c990:L1176-1952]
+- A cmd/abbreviatory/mcp.go (+515 -0) [ref 7cbef4a2c990:L1953-2473]
+- A cmd/abbreviatory/mcp_test.go (+269 -0) [ref 7cbef4a2c990:L2474-2748]
+- A cmd/abbreviatory/norace_test.go (+5 -0) [ref 7cbef4a2c990:L2749-2759]
+- A cmd/abbreviatory/parity_test.go (+380 -0) [ref 7cbef4a2c990:L2760-3145]
+- A cmd/abbreviatory/proc_unix.go (+23 -0) [ref 7cbef4a2c990:L3146-3174]
+- A cmd/abbreviatory/proc_windows.go (+20 -0) [ref 7cbef4a2c990:L3175-3200]
+- A cmd/abbreviatory/race_test.go (+5 -0) [ref 7cbef4a2c990:L3201-3211]
+- A cmd/abbreviatory/serve.go (+373 -0) [ref 7cbef4a2c990:L3212-3590]
+- A cmd/abbreviatory/serve_test.go (+285 -0) [ref 7cbef4a2c990:L3591-3881]
+- A demo/index.html (+315 -0) [ref 7cbef4a2c990:L3882-4202]
+- M docs/reference.md (+70 -2) [ref 7cbef4a2c990:L4203-4305]
+- M expand.go (+118 -6) [ref 7cbef4a2c990:L4306-4483]
+- A expandto_test.go (+61 -0) [ref 7cbef4a2c990:L4484-4550]
+- M jsondoc.go (+5 -6) [ref 7cbef4a2c990:L4551-4600]
+- A scripts/build-demo.sh (+52 -0) [ref 7cbef4a2c990:L4601-4658]
+- M scripts/smoke.py (+51 -1) [ref 7cbef4a2c990:L4659-4729]
+- M store/store.go (+39 -1) [ref 7cbef4a2c990:L4730-4794]
+- M test/results/delta.txt (+7 -7) [ref 7cbef4a2c990:L4795-4822]
+- M test/results/memory.txt (+5 -5) [ref 7cbef4a2c990:L4823-4842]
+- M test/results/race.txt (+5 -5) [ref 7cbef4a2c990:L4843-4860]
+- M test/results/ratios.txt (+2 -2) [ref 7cbef4a2c990:L4861-4873]
+- M test/results/release-plan.txt (+2 -2) [ref 7cbef4a2c990:L4874-4886]
+- M test/results/smoke.txt (+3 -3) [ref 7cbef4a2c990:L4887-4900]
+- M test/results/tests.txt (+138 -110) [ref 7cbef4a2c990:L4901-5286]
+CHANGES (76):
+- .github/workflows/test.yml @@ -2,7 +2,8 @@ name: test [ref 7cbef4a2c990:g1]
+    -# the store and the command) on Linux and macOS, the race detector on Linux,
+    +# the store and the command) on Linux and macOS, the race detector and the
+    +# browser demo's WebAssembly build on Linux,
+- .github/workflows/test.yml @@ -33,6 +34,12 @@ jobs: [ref 7cbef4a2c990:g2]
+    +      - name: The browser demo's WebAssembly build
+    +        if: runner.os == 'Linux'
+    +        env:
+    +          GOOS: js
+    +          GOARCH: wasm
+    +        run: go vet ./cmd/abbreviatory-wasm && go build -o /dev/null ./cmd/abbreviatory-wasm
+- CLAUDE.md @@ -12,7 +12,8 @@ has the procedure and the checks to run afterwards. [ref 7cbef4a2c990:g4]
+    -v0.2.0 (October 2026) adds run history (below). v0.1.0 was the first
+    +v0.3.0 (October 2026) adds the HTTP service and the MCP server, v0.2.0 run
+    +history (both below). v0.1.0 was the first
+- CLAUDE.md @@ -36,7 +37,8 @@ v0.1.0 has the core, the command line and three adapter families: [ref 7cbef4a2c990:g5]
+    -- `cmd/abbreviatory/`: reduce, run, history, expand, prune, formats, version.
+    +- `cmd/abbreviatory/`: reduce, run, history, expand, serve, mcp, prune,
+    +  formats, version.
+- CLAUDE.md @@ -72,6 +74,35 @@ v0.2.0 adds the run-to-run delta: [ref 7cbef4a2c990:g6]
+    +v0.3.0 adds the front ends:
+    +- `cmd/abbreviatory/core.go`: the one core all three use: `request` (the
+    ... (26 lines left out)
+    +
+- CLAUDE.md @@ -113,18 +144,19 @@ front end, not the headline. [ref 7cbef4a2c990:g7]
+    -   MCP give the same results on the whole corpus.
+    +   MCP give the same results on the whole corpus (done in v0.3.0).
+    ... (12 lines left out)
+    +Next session starts at 0.4, when the owner says go.
+not shown: 70 of 76 changes [ref 7cbef4a2c990]

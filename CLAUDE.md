@@ -12,8 +12,9 @@ has the procedure and the checks to run afterwards.
 
 ## Where things stand
 
-v0.3.0 (October 2026) adds the HTTP service and the MCP server, v0.2.0 run
-history (both below). v0.1.0 was the first
+v0.4.0 (October 2026) adds adapters for diffs, HTTP responses and directory
+listings, v0.3.0 the HTTP service and the MCP server, v0.2.0 run history (all
+below). v0.1.0 was the first
 release: Apache 2.0, CI on Linux and macOS plus a Windows smoke check, and automated releases with smoke-tested binaries
 for Linux, macOS and Windows. Pure Go, standard library only, no cgo.
 
@@ -103,6 +104,35 @@ v0.3.0 adds the front ends:
   MCP with five option sets, every reference expanded, histories built
   through each; all the same. Smaller matrix under -short and -race.
 
+v0.4.0 adds three formats:
+- `record.go`: `GroupKey` (grouping identity instead of ID, head and
+  detail) and `GroupHead` (the head shown for a group of several), `Items`
+  (history identities of a record: JSON error fields as pointer and value).
+- `diff.go` + `render_diff.go`: git diff/show/log -p, diff -u and -r,
+  combined (merge) hunks with a count per parent; commits, files (status,
+  +/-, line ref), hunks grouped by a hash of all changed lines (generated
+  and binary files apart), conflict markers errors, trailing whitespace
+  warnings, OTHER for lines between files.
+- `http.go`: curl -i/-v and redirect chains; status lines keyed by code,
+  key headers, folded headers and curl notes, curl errors; a JSON body
+  parsed (error clusters with Items, the rest one record with the outline
+  as detail), other bodies read as a log; render keeps input order for HTTP
+  and gives OTHER groups detail. A status line in a body counts only after a
+  blank line.
+- `listing.go`: find/fd paths, ls -l, ls -R, tree, du; grouped by directory
+  and extension; own summary (files, directories, size, extensions,
+  largest); tree's own count wins.
+- Detection order: http, tests, json, diff, listing, logs.
+- An independent review of 0.4 found: diff lines outside files dropped
+  uncounted, combined diffs, hunks folded by their first 200 lines,
+  generated files swallowing a shared change, HTTP history keyed by
+  position and by whole JSON clusters, status lines and curl lines inside
+  bodies, pip freeze read as a listing, tree leaf directories. A second
+  pass found combined hunks ending in deletions, "@" paths, and notes on
+  Items groups. All fixed, each with a test (`review04_test.go`, inputs in
+  `testdata/review04`). History follows the innermost error fields
+  (`innermost`), for JSON documents too.
+
 The approved plan named a pure-Go SQLite for the store. Cloud sessions can't
 download Go modules, so v0.1.0 uses a plain file store instead (the same
 behaviour for references; no dependencies). Run history in 0.2 stays in
@@ -146,7 +176,7 @@ front end, not the headline.
    server (stdio; tools reduce, run, expand, history). Done when CLI, HTTP and
    MCP give the same results on the whole corpus (done in v0.3.0).
 4. 0.4: adapters for Git diffs, HTTP responses and directory listings, each
-   passing the same promise tests.
+   passing the same promise tests (done in v0.4.0).
 
 Out of scope: language models, embeddings, summarising prose, log shipping
 pipelines, a hosted service.
@@ -156,7 +186,8 @@ subdomain): the engine compiled to WebAssembly (`cmd/abbreviatory-wasm`),
 built by `scripts/build-demo.sh` into the site repo's `static/demo/`. Rebuild
 and push it to the site after each release.
 
-Next session starts at 0.4, when the owner says go.
+The approved plan is done with v0.4.0. What comes next is to be decided with
+the owner.
 
 ## Test results
 
@@ -178,5 +209,6 @@ Abbreviatory.com is in `photozeitgeist/abbreviatory.com`: the Hugo Launch
 template copied unchanged, with content and config values only. Pages: about,
 contact (info@abbreviatory.com), quick start, download, reference. Posts: the
 launch, a plain-language explainer of context reduction, how it was tested
-(before and after examples from `test/results/examples/`), the name, and the
-0.2 release (run history). Images are drawn into static/images. Every number comes from `test/results/`.
+(before and after examples from `test/results/examples/`), the name, the 0.2
+release (run history), the 0.3 release (MCP server and demo) and the 0.4
+release (diffs, HTTP responses, listings). Images are drawn into static/images. Every number comes from `test/results/`.
