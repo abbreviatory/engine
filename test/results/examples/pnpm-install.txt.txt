@@ -1,0 +1,10 @@
+[abbreviatory] npm / pnpm output, 9 lines (507 B), ref 05c6ef338c19, shown whole
+ WARN  deprecated request@2.88.2: request has been deprecated, see https://github.com/request/request/issues/3142
+Progress: resolved 1, reused 0, downloaded 0, added 0
+ ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/left-pad-that-does-not-exist-abv: Not Found - 404
+
+This error happened while installing a direct dependency of /work/pnpmsample
+
+left-pad-that-does-not-exist-abv is not in the npm registry, or you have no permission to fetch it.
+
+No authorization header was set for the request.

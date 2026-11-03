@@ -384,7 +384,7 @@ source tree. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0, v0.2.0, v0.3.0 and v0.4.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go), [review04_test.go](review04_test.go)). In all, 105 Go tests pass (with 101 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.80GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 to v0.5.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go), [review04_test.go](review04_test.go), [review05_test.go](review05_test.go)). In all, 124 Go tests pass (with 185 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.30GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
@@ -400,14 +400,26 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 | junit-pytest.xml | pytest's JUnit report | 82,024 | 117 | 3,961 | 4.8% |
 | pytest-verbose.txt | pytest -v | 79,443 | 1,072 | 3,893 | 4.9% |
 | ls-recursive.txt | ls -lR of two Go packages | 18,879 | 344 | 1,833 | 9.7% |
+| maven-test.txt | mvn test with 4 failing tests | 13,607 | 203 | 3,924 | 29% |
 | pytest-short.txt | pytest | 7,479 | 169 | 3,898 | 52% |
+| cargo-test.txt | cargo test | 3,269 | 109 | 2,059 | 63% |
+| tsc-pretty.txt | tsc at a terminal | 2,227 | 51 | 1,689 | 76% |
+| cargo-build.txt | cargo build with 5 errors | 5,174 | 119 | 3,947 | 76% |
+| eslint.txt | eslint, 54 problems | 4,631 | 68 | 3,876 | 84% |
+| gradle-compile.txt | gradle build, javac errors | 4,634 | 94 | 3,965 | 86% |
+| maven-compile.txt | mvn compile, javac errors | 3,971 | 63 | 3,938 | 99% |
+| gradle-test.txt | gradle test | 2,550 | 66 | 2,629 | shown whole |
 | gotest-short.txt | go test | 1,735 | 35 | 1,815 | shown whole |
+| npm-install.txt | npm install | 1,450 | 19 | 1,533 | shown whole |
+| npm-conflict.txt | npm install, dependency conflict | 875 | 21 | 957 | shown whole |
 | http-verbose-404.txt | curl -v of a 404 | 788 | 30 | 854 | shown whole |
+| tsc.txt | tsc in CI | 649 | 8 | 739 | shown whole |
 | http-redirect.txt | curl -i through a redirect | 583 | 28 | 649 | shown whole |
+| pnpm-install.txt | pnpm install, a missing package | 507 | 9 | 588 | shown whole |
 
-The last three are small enough that the whole input fits the budget, so they are shown whole with a one-line header.
+The ones marked shown whole fit the budget, so they come back whole with a one-line header. Build output from a small project is short already; at the default budget it mostly loses its progress lines and repeated notes, and at smaller budgets each error keeps its file and line in the head.
 
-A generated log of 1,107 MB (12.5 million lines) streamed through in 181.8 seconds with a peak heap of 10.9 MB
+A generated log of 1,107 MB (12.5 million lines) streamed through in 106.2 seconds with a peak heap of 15.9 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in

@@ -1,0 +1,71 @@
+[abbreviatory] cargo / rustc output, 119 lines (5.2 kB), ref 905ded08dbb8
+lines: 82 error, 24 warn, 13 other; 15 distinct messages
+runner: warning: `ledger` (bin "ledger") generated 4 warnings
+ERRORS (6 kinds, 82 lines):
+- error[E0425]: cannot find value `currency` in this scope at src/main.rs:12:27 [ref 905ded08dbb8:g1]
+      --> src/main.rs:12:27
+       |
+    12 |     report::print(&moved, currency);
+       |                           ^^^^^^^^ not found in this scope
+- error[E0308]: mismatched types at src/parse.rs:12:26 [ref 905ded08dbb8:g4]
+      --> src/parse.rs:12:26
+       |
+    12 |         let cents: i64 = parts[1].parse();
+       |                    ---   ^^^^^^^^^^^^^^^^ expected `i64`, found `Result<_, _>`
+       |                    |
+    ... (4 lines left out)
+    help: consider using `Result::expect` to unwrap the `Result<_, _>` value, panicking if the value is a `Result::Err`
+       |
+    12 |         let cents: i64 = parts[1].parse().expect("REASON");
+       |                                          +++++++++++++++++
+- error[E0308]: mismatched types at src/parse.rs:13:70 [ref 905ded08dbb8:g5]
+      --> src/parse.rs:13:70
+       |
+    13 |         out.push(Entry { account: parts[0].to_string(), cents, memo: parts[2] });
+    ... (3 lines left out)
+       |
+    13 |         out.push(Entry { account: parts[0].to_string(), cents, memo: parts[2].to_string() });
+       |                                                                              ++++++++++++
+- error[E0277]: a value of type `u64` cannot be made by summing an iterator over elements of type `i64` at src/report.rs:5:37 [ref 905ded08dbb8:g6]
+     --> src/report.rs:5:37
+      |
+    5 |     entries.iter().map(|e| e.cents).sum()
+    ... (21 lines left out)
+    note: required by a bound in `std::iter::Iterator::sum`
+     --> /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/iter/traits/iterator.rs:3669:4
+      = note: this error originates in the macro `integer_sum_product` (in Nightly builds, run with -Z macro-backtrace for more info)
+- error[E0277]: cannot add `&str` to `u64` at src/main.rs:9:24 [ref 905ded08dbb8:g7]
+     --> src/main.rs:9:24
+      |
+    9 |     println!("{}", sum + "1");
+    ... (17 lines left out)
+      |
+      = note: in this macro invocation
+      = note: this error originates in the macro `forward_ref_binop` which comes from the expansion of the macro `add_impl` (in Nightly builds, run with -Z macro-backtrace for more info)
+- error: could not compile `ledger` (bin "ledger") due to 5 previous errors; 4 warnings emitted [ref 905ded08dbb8:g14]
+WARNINGS (4 kinds, 24 lines):
+- warning: unused import: `std::collections::HashMap` at src/report.rs:2:5 [ref 905ded08dbb8:g3]
+     --> src/report.rs:2:5
+      |
+    2 | use std::collections::HashMap;
+      |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+      |
+      = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+- warning: unused variable: `y` at src/parse.rs:18:40 [ref 905ded08dbb8:g8]
+      --> src/parse.rs:18:40
+       |
+    18 | pub fn unused_one(x: i32) -> i32 { let y = 1; x }
+       |                                        ^ help: if this is intentional, prefix it with an underscore: `_y`
+       |
+       = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+- warning: unused variable: `y` at src/parse.rs:19:40 [ref 905ded08dbb8:g9]
+      --> src/parse.rs:19:40
+       |
+    19 | pub fn unused_two(x: i32) -> i32 { let y = 2; x }
+       |                                        ^ help: if this is intentional, prefix it with an underscore: `_y`
+- warning: unused variable: `y` at src/parse.rs:20:42 [ref 905ded08dbb8:g10]
+      --> src/parse.rs:20:42
+       |
+    20 | pub fn unused_three(x: i32) -> i32 { let y = 3; x }
+       |                                          ^ help: if this is intentional, prefix it with an underscore: `_y`
+not shown: 13 info lines (5 kinds) [ref 905ded08dbb8:info]

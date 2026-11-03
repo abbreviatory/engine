@@ -1,0 +1,68 @@
+[abbreviatory] Gradle output, 94 lines (4.6 kB), ref c70b1a28e676
+lines: 52 error, 20 warn, 22 other; 23 distinct messages
+runner: BUILD FAILED in 751ms
+ERRORS (4 kinds, 52 lines):
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:8 error: incompatible types: possible lossy conversion from long to int [ref c70b1a28e676:g7]
+    int discount = coupon.length() > 0 ? 100L : 0;
+                                       ^
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:9 error: cannot find symbol [ref c70b1a28e676:g8]
+          return total - discount + shipping(cart);
+                                    ^
+    symbol:   method shipping(Cart)
+    location: class Checkout
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:21 error: cannot find symbol [ref c70b1a28e676:g9]
+          return cart.totl();
+                     ^
+    symbol:   method totl()
+    location: variable cart of type Cart
+- Execution failed for task ':compileJava'. [ref c70b1a28e676:g14]
+    > Compilation failed; see the compiler output below.
+      /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14: warning: [deprecation] format(long) in Money has been deprecated
+              return Money.format(total());
+                          ^
+      /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:8: error: incompatible types: possible lossy conversion from long to int
+              int discount = coupon.length() > 0 ? 100L : 0;
+                                                 ^
+      /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: List
+          private final List items = new ArrayList();
+                        ^
+        missing type arguments for generic class List<E>
+        where E is a type-variable:
+          E extends Object declared in interface List
+      /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: ArrayList
+    ... (9 lines left out)
+          E extends Object declared in interface List
+      /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:9: error: cannot find symbol
+              return total - discount + shipping(cart);
+                                        ^
+        symbol:   method shipping(Cart)
+        location: class Checkout
+      /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:21: error: cannot find symbol
+              return cart.totl();
+                         ^
+        symbol:   method totl()
+        location: variable cart of type Cart
+      3 errors
+      4 warnings
+WARNINGS (4 kinds, 20 lines):
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7 warning: [rawtypes] found raw type: List [ref c70b1a28e676:g3]
+      private final List items = new ArrayList();
+                    ^
+    missing type arguments for generic class List<E>
+    where E is a type-variable:
+      E extends Object declared in interface List
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7 warning: [rawtypes] found raw type: ArrayList [ref c70b1a28e676:g4]
+      private final List items = new ArrayList();
+                                     ^
+    missing type arguments for generic class ArrayList<E>
+    where E is a type-variable:
+      E extends Object declared in class ArrayList
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:10 warning: [unchecked] unchecked call to add(E) as a member of the raw type List [ref c70b1a28e676:g5]
+          items.add(sku + ":" + cents);
+                   ^
+    where E is a type-variable:
+      E extends Object declared in interface List
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14 warning: [deprecation] format(long) in Money has been deprecated [ref c70b1a28e676:g6]
+    return Money.format(total());
+                ^
+not shown: 22 info lines (15 kinds) [ref c70b1a28e676:info]

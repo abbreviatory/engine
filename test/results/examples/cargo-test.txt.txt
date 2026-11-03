@@ -1,0 +1,33 @@
+[abbreviatory] cargo test output, 109 lines (3.3 kB), ref ad4c38e1cbfc
+tests: 61 passed, 4 failed, 1 skipped; 1 error
+runner: test result: FAILED. 61 passed; 4 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+FAILED (4):
+- tests::negative_amounts - index out of bounds: the len is 0 but the index is 0 [ref ad4c38e1cbfc:g70]
+    thread 'tests::negative_amounts' (2358) panicked at src/lib.rs:345:21:
+    index out of bounds: the len is 0 but the index is 0
+    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+- tests::parses_one_digit_cents - assertion `left == right` failed [ref ad4c38e1cbfc:g71]
+    thread 'tests::parses_one_digit_cents' (2420) panicked at src/lib.rs:329:9:
+    assertion `left == right` failed
+      left: 105
+     right: 150
+- tests::parses_comma - called `Result::unwrap()` on an `Err` value: "bad amount \"1,50\": invalid digit found in string" [ref ad4c38e1cbfc:g72]
+    thread 'tests::parses_comma' (2419) panicked at src/lib.rs:324:40:
+    called `Result::unwrap()` on an `Err` value: "bad amount \"1,50\": invalid digit found in string"
+- tests::rounds_half_up - assertion `left == right` failed [ref ad4c38e1cbfc:g73]
+    thread 'tests::rounds_half_up' (2422) panicked at src/lib.rs:334:9:
+    assertion `left == right` failed
+      left: 10
+     right: 20
+ERRORS (1):
+- error: test failed, to rerun pass `--lib` [ref ad4c38e1cbfc:g69]
+OTHER (12):
+- x5 (blank line) [ref ad4c38e1cbfc:g3]
+- x2 failures: [ref ad4c38e1cbfc:g67]
+-    Compiling money v0.1.0 (/work/test/fixtures/src/rustsample/tests) [ref ad4c38e1cbfc:g0]
+-     Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s [ref ad4c38e1cbfc:g1]
+-      Running unittests src/lib.rs (target/debug/deps/money-03ca40f40b1a9b08) [ref ad4c38e1cbfc:g2]
+- running 66 tests [ref ad4c38e1cbfc:g4]
+- test result: FAILED. 61 passed; 4 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s [ref ad4c38e1cbfc:g68]
+not shown: 61 passed tests [ref ad4c38e1cbfc:pass]
+not shown: 1 skipped test [ref ad4c38e1cbfc:skip]

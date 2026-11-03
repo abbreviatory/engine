@@ -1,0 +1,48 @@
+[abbreviatory] Maven output, 63 lines (4.0 kB), ref f7807a8cf725
+lines: 15 error, 6 warn, 42 other; 37 distinct messages
+runner: BUILD FAILURE
+ERRORS (4 kinds, 15 lines):
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:8:44 error: incompatible types: possible lossy conversion from long to int [ref f7807a8cf725:g23]
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:9:35 error: cannot find symbol [ref f7807a8cf725:g24]
+    symbol:   method shipping(shop.Cart)
+    location: class shop.Checkout
+- /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:21:20 error: cannot find symbol [ref f7807a8cf725:g25]
+    symbol:   method totl()
+    location: variable cart of type shop.Cart
+- Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project shop: Compilation failure: Compilation failure: [ref f7807a8cf725:g31]
+    [ERROR] /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:[8,44] incompatible types: possible lossy conversion from long to int
+    [ERROR] /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:[9,35] cannot find symbol
+    [ERROR]   symbol:   method shipping(shop.Cart)
+    [ERROR]   location: class shop.Checkout
+    [ERROR] /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:[21,20] cannot find symbol
+    [ERROR]   symbol:   method totl()
+    [ERROR]   location: variable cart of type shop.Cart
+WARNINGS (4 kinds, 6 lines):
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7:19 warning: found raw type: java.util.List [ref f7807a8cf725:g17]
+    missing type arguments for generic class java.util.List<E>
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7:36 warning: found raw type: java.util.ArrayList [ref f7807a8cf725:g18]
+    missing type arguments for generic class java.util.ArrayList<E>
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:10:18 warning: unchecked call to add(E) as a member of the raw type java.util.List [ref f7807a8cf725:g19]
+- /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14:21 warning: format(long) in shop.Money has been deprecated [ref f7807a8cf725:g20]
+OTHER (29 kinds, 42 lines):
+- x7 (blank line) [ref f7807a8cf725:g1]
+- x6 [INFO] ------------------------------------------------------------- [ref f7807a8cf725:g15]
+- x3 [INFO] ------------------------------------------------------------------------ [ref f7807a8cf725:g27]
+- [INFO] Scanning for projects... [ref f7807a8cf725:g0]
+- [INFO] -----------------------------< shop:shop >------------------------------ [ref f7807a8cf725:g2]
+- [INFO] Building shop 1.0 [ref f7807a8cf725:g3]
+- [INFO]   from pom.xml [ref f7807a8cf725:g4]
+- [INFO] --------------------------------[ jar ]--------------------------------- [ref f7807a8cf725:g5]
+- [INFO] --- clean:3.2.0:clean (default-clean) @ shop --- [ref f7807a8cf725:g6]
+- [INFO] Deleting /work/test/fixtures/src/javasample/target [ref f7807a8cf725:g7]
+- [INFO] --- build-helper:3.6.0:add-source (default) @ shop --- [ref f7807a8cf725:g8]
+- [INFO] Source directory: /work/test/fixtures/src/javasample/src/broken/java added. [ref f7807a8cf725:g9]
+- [INFO] --- resources:3.4.0:resources (default-resources) @ shop --- [ref f7807a8cf725:g10]
+- [INFO] skip non existing resourceDirectory /work/test/fixtures/src/javasample/src/main/resources [ref f7807a8cf725:g11]
+- [INFO] --- compiler:3.13.0:compile (default-compile) @ shop --- [ref f7807a8cf725:g12]
+- [INFO] Recompiling the module because of changed source code. [ref f7807a8cf725:g13]
+- [INFO] Compiling 3 source files with javac [debug release 17] to target/classes [ref f7807a8cf725:g14]
+- [WARNING] COMPILATION WARNING : [ref f7807a8cf725:g16]
+- [INFO] 4 warnings [ref f7807a8cf725:g21]
+- [ERROR] COMPILATION ERROR : [ref f7807a8cf725:g22]
+not shown: 9 info lines (9 kinds) [ref f7807a8cf725:info]

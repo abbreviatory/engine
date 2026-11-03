@@ -1,0 +1,52 @@
+[abbreviatory] TypeScript compiler output, 51 lines (2.2 kB), ref 6b043292ba0d, shown whole
+src/cart.ts:9:7 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+9   let sum: number = "0";
+        ~~~
+
+src/cart.ts:11:26 - error TS2339: Property 'quantity' does not exist on type 'Item'.
+
+11     sum += it.cents * it.quantity;
+                            ~~~~~~~~
+
+src/cart.ts:17:9 - error TS6133: 'unused' is declared but its value is never read.
+
+17   const unused = 1;
+           ~~~~~~
+
+src/cart.ts:18:51 - error TS2339: Property 'padStart' does not exist on type 'number'.
+
+18   return item.sku.toUpperCase() + " x" + item.qty.padStart(2);
+                                                     ~~~~~~~~
+
+src/cart.ts:21:43 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+21 export const sample: Item = { sku: "A-1", cents: "250", qty: 1 };
+                                             ~~~~~
+
+  src/cart.ts:4:3 - The expected type comes from property 'cents' which is declared here on type 'Item'
+    4   cents: number;
+        ~~~~~
+
+src/checkout.ts:6:20 - error TS18048: 'coupon' is possibly 'undefined'.
+
+6   const discount = coupon.length > 0 ? 100 : 0;
+                     ~~~~~~
+
+src/checkout.ts:7:43 - error TS2554: Expected 2 arguments, but got 3.
+
+7   return formatMoney(t - discount, "EUR", true);
+                                            ~~~~
+
+src/checkout.ts:11:44 - error TS2339: Property 'price' does not exist on type 'Item'.
+
+11   return items.map((i) => i.sku + ": " + i.price).join("\n");
+                                              ~~~~~
+
+
+Found 8 errors in 2 files.
+
+Errors  Files
+     5  src/cart.ts:9
+     3  src/checkout.ts:6
+

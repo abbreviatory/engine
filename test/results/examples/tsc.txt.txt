@@ -1,0 +1,9 @@
+[abbreviatory] TypeScript compiler output, 8 lines (649 B), ref 4b7fcc0d1e87, shown whole
+src/cart.ts(9,7): error TS2322: Type 'string' is not assignable to type 'number'.
+src/cart.ts(11,26): error TS2339: Property 'quantity' does not exist on type 'Item'.
+src/cart.ts(17,9): error TS6133: 'unused' is declared but its value is never read.
+src/cart.ts(18,51): error TS2339: Property 'padStart' does not exist on type 'number'.
+src/cart.ts(21,43): error TS2322: Type 'string' is not assignable to type 'number'.
+src/checkout.ts(6,20): error TS18048: 'coupon' is possibly 'undefined'.
+src/checkout.ts(7,43): error TS2554: Expected 2 arguments, but got 3.
+src/checkout.ts(11,44): error TS2339: Property 'price' does not exist on type 'Item'.

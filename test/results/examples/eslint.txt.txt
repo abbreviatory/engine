@@ -1,0 +1,36 @@
+[abbreviatory] ESLint output, 68 lines (4.6 kB), ref 71643a3918b4
+lines: 29 error, 25 warn, 14 other; 30 distinct messages
+runner: ✖ 54 problems (29 errors, 25 warnings)
+ERRORS (13 kinds, 29 lines):
+- /work/test/fixtures/src/jssample/src/money.js:12:12 error 'undefinedValue' is not defined (no-undef) [ref 71643a3918b4:g5]
+- /work/test/fixtures/src/jssample/src/orders.js:6:7 error 'count' is assigned a value but never used (no-unused-vars) [ref 71643a3918b4:g8]
+- x2 /work/test/fixtures/src/jssample/src/orders.js:10:20 error Expected '===' and instead saw '==' (eqeqeq) [ref 71643a3918b4:g10]
+- /work/test/fixtures/src/jssample/src/orders.js:18:9 error 'config' is assigned a value but never used (no-unused-vars) [ref 71643a3918b4:g13]
+- /work/test/fixtures/src/jssample/src/orders.js:18:37 error Duplicate key 'currency' (no-dupe-keys) [ref 71643a3918b4:g14]
+- /work/test/fixtures/src/jssample/src/orders.js:20:3 error Unreachable code (no-unreachable) [ref 71643a3918b4:g15]
+- /work/test/fixtures/src/jssample/src/orders.js:25:10 error 'rate' is not defined (no-undef) [ref 71643a3918b4:g16]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:6:7 error 'count' is assigned a value but never used (no-unused-vars) [ref 71643a3918b4:g19]
+- x6 /work/test/fixtures/src/jssample/src/orders1.js:10:20 error Expected '===' and instead saw '==' (eqeqeq) [ref 71643a3918b4:g21]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:18:9 error 'config' is assigned a value but never used (no-unused-vars) [ref 71643a3918b4:g24]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:18:37 error Duplicate key 'currency' (no-dupe-keys) [ref 71643a3918b4:g25]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:20:3 error Unreachable code (no-unreachable) [ref 71643a3918b4:g26]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:25:10 error 'rate' is not defined (no-undef) [ref 71643a3918b4:g27]
+WARNINGS (11 kinds, 25 lines):
+- x6 /work/test/fixtures/src/jssample/src/orders1.js:11:5 warning Unexpected console statement (no-console) [ref 71643a3918b4:g22]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:5:3 warning Unexpected var, use let or const instead (no-var) [ref 71643a3918b4:g18]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:6:7 warning 'count' is never reassigned. Use 'const' instead (prefer-const) [ref 71643a3918b4:g20]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js:17:7 warning 'label' is never reassigned. Use 'const' instead (prefer-const) [ref 71643a3918b4:g23]
+- x2 /work/test/fixtures/src/jssample/src/money.js:2:3 warning Unexpected var, use let or const instead (no-var) [ref 71643a3918b4:g2]
+- x2 /work/test/fixtures/src/jssample/src/money.js:4:3 warning Unexpected console statement (no-console) [ref 71643a3918b4:g3]
+- x2 /work/test/fixtures/src/jssample/src/orders.js:11:5 warning Unexpected console statement (no-console) [ref 71643a3918b4:g11]
+- /work/test/fixtures/src/jssample/src/money.js:9:7 warning 'value' is never reassigned. Use 'const' instead (prefer-const) [ref 71643a3918b4:g4]
+- /work/test/fixtures/src/jssample/src/orders.js:5:3 warning Unexpected var, use let or const instead (no-var) [ref 71643a3918b4:g7]
+- /work/test/fixtures/src/jssample/src/orders.js:6:7 warning 'count' is never reassigned. Use 'const' instead (prefer-const) [ref 71643a3918b4:g9]
+- /work/test/fixtures/src/jssample/src/orders.js:17:7 warning 'label' is never reassigned. Use 'const' instead (prefer-const) [ref 71643a3918b4:g12]
+OTHER (6 kinds, 14 lines):
+- x7 (blank line) [ref 71643a3918b4:g0]
+- x3 /work/test/fixtures/src/jssample/src/orders1.js [ref 71643a3918b4:g17]
+- /work/test/fixtures/src/jssample/src/money.js [ref 71643a3918b4:g1]
+- /work/test/fixtures/src/jssample/src/orders.js [ref 71643a3918b4:g6]
+- ✖ 54 problems (29 errors, 25 warnings) [ref 71643a3918b4:g28]
+not shown: 1 info line (1 kind) [ref 71643a3918b4:info]

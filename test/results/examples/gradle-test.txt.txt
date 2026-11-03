@@ -1,0 +1,67 @@
+[abbreviatory] Gradle output, 66 lines (2.5 kB), ref 7f83b986c514, shown whole
+> Task :clean
+
+> Task :compileJava
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: List
+    private final List items = new ArrayList();
+                  ^
+  missing type arguments for generic class List<E>
+  where E is a type-variable:
+    E extends Object declared in interface List
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: ArrayList
+    private final List items = new ArrayList();
+                                   ^
+  missing type arguments for generic class ArrayList<E>
+  where E is a type-variable:
+    E extends Object declared in class ArrayList
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:10: warning: [unchecked] unchecked call to add(E) as a member of the raw type List
+        items.add(sku + ":" + cents);
+                 ^
+  where E is a type-variable:
+    E extends Object declared in interface List
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14: warning: [deprecation] format(long) in Money has been deprecated
+        return Money.format(total());
+                    ^
+4 warnings
+
+> Task :processResources NO-SOURCE
+> Task :classes
+> Task :compileTestJava
+> Task :processTestResources NO-SOURCE
+> Task :testClasses
+
+> Task :test FAILED
+
+MoneyTest > parsesComma FAILED
+    java.lang.NumberFormatException at MoneyTest.java:50
+
+MoneyTest > cartTotal FAILED
+    java.lang.NumberFormatException at MoneyTest.java:58
+
+MoneyTest > roundsHalfUp FAILED
+    java.lang.AssertionError at MoneyTest.java:52
+
+MoneyTest > parsesOneDigitCents FAILED
+    java.lang.AssertionError at MoneyTest.java:51
+
+46 tests completed, 4 failed, 1 skipped
+
+[Incubating] Problems report is available at: file:///work/test/fixtures/src/javasample/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///work/test/fixtures/src/javasample/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1s
+4 actionable tasks: 4 executed
