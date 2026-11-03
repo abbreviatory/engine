@@ -12,8 +12,9 @@ has the procedure and the checks to run afterwards.
 
 ## Where things stand
 
-v0.4.0 (October 2026) adds adapters for diffs, HTTP responses and directory
-listings, v0.3.0 the HTTP service and the MCP server, v0.2.0 run history (all
+v0.5.0 (November 2026) adds the build family (cargo, cargo test, tsc,
+ESLint, Gradle, Maven, npm/pnpm), v0.4.0 adapters for diffs, HTTP responses
+and directory listings, v0.3.0 the HTTP service and the MCP server, v0.2.0 run history (all
 below). v0.1.0 was the first
 release: Apache 2.0, CI on Linux and macOS plus a Windows smoke check, and automated releases with smoke-tested binaries
 for Linux, macOS and Windows. Pure Go, standard library only, no cgo.
@@ -222,8 +223,21 @@ run) and a GitHub Action wrapping `run` with the cache and the step summary.
 
 Steps:
 1. [x] Phase A adapters, fixtures, tests, README, reference
-2. [ ] Maven fixture from CI; independent review (two rounds), fixes; record-tests.sh
-3. [ ] release 0.5.0; demo; site post and pages; softdevstudio note; softdev-plan.md
+2. [x] Maven fixture from CI; independent review (two rounds: 11 defects,
+       then 6), fixes with failing-first tests (review05_test.go,
+       testdata/review05); record-tests.sh (124 tests, 185 subtests; run it
+       with cgo on, the race step needs it)
+3. [x] release 0.5.0 (fee69d5, run 41740524168; Linux binary checked);
+       demo with build samples (build-demo.sh keeps the site's copy of Go's
+       licence when GOROOT has none, as on Debian's Go); abbreviatory.com post
+       4b21b4d, Cloudflare green; softdevstudio note 045d4c3; softdev-plan.md
+
+Things to keep in mind from 0.5: detection cleans ANSI first (cleanLines);
+Maven is tried before JSON and needs a Maven-only line; input that starts
+with "[" and isn't JSON is tried for build tools before logs; history uses
+test words only for test runners, Gradle and Maven (tracksTests); Gradle
+and Maven test IDs carry the task or module, and unnamed passes are
+claimed only for tasks or modules that ran tests (ranPackages).
 4. [ ] Phase B
 
 ## Test results
