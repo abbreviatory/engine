@@ -33,6 +33,7 @@ type request struct {
 	Keep     []string
 	NoStore  bool
 	Full     bool
+	Warnings bool   // compare warnings with the last run too
 	Key      string // a history to compare with and record in
 	Command  string // the command that printed the input, when known
 	Exit     *int   // its exit status
@@ -61,7 +62,7 @@ func (q request) options() (abbreviatory.Options, error) {
 	if err := abbreviatory.CheckFormat(q.Format); err != nil {
 		return abbreviatory.Options{}, &usageError{err.Error()}
 	}
-	opt := abbreviatory.Options{Format: q.Format, Budget: q.Budget, NoRefs: q.NoStore, Full: q.Full, Command: q.Command, Exit: q.Exit}
+	opt := abbreviatory.Options{Format: q.Format, Budget: q.Budget, NoRefs: q.NoStore, Full: q.Full, Warnings: q.Warnings, Command: q.Command, Exit: q.Exit}
 	preserve := "errors,failures,warnings"
 	if q.Preserve != nil {
 		preserve = *q.Preserve
@@ -135,7 +136,7 @@ func deltaJSON(d *abbreviatory.Delta) map[string]any {
 		}
 		return out
 	}
-	return map[string]any{
+	out := map[string]any{
 		"since":     d.Since,
 		"identical": d.Identical,
 		"unchanged": d.Unchanged,
@@ -147,6 +148,11 @@ func deltaJSON(d *abbreviatory.Delta) map[string]any {
 		"still":     d.Still,
 		"longest":   d.Longest,
 	}
+	if d.WarnCompared {
+		out["new_warnings"] = items(d.NewWarnings)
+		out["gone_warnings"] = items(d.GoneWarnings)
+	}
+	return out
 }
 
 // core holds where the store is.

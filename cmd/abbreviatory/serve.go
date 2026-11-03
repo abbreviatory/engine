@@ -294,7 +294,7 @@ func (j *jsonErrors) Write(p []byte) (int, error) {
 }
 
 // requestFromQuery reads a reduction's options from the query string:
-// format, budget, preserve, keep (repeatable), key, full, no_store, command
+// format, budget, preserve, keep (repeatable), key, full, warnings, no_store, command
 // and exit, as the command line's flags.
 func requestFromQuery(r *http.Request) (request, error) {
 	v := r.URL.Query()
@@ -311,6 +311,9 @@ func requestFromQuery(r *http.Request) (request, error) {
 		q.Preserve = &p
 	}
 	var err error
+	if q.Warnings, err = boolParam(v.Get("warnings")); err != nil {
+		return q, usagef("warnings: %v", err)
+	}
 	if q.Full, err = boolParam(v.Get("full")); err != nil {
 		return q, usagef("full: %v", err)
 	}

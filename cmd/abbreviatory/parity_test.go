@@ -301,11 +301,20 @@ func TestFrontEndsAgree(t *testing.T) {
 		other := filepath.Join(t.TempDir(), name)
 		os.WriteFile(other, everyThirdLineDropped(data), 0o600)
 		key := "parity " + name
+		// Every other fixture compares warnings too.
+		warn := histories%2 == 1
 		for i, p := range []string{path, other, other, path} {
-			cli := f.cliReduce(p, "-key", key, "-budget", "2048")
+			flags := []string{"-key", key, "-budget", "2048"}
 			q := url.Values{"key": {key}, "budget": {"2048"}}
+			args := map[string]any{"path": p, "key": key, "budget": 2048}
+			if warn {
+				flags = append(flags, "-warnings")
+				q.Set("warnings", "true")
+				args["warnings"] = true
+			}
+			cli := f.cliReduce(p, flags...)
 			web := f.httpReduce(p, q)
-			m := f.mcpCall("reduce", map[string]any{"path": p, "key": key, "budget": 2048})
+			m := f.mcpCall("reduce", args)
 			viaMCP := m["structuredContent"].(map[string]any)
 			if !reflect.DeepEqual(cli, web) || !reflect.DeepEqual(cli, viaMCP) {
 				t.Fatalf("%s, run %d: the front ends differ\ncli:  %v\nhttp: %v\nmcp:  %v", name, i+1, cli["delta"], web["delta"], viaMCP["delta"])

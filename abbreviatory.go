@@ -71,6 +71,10 @@ type Options struct {
 	// Full keeps the whole report when nothing changed since the last run;
 	// otherwise that report is one line.
 	Full bool
+	// Warnings compares warnings with the last run too: the report lists
+	// the warnings that are new since then and counts those that are gone.
+	// The last run must have been tracked with Warnings for a comparison.
+	Warnings bool
 	// Command and Exit describe the command that printed the input, when
 	// known; they are kept in the run record and Exit is shown.
 	Command string
@@ -364,6 +368,9 @@ func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[
 		}
 	}
 	d := computeDelta(opt.History, cur, bad, good, passNames, tests)
+	if opt.Warnings && rules.warnings {
+		compareWarnings(opt.History, cur, warnItems(groups), d)
+	}
 	res.Run, res.Delta = cur, d
 
 	if d.Unchanged && !opt.Full {

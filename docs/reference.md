@@ -36,6 +36,7 @@ expression, a budget under 512).
 | `-no-store` | off | don't store the original; the output then has no references |
 | `-key NAME` | | keep a run history under NAME and report what changed since the last run |
 | `-full` | off | with a history, print the whole report even when nothing changed |
+| `-warnings` | off | with a history, compare warnings with the last run too: new ones are listed, those gone counted |
 | `-store DIR` | see below | where originals and histories are stored |
 
 With `-json` the object has `version`, `format`, `family`, `ref` (left out with
@@ -44,7 +45,8 @@ kind), `lines` (input lines by kind) and `text` (the reduction, within the
 budget). With a history it also has `run` (this run's number) and `delta`:
 `since`, `identical`, `unchanged`, `failing`, `new`, `fixed`, `not_run` and
 `flaky` (lists of `{head, ref}`, flaky ones with `now`, `changes` and
-`window`), `still` and `longest`. From `run` it also has `exit`, the
+`window`), `still` and `longest`; with `-warnings`, once the last run had
+them too, `new_warnings` and `gone_warnings` (lists of `{head, ref}`). From `run` it also has `exit`, the
 command's exit status, and `warnings` lists any warnings (an original that
 couldn't be stored, a history that couldn't be read).
 
@@ -89,7 +91,7 @@ history).
 
 | Request | Answer |
 |---|---|
-| `POST /reduce` | The body is the input. Query parameters: `format`, `budget`, `preserve` (present and empty for nothing), `keep` (repeatable), `key`, `full`, `no_store`, and `command` and `exit` to record with the run. The answer is the JSON of `reduce -json`; with `Accept: text/plain` the report alone, warnings in `Abbreviatory-Warning` headers |
+| `POST /reduce` | The body is the input. Query parameters: `format`, `budget`, `preserve` (present and empty for nothing), `keep` (repeatable), `key`, `full`, `warnings`, `no_store`, and `command` and `exit` to record with the run. The answer is the JSON of `reduce -json`; with `Accept: text/plain` the report alone, warnings in `Abbreviatory-Warning` headers |
 | `GET /expand/{ref}` | The original bytes, as `application/octet-stream`; a JSON pointer's slashes may stay as they are |
 | `GET /runs` | The histories, as `history -json` lists them (or as text with `Accept: text/plain`) |
 | `GET /runs/{key}` | One history's runs; the key percent-encoded, a part of it matching one key works |
@@ -124,8 +126,8 @@ JSON of the command line's `-json` as structured content.
 | `expand` | `ref`; `max_bytes` (default 4 MB, up to 64 MB; a larger part is refused with a hint to expand a smaller one) |
 | `history` | `key`, or none for the list |
 
-The options are `format`, `budget`, `preserve`, `keep` (an array), `full` and
-`no_store`, as the flags. `run` starts the command in a process group of its
+The options are `format`, `budget`, `preserve`, `keep` (an array), `full`,
+`warnings` and `no_store`, as the flags. `run` starts the command in a process group of its
 own; at the time limit, when the client cancels the request
 (`notifications/cancelled`), or when the server stops (its input ends, or it
 gets SIGINT or SIGTERM), the group gets SIGTERM and, 5 seconds later,
@@ -376,6 +378,16 @@ the report is one line: the header, the run number and "no change since run
 N", or "identical to run N" when the input is byte for byte the same, with
 how many failures there are. `-full` gives the whole report instead, with
 "no change" in its summary line.
+
+With `-warnings` the warnings the report preserves are compared too, each
+known by its text with numbers aside (like a log error). Warnings new since
+the last run are listed under the summary line (`new warning: ...`) and
+marked `(new)`, first among the warnings; those gone are listed as `warning
+gone: ...` with a reference into the last run. Either makes the run a change,
+so the one-line report needs the same warnings as well as the same failures.
+A run records its warnings only with `-warnings`, so the comparison starts
+with the second such run. With `-preserve` leaving warnings out there are
+none to compare.
 
 A history keeps the last 50 runs of its key. The last 10 keep their failures
 and the names of the tests that passed, which flaky detection needs; older

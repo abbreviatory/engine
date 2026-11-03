@@ -1,0 +1,282 @@
+name: Abbreviatory
+description: Run a test, build or lint command, write a short report of what it printed to the job summary, and say what changed since the last run.
+author: abbreviatory.com
+branding:
+  icon: minimize-2
+  color: blue
+
+inputs:
+  run:
+    description: The command to run, as one shell command line (run with bash, so pipes and && work). Its exit status is the step's.
+    required: true
+  working-directory:
+    description: Folder to run the command in.
+    required: false
+    default: "."
+  key:
+    description: Name of the run history. Empty means one made from the working directory and the command. Give each command of a job its own key when two share a command line.
+    required: false
+    default: ""
+  budget:
+    description: Most bytes of the report.
+    required: false
+    default: "4096"
+  format:
+    description: "Input format: auto, test-output, build, logs, json, or a format name (abbreviatory formats)."
+    required: false
+    default: auto
+  keep:
+    description: Lines matching these regular expressions are kept too, one expression per line.
+    required: false
+    default: ""
+  warnings:
+    description: Compare warnings with the last run too, listing new ones.
+    required: false
+    default: "false"
+  full:
+    description: Write the whole report even when nothing changed since the last run (otherwise that report is one line).
+    required: false
+    default: "false"
+  summary:
+    description: Append the report to the job summary.
+    required: false
+    default: "true"
+  cache:
+    description: Keep the run history and the originals in the Actions cache between runs. Without it every run is run 1.
+    required: false
+    default: "true"
+  cache-key:
+    description: Start of the cache key. Empty means abbreviatory-<job id>. In a matrix, put the matrix values in it (such as abbreviatory-go1.26), or the matrix jobs share one history.
+    required: false
+    default: ""
+  fail:
+    description: Fail the step when the command fails. Set to false to report only.
+    required: false
+    default: "true"
+  version:
+    description: "Abbreviatory release to use (v0.6.0 or later), or latest. Empty means the release of the action's own code: the vX.Y.Z tag it's used at, or else the version its abbreviatory.go names."
+    required: false
+    default: ""
+  abbreviatory-path:
+    description: Folder holding an abbreviatory binary to use instead of downloading one (for testing the action itself).
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: The command's exit status.
+    value: ${{ steps.run.outputs.exit-code }}
+  result:
+    description: pass or fail (the command's exit status was 0 or not)
+    value: ${{ steps.run.outputs.result }}
+  new:
+    description: How many failures and errors are new since the last run.
+    value: ${{ steps.run.outputs.new }}
+  fixed:
+    description: How many failures and errors of the last run are fixed or gone.
+    value: ${{ steps.run.outputs.fixed }}
+  failing:
+    description: How many distinct failures and errors this run has.
+    value: ${{ steps.run.outputs.failing }}
+  report:
+    description: The report as a text file.
+    value: ${{ steps.run.outputs.report }}
+  json:
+    description: The report and its counts as JSON (abbreviatory run -json).
+    value: ${{ steps.run.outputs.json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Abbreviatory
+      id: install
+      shell: bash
+      env:
+        AB_VERSION: ${{ inputs.version }}
+        AB_PATH: ${{ inputs.abbreviatory-path }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        set -euo pipefail
+        ACTION_REF="${ACTION_REF:-${GITHUB_ACTION_REF:-}}"
+        if [ -n "$AB_PATH" ]; then
+          echo "dir=$AB_PATH" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        if [ -z "$AB_VERSION" ]; then
+          if [[ "$ACTION_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            AB_VERSION="$ACTION_REF"
+          else
+            # Pinned by commit or a moving ref: the version in the action's
+            # own code, so the binary matches this action.yml. Older than
+            # 0.6.0 lacks -warnings, which this action passes.
+            v=$(sed -n 's/^const Version = "\([0-9]*\.[0-9]*\.[0-9]*\)"$/\1/p' "$GITHUB_ACTION_PATH/abbreviatory.go" 2>/dev/null || true)
+            if [ -n "$v" ] && [ "$(printf '0.6.0\n%s\n' "$v" | sort -V | head -n 1)" = 0.6.0 ]; then AB_VERSION="v$v"; else AB_VERSION=latest; fi
+            FALLBACK=latest
+          fi
+        fi
+        echo "Abbreviatory $AB_VERSION"
+        case "$RUNNER_OS" in
+          Linux) os=linux ;; macOS) os=darwin ;; Windows) os=windows ;;
+          *) echo "::error::Abbreviatory has no build for $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64) arch=amd64 ;; ARM64) arch=arm64 ;;
+          *) echo "::error::Abbreviatory has no build for $RUNNER_ARCH"; exit 1 ;;
+        esac
+        if [ "$os" = windows ] && [ "$arch" != amd64 ]; then echo "::error::Abbreviatory has no Windows $arch build"; exit 1; fi
+        ext=tar.gz; [ "$os" = windows ] && ext=zip
+        name="abbreviatory_${os}_${arch}.${ext}"
+        if [ "$AB_VERSION" = latest ]; then
+          base="https://github.com/abbreviatory/engine/releases/latest/download"
+        else
+          base="https://github.com/abbreviatory/engine/releases/download/${AB_VERSION}"
+        fi
+        dir="$RUNNER_TEMP/abbreviatory-bin"
+        mkdir -p "$dir"
+        cd "$dir"
+        if ! curl -fsSL --retry 3 -o "$name" "$base/$name"; then
+          # A version named in abbreviatory.go whose release isn't out yet
+          # (main between a version bump and its release): the latest one.
+          if [ "${FALLBACK:-}" = latest ] && [ "$AB_VERSION" != latest ]; then
+            echo "::warning::Abbreviatory $AB_VERSION isn't released; using the latest release"
+            AB_VERSION=latest
+            base="https://github.com/abbreviatory/engine/releases/latest/download"
+            curl -fsSL --retry 3 -o "$name" "$base/$name" || { echo "::error::could not download $base/$name"; exit 1; }
+          else
+            echo "::error::could not download $base/$name"; exit 1
+          fi
+        fi
+        curl -fsSL --retry 3 -o SHA256SUMS "$base/SHA256SUMS" || { echo "::error::could not download SHA256SUMS"; exit 1; }
+        want=$(awk -v n="$name" '$2==n || $2=="*"n {print $1}' SHA256SUMS)
+        if command -v sha256sum >/dev/null; then got=$(sha256sum "$name" | cut -d' ' -f1); else got=$(shasum -a 256 "$name" | cut -d' ' -f1); fi
+        if [ -z "$want" ] || [ "$want" != "$got" ]; then echo "::error::$name does not match SHA256SUMS"; exit 1; fi
+        if [ "$ext" = zip ]; then unzip -oq "$name"; else tar -xzf "$name"; fi
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+
+    - name: Cache settings
+      id: settings
+      shell: bash
+      env:
+        IN_KEY: ${{ inputs.cache-key }}
+        IN_HKEY: ${{ inputs.key }}
+        IN_RUN: ${{ inputs.run }}
+        IN_WD: ${{ inputs.working-directory }}
+        JOB: ${{ github.job }}
+        REF: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+        case "$IN_KEY$REF" in *$'\n'*|*$'\r'*) echo "::error::cache-key can't hold line breaks"; exit 1 ;; esac
+        # Each use of the action keeps its own store and cache, so two in one
+        # job don't overwrite each other's history when restoring.
+        if command -v sha256sum >/dev/null; then sum=sha256sum; else sum="shasum -a 256"; fi
+        id=$(printf '%s\n%s\n%s\n%s' "$IN_KEY" "$IN_HKEY" "$IN_WD" "$IN_RUN" | $sum | cut -c1-12)
+        prefix="${IN_KEY:-abbreviatory-$JOB}-$RUNNER_OS-$id"
+        echo "store=$RUNNER_TEMP/abbreviatory-store-$id" >> "$GITHUB_OUTPUT"
+        echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+        echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the run history
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.settings.outputs.store }}
+        key: ${{ steps.settings.outputs.prefix }}-${{ steps.settings.outputs.ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: |
+          ${{ steps.settings.outputs.prefix }}-${{ steps.settings.outputs.ref }}-
+          ${{ steps.settings.outputs.prefix }}-
+
+    - name: Run
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        AB_DIR: ${{ steps.install.outputs.dir }}
+        AB_STORE: ${{ steps.settings.outputs.store }}
+        IN_RUN: ${{ inputs.run }}
+        IN_KEY: ${{ inputs.key }}
+        IN_BUDGET: ${{ inputs.budget }}
+        IN_FORMAT: ${{ inputs.format }}
+        IN_KEEP: ${{ inputs.keep }}
+        IN_WARNINGS: ${{ inputs.warnings }}
+        IN_FULL: ${{ inputs.full }}
+        IN_SUMMARY: ${{ inputs.summary }}
+      run: |
+        set -uo pipefail
+        bin="$AB_DIR/abbreviatory"
+        [ -x "$bin" ] || bin="$AB_DIR/abbreviatory.exe"
+        for v in "$IN_KEY" "$IN_BUDGET" "$IN_FORMAT"; do
+          case "$v" in *$'\n'*|*$'\r'*) echo "::error::key, budget and format can't hold line breaks"; exit 1 ;; esac
+        done
+        args=(run -json -store "$AB_STORE" -budget "$IN_BUDGET" -format "$IN_FORMAT")
+        [ -n "$IN_KEY" ] && args+=(-key "$IN_KEY")
+        [ "$IN_WARNINGS" = true ] && args+=(-warnings)
+        [ "$IN_FULL" = true ] && args+=(-full)
+        while IFS= read -r k; do
+          k="${k%$'\r'}"
+          [ -n "$k" ] && args+=(-keep "$k")
+        done <<< "$IN_KEEP"
+        out="$RUNNER_TEMP/abbreviatory-$GITHUB_RUN_ID-$GITHUB_JOB-$$"
+        "$bin" "${args[@]}" -- bash -o pipefail -c "$IN_RUN" > "$out.json"
+        code=$?
+        if ! jq -e .text "$out.json" >/dev/null 2>&1; then
+          # Abbreviatory itself failed (a usage mistake, a budget too small):
+          # its message is on stderr above.
+          echo "::error::abbreviatory couldn't make a report (exit $code)"
+          echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+          echo "result=fail" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        jq -r .text "$out.json" > "$out.txt"
+        cat "$out.txt"
+        {
+          echo "exit-code=$code"
+          if [ "$code" = 0 ]; then echo "result=pass"; else echo "result=fail"; fi
+          echo "new=$(jq '.delta.new // [] | length' "$out.json")"
+          echo "fixed=$(jq '.delta.fixed // [] | length' "$out.json")"
+          echo "failing=$(jq '.delta.failing // 0' "$out.json")"
+          echo "report=$out.txt"
+          echo "json=$out.json"
+        } >> "$GITHUB_OUTPUT"
+        if [ "$IN_SUMMARY" = true ] && [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+          # A fence longer than any run of backticks in the report.
+          fence='```'
+          while grep -qF -- "$fence" "$out.txt"; do fence="$fence\`"; done
+          title=$(printf '%s' "$IN_RUN" | head -n 1 | cut -c1-120 | sed 's/[`<>|]/ /g')
+          {
+            echo "### \`$title\`"
+            echo
+            echo "$fence"
+            cat "$out.txt"
+            echo "$fence"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - name: Keep the run history
+      if: always() && inputs.cache == 'true'
+      shell: bash
+      env:
+        AB_DIR: ${{ steps.install.outputs.dir }}
+        AB_STORE: ${{ steps.settings.outputs.store }}
+      run: |
+        bin="$AB_DIR/abbreviatory"
+        [ -x "$bin" ] || bin="$AB_DIR/abbreviatory.exe"
+        [ -d "$AB_STORE" ] && "$bin" prune -store "$AB_STORE" -max-size 50MB || true
+
+    - name: Save the run history
+      if: always() && inputs.cache == 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.settings.outputs.store }}
+        key: ${{ steps.settings.outputs.prefix }}-${{ steps.settings.outputs.ref }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    - name: Result
+      if: inputs.fail == 'true'
+      shell: bash
+      env:
+        CODE: ${{ steps.run.outputs.exit-code }}
+      run: |
+        if [ "${CODE:-1}" != 0 ]; then
+          echo "::error::the command failed with exit status ${CODE:-unknown}"
+          exit 1
+        fi

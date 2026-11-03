@@ -130,6 +130,11 @@ The same run again:
   test doesn't look like news every other run.
 - **No change** (the same failures as last time, timings and IDs aside) is one
   line. `-full` prints the whole report anyway.
+- **New warnings**, with `-warnings`: warnings are compared too. New ones are
+  listed and marked `(new)` in the report, and those gone are counted; either
+  makes the run a change. A warning that only moved to another line is the
+  same warning. The comparison starts with the second run that has
+  `-warnings`.
 
 For logs the same works on error kinds: new, gone, recurring and intermittent.
 `run` runs the command, reduces what it prints (standard output and standard
@@ -256,6 +261,7 @@ errors of earlier compilations stay in the report.
                  eslint, gradle, maven, npm, diff, http, listing
 -key NAME        keep a run history under NAME and report what changed
 -full            with history, the whole report even when nothing changed
+-warnings        with history, compare warnings too: list new ones, count those gone
 -json            a JSON object with the counts, the changes and the text
 -no-store        don't keep the original (the report then has no references)
 -store DIR       where originals and histories are kept
@@ -272,9 +278,30 @@ Histories keep the last 50 runs of each key and go after 90 days unused.
 
 ## In CI
 
-CI machines start empty, so the store has to be kept between runs for the
-history to work. On GitHub Actions, with the cache saved whether the tests
-pass or not:
+On GitHub Actions the action does it in one step: it downloads the release
+and checks it against SHA256SUMS, runs the command, writes the report to the
+job summary, keeps the run history in the Actions cache, and fails the step
+when the command fails.
+
+```yaml
+- uses: abbreviatory/engine@v0.6.0
+  with:
+    run: go test -json ./...
+    warnings: true        # list warnings new since the last run too
+```
+
+Inputs: `run` (one shell command line, run with bash), `working-directory`,
+`key`, `budget`, `format`, `keep` (one expression per line), `warnings`,
+`full`, `summary` (default true), `cache` (default true), `cache-key`
+(default `abbreviatory-<job id>`; in a matrix, put the matrix values in it),
+`fail` (default true; false reports only) and `version` (default: the
+release the action is pinned to). Outputs: `exit-code`, `result` (pass or
+fail), `new`, `fixed`, `failing`, `report` (a text file) and `json`. Each use
+of the action in a job keeps its own history.
+
+Elsewhere, CI machines start empty too, so the store has to be kept between
+runs for the history to work. By hand on GitHub Actions, with the cache
+saved whether the tests pass or not:
 
 ```yaml
 - uses: actions/cache/restore@v5
@@ -500,6 +527,10 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   log. `cargo test -- --nocapture` can put a test's `ok` on a later line than
   its name; such a test isn't counted. Colour codes are taken out before
   reading, so `CARGO_TERM_COLOR=always` and `eslint --color` are fine.
+- `-warnings` compares which warnings there are, not how often each one
+  appears: a warning printed ten times instead of twice isn't new.
+- The GitHub Action needs bash and jq, which GitHub's own runners have; a
+  self-hosted runner needs them installed.
 - The MCP `run` tool runs whatever command the agent asks for, as the user
   the server runs as, the same as an agent's own shell tool would.
 

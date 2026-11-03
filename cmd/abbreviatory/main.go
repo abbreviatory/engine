@@ -112,6 +112,7 @@ func addReduceFlags(fs *flag.FlagSet) *reduceFlags {
 	fs.BoolVar(&f.asJSON, "json", false, "print a JSON object with the counts and the text")
 	fs.BoolVar(&f.q.NoStore, "no-store", false, "don't store the original; the output then has no references")
 	fs.BoolVar(&f.q.Full, "full", false, "with history, print the whole report even when nothing changed since the last run")
+	fs.BoolVar(&f.q.Warnings, "warnings", false, "with history, compare warnings with the last run too: list new ones, count those gone")
 	fs.StringVar(&f.dir, "store", "", "store directory (default $ABBREVIATORY_STORE or the user cache directory)")
 	return f
 }

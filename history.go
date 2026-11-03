@@ -51,6 +51,10 @@ type Run struct {
 	Ran []string `json:"ran,omitempty"`
 	// Full is false once Bad and Good have been dropped from an old run.
 	Full bool `json:"full,omitempty"`
+	// Warned is true when the run was tracked with warnings, and Warn holds
+	// them, keyed like Bad. Only the last run's are needed.
+	Warned bool               `json:"warned,omitempty"`
+	Warn   map[string]RunItem `json:"warn,omitempty"`
 }
 
 // RunItem is one failure or error of a run.
@@ -75,7 +79,7 @@ type RunItem struct {
 // Trim drops what only the last FlakyWindow runs need from a run older than
 // that.
 func (r *Run) Trim() {
-	r.Bad, r.Good, r.Full = nil, "", false
+	r.Bad, r.Good, r.Full, r.Warn = nil, "", false, nil
 }
 
 // Delta is what changed since the previous run.
@@ -99,6 +103,11 @@ type Delta struct {
 	Flaky        []DeltaItem
 	Still        int // failing before and now, not flaky
 	Longest      int // the longest streak among them
+	// With warnings tracked (Options.Warnings) and the previous run tracked
+	// so too: the warnings new since it, and those gone.
+	WarnCompared bool
+	NewWarnings  []DeltaItem
+	GoneWarnings []DeltaItem
 }
 
 // DeltaItem is one line of a delta.
@@ -476,6 +485,69 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 	return d
 }
 
+// warnItems lists the warnings of a reduction, each known by what it says,
+// numbers aside (a warning that moved down a line is the same warning).
+func warnItems(groups []*group) []item {
+	var out []item
+	seen := map[string]bool{}
+	for _, g := range groups {
+		if g.more || g.kind != KindWarn {
+			continue
+		}
+		k := hashKey("w\x00" + g.fp)
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		out = append(out, item{key: k, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)})
+	}
+	return out
+}
+
+// compareWarnings records the run's warnings and, when the previous run had
+// its warnings recorded too, lists those new and gone. Either makes the run
+// changed.
+func compareWarnings(history []Run, cur *Run, warns []item, d *Delta) {
+	cur.Warned, cur.Warn = true, map[string]RunItem{}
+	for _, it := range warns {
+		cur.Warn[it.key] = RunItem{Head: it.head, Sel: it.sel}
+	}
+	if len(history) == 0 {
+		return
+	}
+	prev := &history[len(history)-1]
+	if !prev.Full || !prev.Warned || d.Since == 0 {
+		return
+	}
+	d.WarnCompared = true
+	ref := func(id, sel string) string { return id + ":" + sel }
+	for _, it := range warns {
+		if _, ok := prev.Warn[it.key]; !ok {
+			d.NewWarnings = append(d.NewWarnings, DeltaItem{Key: it.key, Head: it.head, Ref: ref(cur.ID, it.sel)})
+		}
+	}
+	var gone []string
+	for k := range prev.Warn {
+		if _, ok := cur.Warn[k]; !ok {
+			gone = append(gone, k)
+		}
+	}
+	sort.Slice(gone, func(i, j int) bool {
+		a, b := prev.Warn[gone[i]], prev.Warn[gone[j]]
+		if selOrder(a.Sel) != selOrder(b.Sel) {
+			return selOrder(a.Sel) < selOrder(b.Sel)
+		}
+		return gone[i] < gone[j]
+	})
+	for _, k := range gone {
+		it := prev.Warn[k]
+		d.GoneWarnings = append(d.GoneWarnings, DeltaItem{Key: k, Head: it.Head, Ref: ref(prev.ID, it.Sel)})
+	}
+	if len(d.NewWarnings) > 0 || len(d.GoneWarnings) > 0 {
+		d.Unchanged = false
+	}
+}
+
 // keepGood is the passing tests a run keeps: all of them, or past MaxGood
 // those that failed in one of the window's runs.
 func keepGood(good map[string]bool, win []*Run) map[string]bool {
@@ -602,7 +674,18 @@ func noteGroups(d *Delta, cur *Run, groups []*group, tests bool) {
 			}
 		}
 	}
+	newWarn := map[string]bool{}
+	for _, it := range d.NewWarnings {
+		newWarn[it.Key] = true
+	}
 	for _, g := range groups {
+		if !g.more && g.kind == KindWarn && len(newWarn) > 0 {
+			// New warnings first among the warnings.
+			g.rank = 2
+			if newWarn[hashKey("w\x00"+g.fp)] {
+				g.rank, g.note = 0, "new"
+			}
+		}
 		if g.more || (g.kind != KindFail && g.kind != KindError) {
 			continue
 		}
@@ -654,7 +737,11 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	if d.Since == 0 {
 		first += "no earlier runs to compare with"
 		if d.Failing > 0 {
-			first += " (" + plural(int64(d.Failing), "failure", "failures") + " recorded)"
+			if d.Tests {
+				first += " (" + plural(int64(d.Failing), "failure", "failures") + " recorded)"
+			} else {
+				first += " (" + plural(int64(d.Failing), "error", "errors") + " recorded)"
+			}
 		}
 		return []string{first}
 	}
@@ -675,6 +762,8 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 		parts = append(parts, s)
 	}
 	add(len(d.Flaky), words.flaky)
+	add(len(d.NewWarnings), plainWord(len(d.NewWarnings), "new warning", "new warnings"))
+	add(len(d.GoneWarnings), plainWord(len(d.GoneWarnings), "warning gone", "warnings gone"))
 	since := "since run " + strconv.Itoa(d.Since)
 	if d.Identical {
 		since += " (identical input)"
@@ -718,7 +807,16 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	list(words.flaky, d.Flaky, words.flaky, func(it DeltaItem) string {
 		return " (" + it.Now + " now, " + strconv.Itoa(it.Flips) + " changes in the last " + strconv.Itoa(it.Window) + " runs)"
 	})
+	list("new warning", d.NewWarnings, "new warnings", nil)
+	list("warning gone", d.GoneWarnings, "warnings gone", nil)
 	return out
+}
+
+func plainWord(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }
 
 func runLabel(d *Delta) string {

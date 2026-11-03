@@ -296,13 +296,14 @@ type toolArgs struct {
 	Keep      []string `json:"keep"`
 	Key       string   `json:"key"`
 	Full      bool     `json:"full"`
+	Warnings  bool     `json:"warnings"`
 	NoStore   bool     `json:"no_store"`
 	NoHistory bool     `json:"no_history"`
 	Stdin     *string  `json:"stdin"`
 }
 
 func (a toolArgs) request() request {
-	return request{Format: a.Format, Budget: a.Budget, Preserve: a.Preserve, Keep: a.Keep, Key: a.Key, Full: a.Full, NoStore: a.NoStore}
+	return request{Format: a.Format, Budget: a.Budget, Preserve: a.Preserve, Keep: a.Keep, Key: a.Key, Full: a.Full, Warnings: a.Warnings, NoStore: a.NoStore}
 }
 
 // call runs a tool. Problems with the tool's work come back as a result
@@ -467,6 +468,7 @@ func mcpTools() []map[string]any {
 		props["preserve"] = str("what is always shown or referenced: any of errors, failures, warnings, comma separated; default all three, empty for none")
 		props["keep"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "regular expressions; matching lines are kept like errors"}
 		props["full"] = boolean("with a history, the whole report even when nothing changed since the last run")
+		props["warnings"] = boolean("with a history, compare warnings with the last run too: list new ones, count those gone")
 		props["no_store"] = boolean("don't keep the original; the report then has no references")
 		return props
 	}

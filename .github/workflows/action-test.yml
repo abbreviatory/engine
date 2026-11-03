@@ -1,0 +1,144 @@
+name: action-test
+
+# Tests action.yml: with a binary built from this commit on Linux, macOS and
+# Windows (push), and the published release download (by hand).
+on:
+  push:
+    branches: [main]
+    paths: [action.yml, .github/workflows/action-test.yml]
+  workflow_dispatch:
+    inputs:
+      download:
+        description: Also test downloading the published release (latest and pinned)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  first:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build abbreviatory
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ab"
+          go build -o "$RUNNER_TEMP/ab/abbreviatory$( [ "$RUNNER_OS" = Windows ] && echo .exe )" ./cmd/abbreviatory
+          echo "AB_PATH=$RUNNER_TEMP/ab" >> "$GITHUB_ENV"
+      - name: Run 1 (tsc, failing)
+        id: a
+        uses: ./
+        env:
+          AB_TEST_INPUT: test/fixtures/tsc.txt
+        with:
+          run: cat "$AB_TEST_INPUT"; exit 2
+          cache-key: action-test-${{ github.run_id }}
+          warnings: "true"
+          fail: "false"
+          abbreviatory-path: ${{ env.AB_PATH }}
+      - name: Check run 1
+        shell: bash
+        env:
+          CODE: ${{ steps.a.outputs.exit-code }}
+          RESULT: ${{ steps.a.outputs.result }}
+          FAILING: ${{ steps.a.outputs.failing }}
+          REPORT: ${{ steps.a.outputs.report }}
+        run: |
+          set -eu
+          echo "exit=$CODE result=$RESULT failing=$FAILING"
+          [ "$CODE" = 2 ] && [ "$RESULT" = fail ] && [ "$FAILING" = 7 ] || { echo "::error::run 1 outputs: exit=$CODE result=$RESULT failing=$FAILING"; exit 1; }
+          grep -q "run 1, exit status 2" "$REPORT" || { echo "::error::run 1 report: $(head -c 300 "$REPORT")"; exit 1; }
+          grep -q "TypeScript compiler output" "$GITHUB_STEP_SUMMARY" || { echo "::error::no job summary"; exit 1; }
+      - name: The step fails with the command
+        id: b
+        continue-on-error: true
+        uses: ./
+        with:
+          run: exit 3
+          cache: "false"
+          abbreviatory-path: ${{ env.AB_PATH }}
+      - name: Check the failure
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.b.outcome }}
+          CODE: ${{ steps.b.outputs.exit-code }}
+        run: |
+          [ "$OUTCOME" = failure ] && [ "$CODE" = 3 ] || { echo "::error::exit 3 gave outcome=$OUTCOME exit=$CODE"; exit 1; }
+
+  second:
+    needs: first
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Build abbreviatory
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ab"
+          go build -o "$RUNNER_TEMP/ab/abbreviatory$( [ "$RUNNER_OS" = Windows ] && echo .exe )" ./cmd/abbreviatory
+          echo "AB_PATH=$RUNNER_TEMP/ab" >> "$GITHUB_ENV"
+          # Run 2: one error fixed, one new.
+          sed -e "s/TS2554: Expected 2 arguments, but got 3./TS2304: Cannot find name 'total'./" -e '/TS6133/d' test/fixtures/tsc.txt > "$RUNNER_TEMP/tsc2.txt"
+          echo "AB_TEST_INPUT=$RUNNER_TEMP/tsc2.txt" >> "$GITHUB_ENV"
+      - name: Run 2 (tsc, changed)
+        id: a
+        uses: ./
+        with:
+          run: cat "$AB_TEST_INPUT"; exit 2
+          cache-key: action-test-${{ github.run_id }}
+          warnings: "true"
+          fail: "false"
+          abbreviatory-path: ${{ env.AB_PATH }}
+      - name: Check run 2
+        shell: bash
+        env:
+          NEW: ${{ steps.a.outputs.new }}
+          FIXED: ${{ steps.a.outputs.fixed }}
+          REPORT: ${{ steps.a.outputs.report }}
+        run: |
+          set -eu
+          cat "$REPORT"
+          grep -q "run 2, exit status 2; since run 1" "$REPORT" || { echo "::error::run 2 not compared: $(head -c 300 "$REPORT")"; exit 1; }
+          [ "$NEW" = 1 ] && [ "$FIXED" = 2 ] || { echo "::error::run 2: new=$NEW fixed=$FIXED"; exit 1; }
+
+  download:
+    if: github.event_name == 'workflow_dispatch' && inputs.download
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        version: [latest, ""]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Report a passing command
+        id: a
+        uses: ./
+        with:
+          run: echo "ok 1 - all good"
+          cache: "false"
+          version: ${{ matrix.version }}
+      - name: Check
+        shell: bash
+        env:
+          CODE: ${{ steps.a.outputs.exit-code }}
+          REPORT: ${{ steps.a.outputs.report }}
+        run: |
+          [ "$CODE" = 0 ] && grep -q "all good" "$REPORT" || { echo "::error::download run: exit=$CODE $(head -c 300 "$REPORT")"; exit 1; }

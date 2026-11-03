@@ -94,6 +94,7 @@ func render(res *Result, groups []*group, summary []string, rules preserve, budg
 	}
 	byRank(fail)
 	byRank(errs)
+	byRank(warn) // new warnings first, when warnings are compared too
 
 	failNoun := "failures"
 	if tests {

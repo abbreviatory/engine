@@ -38,42 +38,44 @@ func TestTrackedPromise(t *testing.T) {
 		}
 		for _, budget := range budgets {
 			for _, order := range [][2][]byte{{data, other}, {other, data}} {
-				first, err := Reduce(bytes.NewReader(order[0]), Options{Budget: 16384, Track: true})
-				if err != nil {
-					t.Fatalf("%s: %v", name, err)
-				}
-				for _, full := range []bool{false, true} {
-					opt := Options{Budget: budget, Track: true, History: []Run{*first.Run}, Full: full}
-					res, err := Reduce(bytes.NewReader(order[1]), opt)
-					if be, ok := err.(*BudgetError); ok {
-						if budget > 1024 {
-							t.Fatalf("%s at %d: %v", name, budget, be)
-						}
-						continue
-					}
+				for _, warn := range []bool{false, true} {
+					first, err := Reduce(bytes.NewReader(order[0]), Options{Budget: 16384, Track: true, Warnings: warn})
 					if err != nil {
-						t.Fatalf("%s at %d: %v", name, budget, err)
+						t.Fatalf("%s: %v", name, err)
 					}
-					if len(res.Text) > budget {
-						t.Fatalf("%s at %d: %d bytes", name, budget, len(res.Text))
-					}
-					again, _ := Reduce(bytes.NewReader(order[1]), opt)
-					if again.Text != res.Text {
-						t.Fatalf("%s at %d: not deterministic", name, budget)
-					}
-					if !strings.Contains(res.Text, "since run 1") && !strings.Contains(res.Text, "identical to run 1") {
-						t.Fatalf("%s at %d: no comparison in:\n%s", name, budget, res.Text)
-					}
-					for _, m := range anyRef.FindAllStringSubmatch(res.Text, -1) {
-						src, ix := order[1], res.Index
-						if m[1] == first.ID && first.ID != res.ID {
-							src, ix = order[0], first.Index
-						} else if m[1] != res.ID {
-							t.Fatalf("%s: reference to unknown %s", name, m[1])
+					for _, full := range []bool{false, true} {
+						opt := Options{Budget: budget, Track: true, History: []Run{*first.Run}, Full: full, Warnings: warn}
+						res, err := Reduce(bytes.NewReader(order[1]), opt)
+						if be, ok := err.(*BudgetError); ok {
+							if budget > 1024 {
+								t.Fatalf("%s at %d: %v", name, budget, be)
+							}
+							continue
 						}
-						part, err := Expand(src, ix, m[2])
-						if err != nil || len(part) == 0 {
-							t.Fatalf("%s at %d: %s:%s doesn't expand: %v", name, budget, m[1], m[2], err)
+						if err != nil {
+							t.Fatalf("%s at %d: %v", name, budget, err)
+						}
+						if len(res.Text) > budget {
+							t.Fatalf("%s at %d: %d bytes", name, budget, len(res.Text))
+						}
+						again, _ := Reduce(bytes.NewReader(order[1]), opt)
+						if again.Text != res.Text {
+							t.Fatalf("%s at %d: not deterministic", name, budget)
+						}
+						if !strings.Contains(res.Text, "since run 1") && !strings.Contains(res.Text, "identical to run 1") {
+							t.Fatalf("%s at %d: no comparison in:\n%s", name, budget, res.Text)
+						}
+						for _, m := range anyRef.FindAllStringSubmatch(res.Text, -1) {
+							src, ix := order[1], res.Index
+							if m[1] == first.ID && first.ID != res.ID {
+								src, ix = order[0], first.Index
+							} else if m[1] != res.ID {
+								t.Fatalf("%s: reference to unknown %s", name, m[1])
+							}
+							part, err := Expand(src, ix, m[2])
+							if err != nil || len(part) == 0 {
+								t.Fatalf("%s at %d: %s:%s doesn't expand: %v", name, budget, m[1], m[2], err)
+							}
 						}
 					}
 				}
@@ -88,7 +90,7 @@ func TestFirstRunAndNoChange(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(first.Text, "run 1; no earlier runs to compare with (1 failure recorded)") {
+	if !strings.Contains(first.Text, "run 1; no earlier runs to compare with (1 error recorded)") {
 		t.Fatalf("first run:\n%s", first.Text)
 	}
 	// Different timestamps, same events: no change, one line.
