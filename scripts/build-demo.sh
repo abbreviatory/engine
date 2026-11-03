@@ -14,6 +14,10 @@ set -eu
 site=${1:?usage: build-demo.sh SITE_DIR}
 cd "$(dirname "$0")/.."
 out="$site/static/demo"
+# Go's licence comes with the loader. Some packaged Go installs (Debian's)
+# don't keep LICENSE in GOROOT; then the copy already in the site stays.
+oldlicense=$(mktemp)
+cp "$out/wasm_exec.LICENSE.txt" "$oldlicense" 2>/dev/null || :
 rm -rf "$out"
 mkdir -p "$out/samples"
 
@@ -24,7 +28,15 @@ if test -f "$goroot/lib/wasm/wasm_exec.js"; then
 else
 	cp "$goroot/misc/wasm/wasm_exec.js" "$out/"
 fi
-cp "$goroot/LICENSE" "$out/wasm_exec.LICENSE.txt"
+if test -f "$goroot/LICENSE"; then
+	cp "$goroot/LICENSE" "$out/wasm_exec.LICENSE.txt"
+elif test -s "$oldlicense"; then
+	cp "$oldlicense" "$out/wasm_exec.LICENSE.txt"
+else
+	echo "Go's LICENSE not found in $goroot" >&2
+	exit 1
+fi
+rm -f "$oldlicense"
 cp demo/index.html "$out/index.html"
 
 f=test/fixtures
