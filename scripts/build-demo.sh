@@ -29,7 +29,8 @@ cp demo/index.html "$out/index.html"
 
 f=test/fixtures
 cp "$f/gotest-verbose.txt" "$f/pytest-verbose.txt" "$f/junit-pytest.xml" "$f/api-response.json" \
-	"$f/git-diff.txt" "$f/http-json.txt" "$f/http-verbose-404.txt" "$f/find-listing.txt" "$out/samples/"
+	"$f/git-diff.txt" "$f/http-json.txt" "$f/http-verbose-404.txt" "$f/find-listing.txt" \
+	"$f/cargo-build.txt" "$f/tsc-pretty.txt" "$f/eslint.txt" "$f/maven-test.txt" "$out/samples/"
 head -n 12000 "$f/app.log" > "$out/samples/app.log"
 
 # The earlier of the two runs for "Compare two runs": TestFieldSpaces still

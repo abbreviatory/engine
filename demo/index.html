@@ -75,7 +75,7 @@ footer { margin: 40px 0 30px; color: var(--gray); font-size: 14px; }
 
 <main class="wrap">
   <h1>Try Abbreviatory in Your Browser</h1>
-  <p class="lede">Pick a sample or paste your own test run, log, JSON, diff, HTTP response or directory listing, and reduce it. The engine runs right here, compiled to WebAssembly, the same code as the <a href="/download/">command line tool</a>. Nothing you paste leaves this page. Click any <code>[ref …]</code> in the report to see the original lines it stands for.</p>
+  <p class="lede">Pick a sample or paste your own test run, build output, log, JSON, diff, HTTP response or directory listing, and reduce it. The engine runs right here, compiled to WebAssembly, the same code as the <a href="/download/">command line tool</a>. Nothing you paste leaves this page. Click any <code>[ref …]</code> in the report to see the original lines it stands for.</p>
 
   <div class="controls">
     <label>Sample
@@ -83,6 +83,10 @@ footer { margin: 40px 0 30px; color: var(--gray); font-size: 14px; }
         <option value="gotest-verbose.txt" data-format="go test -v">go test -v, 2,453 lines</option>
         <option value="pytest-verbose.txt">pytest -v, 1,072 lines</option>
         <option value="junit-pytest.xml">JUnit XML report</option>
+        <option value="cargo-build.txt">cargo build, 5 errors</option>
+        <option value="tsc-pretty.txt">tsc, 8 errors</option>
+        <option value="eslint.txt">eslint, 54 problems</option>
+        <option value="maven-test.txt">mvn test, 4 failing tests</option>
         <option value="app.log">Application log, 12,000 lines</option>
         <option value="api-response.json">API response, JSON</option>
         <option value="git-diff.txt">git diff, 5,286 lines</option>
@@ -99,6 +103,7 @@ footer { margin: 40px 0 30px; color: var(--gray); font-size: 14px; }
       <select id="format">
         <option value="auto">auto (detect)</option>
         <option value="test-output">test output</option>
+        <option value="build">build output</option>
         <option value="logs">log</option>
         <option value="json">JSON</option>
         <option value="diff">diff</option>
