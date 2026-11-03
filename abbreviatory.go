@@ -369,7 +369,8 @@ func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[
 	}
 	d := computeDelta(opt.History, cur, bad, good, passNames, tests)
 	if opt.Warnings && rules.warnings {
-		compareWarnings(opt.History, cur, warnItems(groups), d)
+		warns, cut := warnItems(groups)
+		compareWarnings(opt.History, cur, warns, cut, d)
 	}
 	res.Run, res.Delta = cur, d
 

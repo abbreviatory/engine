@@ -52,9 +52,12 @@ type Run struct {
 	// Full is false once Bad and Good have been dropped from an old run.
 	Full bool `json:"full,omitempty"`
 	// Warned is true when the run was tracked with warnings, and Warn holds
-	// them, keyed like Bad. Only the last run's are needed.
-	Warned bool               `json:"warned,omitempty"`
-	Warn   map[string]RunItem `json:"warn,omitempty"`
+	// them, keyed like Bad; only the newest run of a history keeps them.
+	// WarnCut is true when its warnings had more kinds than the grouper
+	// keeps apart, so they can't all be compared.
+	Warned  bool               `json:"warned,omitempty"`
+	Warn    map[string]RunItem `json:"warn,omitempty"`
+	WarnCut bool               `json:"warn_cut,omitempty"`
 }
 
 // RunItem is one failure or error of a run.
@@ -108,6 +111,9 @@ type Delta struct {
 	WarnCompared bool
 	NewWarnings  []DeltaItem
 	GoneWarnings []DeltaItem
+	// WarnCut is true when warnings weren't compared because this run or
+	// the last had more kinds of warning than are kept apart.
+	WarnCut bool
 }
 
 // DeltaItem is one line of a delta.
@@ -487,11 +493,15 @@ func computeDelta(history []Run, cur *Run, bad []item, good, passNames map[strin
 
 // warnItems lists the warnings of a reduction, each known by what it says,
 // numbers aside (a warning that moved down a line is the same warning).
-func warnItems(groups []*group) []item {
-	var out []item
+// cut is true when some fell past the cap on distinct groups.
+func warnItems(groups []*group) (out []item, cut bool) {
 	seen := map[string]bool{}
 	for _, g := range groups {
-		if g.more || g.kind != KindWarn {
+		if g.kind != KindWarn {
+			continue
+		}
+		if g.more {
+			cut = true
 			continue
 		}
 		k := hashKey("w\x00" + g.fp)
@@ -501,14 +511,14 @@ func warnItems(groups []*group) []item {
 		seen[k] = true
 		out = append(out, item{key: k, head: g.ex.Head, sel: "g" + strconv.Itoa(g.idx)})
 	}
-	return out
+	return out, cut
 }
 
 // compareWarnings records the run's warnings and, when the previous run had
 // its warnings recorded too, lists those new and gone. Either makes the run
 // changed.
-func compareWarnings(history []Run, cur *Run, warns []item, d *Delta) {
-	cur.Warned, cur.Warn = true, map[string]RunItem{}
+func compareWarnings(history []Run, cur *Run, warns []item, cut bool, d *Delta) {
+	cur.Warned, cur.Warn, cur.WarnCut = true, map[string]RunItem{}, cut
 	for _, it := range warns {
 		cur.Warn[it.key] = RunItem{Head: it.head, Sel: it.sel}
 	}
@@ -517,6 +527,12 @@ func compareWarnings(history []Run, cur *Run, warns []item, d *Delta) {
 	}
 	prev := &history[len(history)-1]
 	if !prev.Full || !prev.Warned || d.Since == 0 {
+		return
+	}
+	if cut || prev.WarnCut {
+		// Warnings past the cap aren't kept apart: one that fell past it
+		// would read as gone, and a new one there wouldn't show.
+		d.WarnCut = true
 		return
 	}
 	d.WarnCompared = true
@@ -764,6 +780,9 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	add(len(d.Flaky), words.flaky)
 	add(len(d.NewWarnings), plainWord(len(d.NewWarnings), "new warning", "new warnings"))
 	add(len(d.GoneWarnings), plainWord(len(d.GoneWarnings), "warning gone", "warnings gone"))
+	if d.WarnCut {
+		parts = append(parts, "warnings not compared (too many kinds)")
+	}
 	since := "since run " + strconv.Itoa(d.Since)
 	if d.Identical {
 		since += " (identical input)"
@@ -776,7 +795,11 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	case d.Unchanged:
 		first += since + ": no change; " + strings.Join(parts, ", ")
 	case d.SameFailures:
-		first += since + ": the same failures; " + strings.Join(parts, ", ")
+		same := "the same failures"
+		if !d.Tests {
+			same = "the same errors"
+		}
+		first += since + ": " + same + "; " + strings.Join(parts, ", ")
 	default:
 		first += since + ": " + strings.Join(parts, ", ")
 	}
@@ -843,12 +866,16 @@ func unchangedLine(res *Result, d *Delta, refs bool) string {
 	if !d.Tests {
 		noun = "errors"
 	}
+	cutNote := ""
+	if d.WarnCut {
+		cutNote = "; warnings not compared (too many kinds)"
+	}
 	if d.Failing == 0 {
-		return s + ": no " + noun + "\n"
+		return s + ": no " + noun + cutNote + "\n"
 	}
 	s += ": the same " + group3(int64(d.Failing)) + " "
 	if d.Failing == 1 {
 		noun = strings.TrimSuffix(noun, "s")
 	}
-	return s + noun + "\n"
+	return s + noun + cutNote + "\n"
 }

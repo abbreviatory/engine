@@ -119,6 +119,10 @@ func (s *Store) save(h *History, run *abbreviatory.Run) error {
 	for i := 0; i < len(h.Runs)-abbreviatory.FlakyWindow; i++ {
 		h.Runs[i].Trim()
 	}
+	// Only the newest run's warnings are compared with.
+	for i := 0; i < len(h.Runs)-1; i++ {
+		h.Runs[i].Warn = nil
+	}
 	data, err := json.Marshal(h)
 	if err != nil {
 		return err

@@ -89,3 +89,47 @@ func TestWarningHistoryCargo(t *testing.T) {
 		t.Errorf("delta new warnings %v, gone %v, new %v", next.Delta.NewWarnings, next.Delta.GoneWarnings, next.Delta.New)
 	}
 }
+
+// Past the cap on distinct groups, warnings aren't kept apart: they aren't
+// compared, rather than read as gone.
+func TestWarningHistoryCap(t *testing.T) {
+	var b strings.Builder
+	for i := 0; i < maxDistinct+10; i++ {
+		b.WriteString("WARN w" + itoaLetters(i) + " bad\n")
+	}
+	b.WriteString("ERROR x\n")
+	first := warnRun(t, []byte(b.String()), true)
+	if !first.Run.WarnCut {
+		t.Fatal("cut not recorded")
+	}
+	next := warnRun(t, []byte("WARN brand new thing\n"+b.String()), true, *first.Run)
+	if len(next.Delta.GoneWarnings) != 0 || len(next.Delta.NewWarnings) != 0 || !next.Delta.WarnCut {
+		t.Errorf("compared past the cap: new %d, gone %d", len(next.Delta.NewWarnings), len(next.Delta.GoneWarnings))
+	}
+	if !strings.Contains(next.Text, "warnings not compared (too many kinds)") {
+		t.Errorf("no note:\n%s", next.Text)
+	}
+}
+
+// itoaLetters writes n in letters, so the numbers that grouping ignores
+// don't fold the warnings together.
+func itoaLetters(n int) string {
+	s := ""
+	for {
+		s = string(rune('a'+n%26)) + s
+		n /= 26
+		if n == 0 {
+			return s
+		}
+	}
+}
+
+// Logs and builds say "the same errors".
+func TestWarningHistoryWording(t *testing.T) {
+	pad := strings.Repeat("INFO tick\n", 300)
+	first := warnRun(t, []byte("WARN a\nERROR x\n"+pad), true)
+	next := warnRun(t, []byte("WARN b\nERROR x\n"+pad), true, *first.Run)
+	if !strings.Contains(next.Text, "the same errors;") {
+		t.Errorf("wording:\n%s", next.Text)
+	}
+}

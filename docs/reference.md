@@ -387,7 +387,11 @@ gone: ...` with a reference into the last run. Either makes the run a change,
 so the one-line report needs the same warnings as well as the same failures.
 A run records its warnings only with `-warnings`, so the comparison starts
 with the second such run. With `-preserve` leaving warnings out there are
-none to compare.
+none to compare, so `-warnings` with such a `-preserve` is refused. Past
+50,000 kinds of warning in this run or the last one, warnings aren't
+compared (a kind past the cap would read as gone); the report says
+"warnings not compared (too many kinds)". Only the newest run of a history
+keeps its warnings.
 
 A history keeps the last 50 runs of its key. The last 10 keep their failures
 and the names of the tests that passed, which flaky detection needs; older

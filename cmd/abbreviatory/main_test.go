@@ -319,3 +319,12 @@ func TestRunSignalDuringLockWait(t *testing.T) {
 		t.Fatalf("exit %d\n%s%s", code, out.String(), errb.String())
 	}
 }
+
+// -warnings needs warnings preserved.
+func TestWarningsNeedPreserve(t *testing.T) {
+	dir := t.TempDir()
+	_, errs, code := runCLI(t, sample(), "reduce", "-store", dir, "-key", "k", "-warnings", "-preserve", "errors")
+	if code != 2 || !strings.Contains(errs, "warnings") {
+		t.Errorf("exit %d, %q", code, errs)
+	}
+}

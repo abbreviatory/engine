@@ -292,3 +292,27 @@ func TestLockKeptFresh(t *testing.T) {
 	unlock()
 	<-got
 }
+
+// Only the newest run of a history keeps its warnings: they are what the
+// next run compares with, and older ones only make the file bigger.
+func TestHistoryKeepsLastWarnings(t *testing.T) {
+	s, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 3; i++ {
+		run := &abbreviatory.Run{N: i, Full: true, Warned: true, Warn: map[string]abbreviatory.RunItem{"k": {Head: "WARN x"}}}
+		if err := s.Record("w", run); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h, err := s.History("w")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, r := range h.Runs {
+		if (r.Warn != nil) != (i == len(h.Runs)-1) {
+			t.Errorf("run %d keeps warnings: %v", r.N, r.Warn != nil)
+		}
+	}
+}

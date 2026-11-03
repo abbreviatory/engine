@@ -131,7 +131,7 @@ The same run again:
 - **No change** (the same failures as last time, timings and IDs aside) is one
   line. `-full` prints the whole report anyway.
 - **New warnings**, with `-warnings`: warnings are compared too. New ones are
-  listed and marked `(new)` in the report, and those gone are counted; either
+  listed and marked `(new)` in the report, and those gone are listed too; either
   makes the run a change. A warning that only moved to another line is the
   same warning. The comparison starts with the second run that has
   `-warnings`.
@@ -293,11 +293,14 @@ when the command fails.
 Inputs: `run` (one shell command line, run with bash), `working-directory`,
 `key`, `budget`, `format`, `keep` (one expression per line), `warnings`,
 `full`, `summary` (default true), `cache` (default true), `cache-key`
-(default `abbreviatory-<job id>`; in a matrix, put the matrix values in it),
+(default `abbreviatory-<job id>-<matrix index>`),
 `fail` (default true; false reports only) and `version` (default: the
 release the action is pinned to). Outputs: `exit-code`, `result` (pass or
-fail), `new`, `fixed`, `failing`, `report` (a text file) and `json`. Each use
-of the action in a job keeps its own history.
+fail, or error when Abbreviatory itself couldn't run, which fails the step
+whatever `fail` says), `new`, `fixed`, `failing`, `report` (a text file) and
+`json`. Each use of the action in a job, and each job of a matrix, keeps its
+own history. Each run saves a cache entry of up to 50 MB; GitHub removes the
+oldest entries when a repository's caches pass its limit.
 
 Elsewhere, CI machines start empty too, so the store has to be kept between
 runs for the history to work. By hand on GitHub Actions, with the cache
@@ -528,7 +531,9 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   its name; such a test isn't counted. Colour codes are taken out before
   reading, so `CARGO_TERM_COLOR=always` and `eslint --color` are fine.
 - `-warnings` compares which warnings there are, not how often each one
-  appears: a warning printed ten times instead of twice isn't new.
+  appears: a warning printed ten times instead of twice isn't new. Past
+  50,000 kinds of warning in one run they aren't compared, and the report
+  says so.
 - The GitHub Action needs bash and jq, which GitHub's own runners have; a
   self-hosted runner needs them installed.
 - The MCP `run` tool runs whatever command the agent asks for, as the user

@@ -74,6 +74,24 @@ jobs:
           CODE: ${{ steps.b.outputs.exit-code }}
         run: |
           [ "$OUTCOME" = failure ] && [ "$CODE" = 3 ] || { echo "::error::exit 3 gave outcome=$OUTCOME exit=$CODE"; exit 1; }
+      - name: A wrong input is Abbreviatory's error, even with fail false
+        id: c
+        continue-on-error: true
+        uses: ./
+        with:
+          run: "true"
+          budget: abc
+          fail: "false"
+          cache: "false"
+          abbreviatory-path: ${{ env.AB_PATH }}
+      - name: Check the error
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.c.outcome }}
+          RESULT: ${{ steps.c.outputs.result }}
+          CODE: ${{ steps.c.outputs.exit-code }}
+        run: |
+          [ "$OUTCOME" = failure ] && [ "$RESULT" = error ] && [ -z "$CODE" ] || { echo "::error::wrong budget gave outcome=$OUTCOME result=$RESULT exit=$CODE"; exit 1; }
 
   second:
     needs: first

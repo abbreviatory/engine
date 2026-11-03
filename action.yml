@@ -46,7 +46,7 @@ inputs:
     required: false
     default: "true"
   cache-key:
-    description: Start of the cache key. Empty means abbreviatory-<job id>. In a matrix, put the matrix values in it (such as abbreviatory-go1.26), or the matrix jobs share one history.
+    description: Start of the cache key. Empty means abbreviatory-<job id>-<matrix index>, so each job of a matrix has its own history. Jobs that should share a history give the same key.
     required: false
     default: ""
   fail:
@@ -67,7 +67,7 @@ outputs:
     description: The command's exit status.
     value: ${{ steps.run.outputs.exit-code }}
   result:
-    description: pass or fail (the command's exit status was 0 or not)
+    description: pass or fail (the command's exit status was 0 or not), or error when Abbreviatory itself couldn't run or make a report (a wrong input, a budget too small); exit-code is then empty.
     value: ${{ steps.run.outputs.result }}
   new:
     description: How many failures and errors are new since the last run.
@@ -150,7 +150,13 @@ runs:
         want=$(awk -v n="$name" '$2==n || $2=="*"n {print $1}' SHA256SUMS)
         if command -v sha256sum >/dev/null; then got=$(sha256sum "$name" | cut -d' ' -f1); else got=$(shasum -a 256 "$name" | cut -d' ' -f1); fi
         if [ -z "$want" ] || [ "$want" != "$got" ]; then echo "::error::$name does not match SHA256SUMS"; exit 1; fi
-        if [ "$ext" = zip ]; then unzip -oq "$name"; else tar -xzf "$name"; fi
+        if [ "$ext" = tar.gz ]; then
+          tar -xzf "$name"
+        elif command -v unzip >/dev/null; then
+          unzip -oq "$name"
+        else
+          powershell -NoProfile -Command "Expand-Archive -Force -Path '$name' -DestinationPath ."
+        fi
         echo "dir=$dir" >> "$GITHUB_OUTPUT"
 
     - name: Cache settings
@@ -162,6 +168,7 @@ runs:
         IN_RUN: ${{ inputs.run }}
         IN_WD: ${{ inputs.working-directory }}
         JOB: ${{ github.job }}
+        JOB_INDEX: ${{ strategy.job-index }}
         REF: ${{ github.ref_name }}
       run: |
         set -euo pipefail
@@ -170,13 +177,14 @@ runs:
         # job don't overwrite each other's history when restoring.
         if command -v sha256sum >/dev/null; then sum=sha256sum; else sum="shasum -a 256"; fi
         id=$(printf '%s\n%s\n%s\n%s' "$IN_KEY" "$IN_HKEY" "$IN_WD" "$IN_RUN" | $sum | cut -c1-12)
-        prefix="${IN_KEY:-abbreviatory-$JOB}-$RUNNER_OS-$id"
+        # Matrix jobs share the job id: the default key tells them apart.
+        prefix="${IN_KEY:-abbreviatory-$JOB-${JOB_INDEX:-0}}-$RUNNER_OS-$id"
         echo "store=$RUNNER_TEMP/abbreviatory-store-$id" >> "$GITHUB_OUTPUT"
         echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
         echo "ref=$REF" >> "$GITHUB_OUTPUT"
 
     - name: Restore the run history
-      if: inputs.cache == 'true'
+      if: inputs.cache == 'true' && steps.settings.outcome == 'success'
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.settings.outputs.store }}
@@ -201,7 +209,8 @@ runs:
         IN_FULL: ${{ inputs.full }}
         IN_SUMMARY: ${{ inputs.summary }}
       run: |
-        set -uo pipefail
+        # The command failing is an answer, not an error of this step.
+        set +e -uo pipefail
         bin="$AB_DIR/abbreviatory"
         [ -x "$bin" ] || bin="$AB_DIR/abbreviatory.exe"
         for v in "$IN_KEY" "$IN_BUDGET" "$IN_FORMAT"; do
@@ -216,14 +225,16 @@ runs:
           [ -n "$k" ] && args+=(-keep "$k")
         done <<< "$IN_KEEP"
         out="$RUNNER_TEMP/abbreviatory-$GITHUB_RUN_ID-$GITHUB_JOB-$$"
-        "$bin" "${args[@]}" -- bash -o pipefail -c "$IN_RUN" > "$out.json"
+        "$bin" "${args[@]}" -- bash -o pipefail -c "$IN_RUN" > "$out.json" 2> "$out.err"
         code=$?
-        if ! jq -e .text "$out.json" >/dev/null 2>&1; then
-          # Abbreviatory itself failed (a usage mistake, a budget too small):
-          # its message is on stderr above.
-          echo "::error::abbreviatory couldn't make a report (exit $code)"
-          echo "exit-code=$code" >> "$GITHUB_OUTPUT"
-          echo "result=fail" >> "$GITHUB_OUTPUT"
+        cat "$out.err" >&2
+        if ! jq -e '.text | type == "string"' "$out.json" >/dev/null 2>&1; then
+          # Abbreviatory itself failed (a wrong input, a budget too small):
+          # not the command's doing, and its status isn't known.
+          msg=$(head -n 3 "$out.err" | tr '\r\n' '  ')
+          echo "::error::abbreviatory couldn't make a report: ${msg:-exit $code}"
+          echo "exit-code=" >> "$GITHUB_OUTPUT"
+          echo "result=error" >> "$GITHUB_OUTPUT"
           exit 0
         fi
         jq -r .text "$out.json" > "$out.txt"
@@ -253,7 +264,7 @@ runs:
         fi
 
     - name: Keep the run history
-      if: always() && inputs.cache == 'true'
+      if: always() && inputs.cache == 'true' && steps.install.outcome == 'success' && steps.settings.outcome == 'success'
       shell: bash
       env:
         AB_DIR: ${{ steps.install.outputs.dir }}
@@ -264,19 +275,24 @@ runs:
         [ -d "$AB_STORE" ] && "$bin" prune -store "$AB_STORE" -max-size 50MB || true
 
     - name: Save the run history
-      if: always() && inputs.cache == 'true'
+      if: always() && inputs.cache == 'true' && steps.settings.outcome == 'success'
       uses: actions/cache/save@v5
       with:
         path: ${{ steps.settings.outputs.store }}
         key: ${{ steps.settings.outputs.prefix }}-${{ steps.settings.outputs.ref }}-${{ github.run_id }}-${{ github.run_attempt }}
 
     - name: Result
-      if: inputs.fail == 'true'
       shell: bash
       env:
         CODE: ${{ steps.run.outputs.exit-code }}
+        RESULT: ${{ steps.run.outputs.result }}
+        FAIL: ${{ inputs.fail }}
       run: |
-        if [ "${CODE:-1}" != 0 ]; then
-          echo "::error::the command failed with exit status ${CODE:-unknown}"
+        if [ "$RESULT" = error ]; then
+          # Abbreviatory's own failure fails the step whatever fail says.
+          exit 1
+        fi
+        if [ "$FAIL" = true ] && [ "$CODE" != 0 ]; then
+          echo "::error::the command failed with exit status $CODE"
           exit 1
         fi

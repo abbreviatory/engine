@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -75,6 +76,9 @@ func (q request) options() (abbreviatory.Options, error) {
 	}
 	if err := abbreviatory.CheckPreserve(opt.Preserve); err != nil {
 		return opt, &usageError{err.Error()}
+	}
+	if q.Warnings && !slices.Contains(opt.Preserve, "warnings") {
+		return opt, usagef("warnings: there are no warnings to compare when -preserve leaves them out")
 	}
 	for _, k := range q.Keep {
 		re, err := regexp.Compile(k)
