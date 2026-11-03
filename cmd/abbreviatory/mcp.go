@@ -462,7 +462,7 @@ func mcpTools() []map[string]any {
 	integer := func(desc string) map[string]any { return map[string]any{"type": "integer", "description": desc} }
 	boolean := func(desc string) map[string]any { return map[string]any{"type": "boolean", "description": desc} }
 	common := func(props map[string]any) map[string]any {
-		props["format"] = str("auto (the default), test-output, logs, json, or one of: " + strings.Join(abbreviatory.FormatNames(), ", "))
+		props["format"] = str("auto (the default), test-output, build, logs, json, or one of: " + strings.Join(abbreviatory.FormatNames(), ", "))
 		props["budget"] = integer(fmt.Sprintf("most bytes of the report; default %d, at least %d", abbreviatory.DefaultBudget, abbreviatory.MinBudget))
 		props["preserve"] = str("what is always shown or referenced: any of errors, failures, warnings, comma separated; default all three, empty for none")
 		props["keep"] = map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "regular expressions; matching lines are kept like errors"}

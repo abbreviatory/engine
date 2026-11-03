@@ -1,0 +1,138 @@
+[10:00:01 AM] Starting compilation in watch mode...
+
+src/cart.ts:9:7 - error TS2322: Type 'string' is not assignable to type 'number'.
+
+9 const total: number = "x";
+        ~~~~~
+
+[10:00:03 AM] Found 1 error. Watching for file changes.
+
+[10:01:10 AM] File change detected. Starting incremental compilation...
+
+src/cart.ts:12:3 - error TS2304: Cannot find name 'foo'.
+
+12   foo();
+     ~~~
+
+[10:01:11 AM] Found 1 error. Watching for file changes.
+
+[10:01:00 AM] File change detected. Starting incremental compilation...
+
+[10:01:01 AM] Found 0 errors. Watching for file changes.
+
+[10:02:00 AM] File change detected. Starting incremental compilation...
+
+[10:02:01 AM] Found 0 errors. Watching for file changes.
+
+[10:03:00 AM] File change detected. Starting incremental compilation...
+
+[10:03:01 AM] Found 0 errors. Watching for file changes.
+
+[10:04:00 AM] File change detected. Starting incremental compilation...
+
+[10:04:01 AM] Found 0 errors. Watching for file changes.
+
+[10:05:00 AM] File change detected. Starting incremental compilation...
+
+[10:05:01 AM] Found 0 errors. Watching for file changes.
+
+[10:06:00 AM] File change detected. Starting incremental compilation...
+
+[10:06:01 AM] Found 0 errors. Watching for file changes.
+
+[10:07:00 AM] File change detected. Starting incremental compilation...
+
+[10:07:01 AM] Found 0 errors. Watching for file changes.
+
+[10:08:00 AM] File change detected. Starting incremental compilation...
+
+[10:08:01 AM] Found 0 errors. Watching for file changes.
+
+[10:09:00 AM] File change detected. Starting incremental compilation...
+
+[10:09:01 AM] Found 0 errors. Watching for file changes.
+
+[10:00:00 AM] File change detected. Starting incremental compilation...
+
+[10:00:01 AM] Found 0 errors. Watching for file changes.
+
+[10:01:00 AM] File change detected. Starting incremental compilation...
+
+[10:01:01 AM] Found 0 errors. Watching for file changes.
+
+[10:02:00 AM] File change detected. Starting incremental compilation...
+
+[10:02:01 AM] Found 0 errors. Watching for file changes.
+
+[10:03:00 AM] File change detected. Starting incremental compilation...
+
+[10:03:01 AM] Found 0 errors. Watching for file changes.
+
+[10:04:00 AM] File change detected. Starting incremental compilation...
+
+[10:04:01 AM] Found 0 errors. Watching for file changes.
+
+[10:05:00 AM] File change detected. Starting incremental compilation...
+
+[10:05:01 AM] Found 0 errors. Watching for file changes.
+
+[10:06:00 AM] File change detected. Starting incremental compilation...
+
+[10:06:01 AM] Found 0 errors. Watching for file changes.
+
+[10:07:00 AM] File change detected. Starting incremental compilation...
+
+[10:07:01 AM] Found 0 errors. Watching for file changes.
+
+[10:08:00 AM] File change detected. Starting incremental compilation...
+
+[10:08:01 AM] Found 0 errors. Watching for file changes.
+
+[10:09:00 AM] File change detected. Starting incremental compilation...
+
+[10:09:01 AM] Found 0 errors. Watching for file changes.
+
+[10:00:00 AM] File change detected. Starting incremental compilation...
+
+[10:00:01 AM] Found 0 errors. Watching for file changes.
+
+[10:01:00 AM] File change detected. Starting incremental compilation...
+
+[10:01:01 AM] Found 0 errors. Watching for file changes.
+
+[10:02:00 AM] File change detected. Starting incremental compilation...
+
+[10:02:01 AM] Found 0 errors. Watching for file changes.
+
+[10:03:00 AM] File change detected. Starting incremental compilation...
+
+[10:03:01 AM] Found 0 errors. Watching for file changes.
+
+[10:04:00 AM] File change detected. Starting incremental compilation...
+
+[10:04:01 AM] Found 0 errors. Watching for file changes.
+
+[10:05:00 AM] File change detected. Starting incremental compilation...
+
+[10:05:01 AM] Found 0 errors. Watching for file changes.
+
+[10:06:00 AM] File change detected. Starting incremental compilation...
+
+[10:06:01 AM] Found 0 errors. Watching for file changes.
+
+[10:07:00 AM] File change detected. Starting incremental compilation...
+
+[10:07:01 AM] Found 0 errors. Watching for file changes.
+
+[10:08:00 AM] File change detected. Starting incremental compilation...
+
+[10:08:01 AM] Found 0 errors. Watching for file changes.
+
+[10:09:00 AM] File change detected. Starting incremental compilation...
+
+[10:09:01 AM] Found 0 errors. Watching for file changes.
+
+[10:00:00 AM] File change detected. Starting incremental compilation...
+
+[10:00:01 AM] Found 0 errors. Watching for file changes.
+

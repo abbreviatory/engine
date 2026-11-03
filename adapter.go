@@ -118,7 +118,7 @@ func detect(sample []byte, want string) (formatInfo, error) {
 	}
 	// Maven's lines start with "[INFO]", which would otherwise be taken
 	// for the start of a JSON array.
-	if looksMaven(sample) {
+	if looksMaven(cleanLines(sample)) {
 		fi, _ := lookupFormat("maven")
 		return fi, nil
 	}
@@ -196,7 +196,7 @@ func detectTests(sample []byte) string {
 	if events > 0 && events >= plain {
 		return "gotest-json"
 	}
-	if looksCargoTest(sample) {
+	if looksCargoTest(cleanLines(sample)) {
 		return "cargo-test"
 	}
 	if bytes.Contains(sample, []byte("test session starts")) || bytes.Contains(sample, []byte("\n=========================== short test summary info")) {

@@ -169,7 +169,7 @@ defaults at most once an hour.
 | `tsc` | build | `file(line,col): error TS1234:` or `file:line:col - error TS1234:` lines |
 | `eslint` | build | a file path followed by `line:col  error` rows, a `✖ N problems` count, or compact or unix lines |
 | `gradle` | build | `> Task :` lines, `BUILD FAILED in` or `BUILD SUCCESSFUL in` |
-| `maven` | build | `[INFO] Scanning for projects`, `[INFO] BUILD`, `[INFO] ---` or `[ERROR] Failed to execute goal` lines, or 20 bracketed level lines |
+| `maven` | build | `[INFO] Scanning for projects...`, `[INFO] BUILD SUCCESS` or `FAILURE`, a plugin line (`[INFO] --- compiler:3.13.0:compile (default-compile) @ shop ---`), `[INFO] Reactor Summary` or `[ERROR] Failed to execute goal` |
 | `npm` | build | `npm error`, `npm ERR!` or `npm warn` lines, `ERR_PNPM_` errors or pnpm's `Progress: resolved` |
 | `http` | http | a status line first (`HTTP/1.1 200 OK`), or curl `-v`'s `*` and `>` lines before one |
 | `diff` | diff | a `diff --git` line, or `---`, `+++` and `@@ -` lines in a row, in the first 400 lines |
@@ -181,7 +181,9 @@ defaults at most once an hour.
 finds none; `-format build` does the same for the build tools. Detection
 tries HTTP, test runners, JSON, build tools, diffs and listings, in that
 order, except that Maven's console is tried before JSON (its lines start
-with `[INFO]`). JSON lines (one object per line) are read as a log, with the level
+with `[INFO]`). Input that starts like a JSON array but doesn't parse
+(`tsc --watch` starts with `[10:00:01 AM]`) is tried for the build tools
+before it's read as a log. Detection takes colour codes out first. JSON lines (one object per line) are read as a log, with the level
 taken from `"level"` or `"severity"`. Detection looks at the first megabyte.
 When auto-detection picks `json` or `junit` and the input turns out not to be
 one (a log whose lines start with `[`, a damaged report), or is too big to
@@ -327,7 +329,8 @@ it. What is compared are the failures and errors the report preserves (as
 `-preserve` sets them), each known by an identity:
 
 - a failed test by its name, with its package for go test (from the
-  package's `ok` or `FAIL` line in plain output);
+  package's `ok` or `FAIL` line in plain output) and its test binary for
+  cargo test; Gradle's and Maven's failed tests too;
 - an error from a test runner that has a name for it, such as a package or a
   build that failed, by that name;
 - anything else, such as a log error, by its text with numbers, hex runs and

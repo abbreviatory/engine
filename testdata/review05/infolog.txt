@@ -1,0 +1,33 @@
+[INFO] worker 0 started
+[INFO] worker 1 started
+[INFO] worker 2 started
+[INFO] worker 3 started
+[INFO] worker 4 started
+[INFO] worker 5 started
+[INFO] worker 6 started
+[INFO] worker 7 started
+[INFO] worker 8 started
+[INFO] worker 9 started
+[INFO] worker 10 started
+[INFO] worker 11 started
+[INFO] worker 12 started
+[INFO] worker 13 started
+[INFO] worker 14 started
+[INFO] worker 15 started
+[INFO] worker 16 started
+[INFO] worker 17 started
+[INFO] worker 18 started
+[INFO] worker 19 started
+[INFO] worker 20 started
+[INFO] worker 21 started
+[INFO] worker 22 started
+[INFO] worker 23 started
+[INFO] worker 24 started
+[ERROR] job failed
+Traceback (most recent call last):
+  File "app.py", line 3, in <module>
+    main()
+  File "app.py", line 2, in main
+    1/0
+ZeroDivisionError: division by zero
+[INFO] retry

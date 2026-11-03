@@ -1,6 +1,7 @@
 package abbreviatory
 
 import (
+	"bytes"
 	"strings"
 )
 
@@ -73,6 +74,7 @@ func infoLine(n int64, text string, emit func(Record)) {
 
 // detectBuild names the build tool whose output the sample is, or "".
 func detectBuild(sample []byte) string {
+	sample = cleanLines(sample)
 	switch {
 	case looksCargo(sample):
 		return "cargo"
@@ -88,6 +90,24 @@ func detectBuild(sample []byte) string {
 		return "npm"
 	}
 	return ""
+}
+
+// cleanLines is the sample with colour codes and other control characters
+// taken out of each line, as the adapters see it: cargo, ESLint and others
+// colour their output when told to (CARGO_TERM_COLOR=always in CI).
+func cleanLines(sample []byte) []byte {
+	if !bytes.ContainsRune(sample, 0x1b) {
+		return sample
+	}
+	lines := bytes.Split(sample, []byte("\n"))
+	out := make([]byte, 0, len(sample))
+	for i, l := range lines {
+		if i > 0 {
+			out = append(out, '\n')
+		}
+		out = append(out, clean(l)...)
+	}
+	return out
 }
 
 // npm and pnpm: install and run output. An npm error is a run of "npm

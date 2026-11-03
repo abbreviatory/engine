@@ -1,0 +1,74 @@
+> Task :module1:processResources NO-SOURCE
+> Task :module2:processResources NO-SOURCE
+> Task :module3:processResources NO-SOURCE
+> Task :module4:processResources NO-SOURCE
+> Task :module5:processResources NO-SOURCE
+> Task :module6:processResources NO-SOURCE
+> Task :module7:processResources NO-SOURCE
+> Task :module8:processResources NO-SOURCE
+> Task :module9:processResources NO-SOURCE
+> Task :module10:processResources NO-SOURCE
+> Task :module11:processResources NO-SOURCE
+> Task :module12:processResources NO-SOURCE
+> Task :module13:processResources NO-SOURCE
+> Task :module14:processResources NO-SOURCE
+> Task :module15:processResources NO-SOURCE
+> Task :module16:processResources NO-SOURCE
+> Task :module17:processResources NO-SOURCE
+> Task :module18:processResources NO-SOURCE
+> Task :module19:processResources NO-SOURCE
+> Task :module20:processResources NO-SOURCE
+> Task :module21:processResources NO-SOURCE
+> Task :module22:processResources NO-SOURCE
+> Task :module23:processResources NO-SOURCE
+> Task :module24:processResources NO-SOURCE
+> Task :module25:processResources NO-SOURCE
+> Task :module26:processResources NO-SOURCE
+> Task :module27:processResources NO-SOURCE
+> Task :module28:processResources NO-SOURCE
+> Task :module29:processResources NO-SOURCE
+> Task :module30:processResources NO-SOURCE
+> Task :module31:processResources NO-SOURCE
+> Task :module32:processResources NO-SOURCE
+> Task :module33:processResources NO-SOURCE
+> Task :module34:processResources NO-SOURCE
+> Task :module35:processResources NO-SOURCE
+> Task :module36:processResources NO-SOURCE
+> Task :module37:processResources NO-SOURCE
+> Task :module38:processResources NO-SOURCE
+> Task :module39:processResources NO-SOURCE
+> Task :module40:processResources NO-SOURCE
+> Task :module41:processResources NO-SOURCE
+> Task :module42:processResources NO-SOURCE
+> Task :module43:processResources NO-SOURCE
+> Task :module44:processResources NO-SOURCE
+> Task :module45:processResources NO-SOURCE
+> Task :module46:processResources NO-SOURCE
+> Task :module47:processResources NO-SOURCE
+> Task :module48:processResources NO-SOURCE
+> Task :module49:processResources NO-SOURCE
+> Task :module50:processResources NO-SOURCE
+> Task :module51:processResources NO-SOURCE
+> Task :module52:processResources NO-SOURCE
+> Task :module53:processResources NO-SOURCE
+> Task :module54:processResources NO-SOURCE
+> Task :module55:processResources NO-SOURCE
+> Task :module56:processResources NO-SOURCE
+> Task :module57:processResources NO-SOURCE
+> Task :module58:processResources NO-SOURCE
+> Task :module59:processResources NO-SOURCE
+> Task :module60:processResources NO-SOURCE
+> Task :compileKotlin FAILED
+e: /home/u/app/src/main/kotlin/Shop.kt: (12, 5): Unresolved reference: totl
+w: /home/u/app/src/main/kotlin/Shop.kt: (3, 9): Variable 'x' is never used
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileKotlin'.
+> Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+
+BUILD FAILED in 2s

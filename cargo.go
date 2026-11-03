@@ -2,6 +2,7 @@ package abbreviatory
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -181,18 +182,21 @@ func (c *cargoTest) line(n int64, text string, emit func(Record)) {
 	}
 	switch {
 	case strings.HasPrefix(text, "     Running ") || strings.HasPrefix(text, "   Doc-tests "):
-		c.target = strings.TrimSpace(text)
-		if i := strings.Index(c.target, " ("); i > 0 {
-			c.target = c.target[:i]
-		}
+		c.target = cargoTarget(strings.TrimSpace(text))
 		c.listing = false
 		infoLine(n, text, emit)
 	case cargoTestLine.MatchString(text):
 		m := cargoTestLine.FindStringSubmatch(text)
 		tc := &cargoCase{target: c.target, name: m[1], status: m[2], lines: []Range{{n, n}}}
-		if old := c.byName[c.key(m[1])]; old != nil {
-			// The same name twice in one binary: keep both.
-			tc.name += " (again)"
+		if tc.status != "FAILED" {
+			// Passes and skips need nothing that comes later: emitted now,
+			// so a run of a million tests holds only its failures.
+			emit(tc.record())
+			return
+		}
+		for i := 2; c.byName[c.key(tc.name)] != nil; i++ {
+			// The same name failing twice in one binary: keep both.
+			tc.name = m[1] + " (again " + strconv.Itoa(i) + ")"
 		}
 		c.byName[c.key(tc.name)] = tc
 		c.tests = append(c.tests, tc)
@@ -219,36 +223,72 @@ func (c *cargoTest) line(n int64, text string, emit func(Record)) {
 func (c *cargoTest) finish(emit func(Record)) []string {
 	c.diags.flush(emit)
 	for _, tc := range c.tests {
-		id := tc.name
-		if tc.target != "" {
-			id = tc.target + " " + tc.name
-		}
-		r := Record{ID: id, Name: tc.name, Head: tc.name, Lines: mergeRanges(tc.lines)}
-		switch {
-		case tc.status == "ok" || strings.HasPrefix(tc.status, "bench:"):
-			r.Kind = KindPass
-		case tc.status == "FAILED":
-			r.Kind = KindFail
-			r.Detail = tc.detail
-			if tc.more > 0 {
-				r.Detail = append(r.Detail, "... ("+plural(tc.more, "more line", "more lines")+")")
-			}
-			// The panic message says why: show it in the head.
-			if msg := cargoPanicMessage(tc.detail); msg != "" {
-				r.Head = tc.name + " - " + msg
-			}
-		default:
-			r.Kind = KindSkip
-		}
-		emit(r)
+		emit(tc.record())
 	}
 	return c.summary
 }
 
-// cargoPanicMessage is the line after "thread '...' panicked at ...:".
+func (tc *cargoCase) record() Record {
+	id := tc.name
+	if tc.target != "" {
+		id = tc.target + " " + tc.name
+	}
+	r := Record{ID: id, Name: tc.name, Head: tc.name, Lines: mergeRanges(tc.lines)}
+	switch {
+	case tc.status == "ok" || strings.HasPrefix(tc.status, "bench:"):
+		r.Kind = KindPass
+	case tc.status == "FAILED":
+		r.Kind = KindFail
+		r.Detail = tc.detail
+		if tc.more > 0 {
+			r.Detail = append(r.Detail, "... ("+plural(tc.more, "more line", "more lines")+")")
+		}
+		// The panic message says why: show it in the head.
+		if msg := cargoPanicMessage(tc.detail); msg != "" {
+			r.Head = tc.name + " - " + msg
+		}
+	default:
+		r.Kind = KindSkip
+	}
+	return r
+}
+
+// cargoTarget names the test binary of a "Running" or "Doc-tests" line.
+// Every crate's library tests are "unittests src/lib.rs", so in a workspace
+// the binary's name (its file name without the hash) tells them apart:
+// "Running unittests src/lib.rs (target/debug/deps/core-1a2b3c)" is
+// "core unittests src/lib.rs".
+func cargoTarget(line string) string {
+	desc, bin, ok := strings.Cut(line, " (")
+	if !ok {
+		return line
+	}
+	bin = strings.TrimSuffix(bin, ")")
+	if i := strings.LastIndexAny(bin, "/\\"); i >= 0 {
+		bin = bin[i+1:]
+	}
+	bin = strings.TrimSuffix(bin, ".exe")
+	if i := strings.LastIndexByte(bin, '-'); i > 0 && allHex(bin[i+1:]) {
+		bin = bin[:i]
+	}
+	desc = strings.TrimPrefix(desc, "Running ")
+	if bin == "" {
+		return desc
+	}
+	return bin + " " + desc
+}
+
+// cargoPanicMessage is the line after "thread '...' panicked at ...:", or,
+// before Rust 1.73, the quoted message on that line itself ("panicked at
+// 'boom', src/lib.rs:4:5").
 func cargoPanicMessage(detail []string) string {
 	for i, l := range detail {
 		if strings.HasPrefix(l, "thread '") && strings.Contains(l, "panicked at") {
+			if _, rest, ok := strings.Cut(l, "panicked at '"); ok {
+				if j := strings.LastIndex(rest, "', "); j >= 0 {
+					return rest[:j]
+				}
+			}
 			if i+1 < len(detail) {
 				return strings.TrimSpace(detail[i+1])
 			}

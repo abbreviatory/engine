@@ -1,0 +1,50 @@
+   Compiling b v0.1.0 (/work/b)
+   Compiling a v0.1.0 (/work/a)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+     Running unittests src/lib.rs (target/debug/deps/a-ccd5514ba7ba7e0a)
+
+running 2 tests
+test tests::it_works ... ok
+test tests::other ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/b-b330f3dc66b5b7aa)
+
+running 1 test
+test tests::it_works ... FAILED
+
+failures:
+
+---- tests::it_works stdout ----
+
+thread 'tests::it_works' (6879) panicked at b/src/lib.rs:1:50:
+assertion `left == right` failed: b is broken
+  left: 2
+ right: 3
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/std/src/panicking.rs:689:5
+   1: core::panicking::panic_fmt
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:80:14
+   2: core::panicking::assert_failed_inner
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:434:23
+   3: core::panicking::assert_failed::<i32, i32>
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/panicking.rs:394:5
+   4: b::tests::it_works
+             at ./src/lib.rs:1:50
+   5: b::tests::it_works::{closure#0}
+             at ./src/lib.rs:1:47
+   6: <b::tests::it_works::{closure#0} as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+   7: <fn() -> core::result::Result<(), alloc::string::String> as core::ops::function::FnOnce<()>>::call_once
+             at /rustc/2d8144b7880597b6e6d3dfd63a9a9efae3f533d3/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+
+failures:
+    tests::it_works
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+error: test failed, to rerun pass `-p b --lib`

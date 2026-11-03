@@ -12,7 +12,9 @@ import (
 var (
 	tscPlain  = regexp.MustCompile(`^(.+?)\(([0-9]+),([0-9]+)\): (error|warning|message) (TS[0-9]+): (.*)$`)
 	tscPretty = regexp.MustCompile(`^(.+?):([0-9]+):([0-9]+) - (error|warning|message) (TS[0-9]+): (.*)$`)
-	tscFound  = regexp.MustCompile(`^Found [0-9]+ errors?\b`)
+	tscFound  = regexp.MustCompile(`^(?:\[[^\]]{1,40}\] )?Found [0-9]+ errors?\b`)
+	// tscStamp starts a line of tsc --watch or -b --verbose: "[10:00:01 AM] ".
+	tscStamp = regexp.MustCompile(`^\[[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?: ?[AaPp][Mm])?\] `)
 	// A diagnostic without a file, such as a bad tsconfig.json.
 	tscBare = regexp.MustCompile(`^(error|warning) (TS[0-9]+): (.*)$`)
 )
@@ -54,13 +56,23 @@ func (t *tsc) line(n int64, text string, emit func(Record)) {
 	}
 	if tscFound.MatchString(text) {
 		t.b.flush(emit)
-		t.summary = append(t.summary, text)
+		// In watch mode every compilation ends with a count; the last one
+		// is the state the output ends in.
+		t.summary = []string{text}
 		infoLine(n, text, emit)
 		return
 	}
 	if text == "Errors  Files" {
 		t.b.flush(emit)
 		t.table = true
+		infoLine(n, text, emit)
+		return
+	}
+	if tscStamp.MatchString(text) {
+		// A new compilation in watch mode, or a build step: information,
+		// and the end of the diagnostic before it.
+		t.b.flush(emit)
+		t.table = false
 		infoLine(n, text, emit)
 		return
 	}
@@ -165,13 +177,18 @@ func (e *eslint) line(n int64, text string, emit func(Record)) {
 
 func (e *eslint) finish(emit func(Record)) []string { return e.summary }
 
-// looksPath reports a line that is a file path on its own.
+// looksPath reports a line that is a file path on its own: an absolute path
+// (ESLint's stylish output prints those, extension or not), or a relative one
+// whose file name has an extension.
 func looksPath(s string) bool {
 	if strings.ContainsAny(s, " \t") && !strings.Contains(s, "/") && !strings.Contains(s, "\\") {
 		return false
 	}
-	return (strings.HasPrefix(s, "/") || strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") ||
-		len(s) > 2 && s[1] == ':' && (s[2] == '\\' || s[2] == '/') || strings.Contains(s, "/")) &&
+	abs := strings.HasPrefix(s, "/") || len(s) > 2 && s[1] == ':' && (s[2] == '\\' || s[2] == '/')
+	if abs && !strings.HasSuffix(s, "/") && !strings.HasSuffix(s, ":") {
+		return true
+	}
+	return (strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") || strings.Contains(s, "/")) &&
 		strings.LastIndex(s, ".") > strings.LastIndexAny(s, "/\\")
 }
 

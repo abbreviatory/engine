@@ -161,6 +161,12 @@ func innermostItems(items []string) []string {
 	return out
 }
 
+// tracksTests reports a reduction whose failed tests run history knows by
+// name: test runners', and the build tools that run tests (Gradle, Maven).
+func tracksTests(res *Result) bool {
+	return res.Family == FamilyTests || res.Family == FamilyBuild
+}
+
 func hashKey(s string) string {
 	h := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(h[:8])
@@ -171,7 +177,7 @@ func hashKey(s string) string {
 func runItems(res *Result, groups []*group, passIDs map[string]bool, doc *jsonDoc, rules preserve) (bad []item, good map[string]bool) {
 	seen := map[string]bool{}
 	good = map[string]bool{}
-	tests := res.Family == FamilyTests
+	tests := tracksTests(res)
 	if doc != nil {
 		if !rules.errors {
 			return nil, good

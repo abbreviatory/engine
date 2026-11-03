@@ -105,7 +105,7 @@ type reduceFlags struct {
 
 func addReduceFlags(fs *flag.FlagSet) *reduceFlags {
 	f := &reduceFlags{}
-	fs.StringVar(&f.q.Format, "format", "auto", "input format: auto, test-output, logs, json, or a format from \"abbreviatory formats\"")
+	fs.StringVar(&f.q.Format, "format", "auto", "input format: auto, test-output, build, logs, json, or a format from \"abbreviatory formats\"")
 	fs.IntVar(&f.q.Budget, "budget", abbreviatory.DefaultBudget, "most bytes of output")
 	fs.StringVar(&f.preserve, "preserve", "errors,failures,warnings", "what is always shown or referenced (any of errors, failures, warnings; empty for none)")
 	fs.Var(&f.keep, "keep", "also preserve lines matching this regular expression (repeatable)")

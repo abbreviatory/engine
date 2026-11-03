@@ -1,0 +1,17 @@
+[INFO] Scanning for projects...
+[INFO] Reactor Summary for parent 1.0:
+[INFO] core ............................................... FAILURE [  0.5 s]
+[INFO] cli ................................................ SKIPPED
+[INFO] BUILD FAILURE
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project core: Compilation failure
+[ERROR] /x/core/src/main/java/A.java:[3,5] cannot find symbol
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+[ERROR] 
+[ERROR] After correcting the problems, you can resume the build with the command
+[ERROR]   mvn <args> -rf :core

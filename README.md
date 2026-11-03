@@ -231,7 +231,13 @@ as the runner line.
   notices are information.
 
 Their history works as for logs: an error is known by its text with numbers
-aside, a failed test by its name.
+aside, a failed test (cargo, Gradle, Maven) by its name. A failure that sums
+up others (Gradle's "What went wrong", Maven's "Failed to execute goal") is
+known by its first line, so fixing one compiler error under it doesn't make
+it new. In a cargo workspace a test is named with its crate's test binary
+(`core unittests src/lib.rs tests::parses`), so crates with the same test
+names stay apart. tsc in watch mode ends each compilation with a count; the
+last one is the runner line.
 
 ## Options
 
@@ -473,7 +479,9 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   by default; passes and skips with `testLogging`). A tool's output wrapped
   by another (tsc run by `npm run build`) is read as the first one found, and
   the other tool's lines by their level words. Yarn's output is read as a
-  log.
+  log. `cargo test -- --nocapture` can put a test's `ok` on a later line than
+  its name; such a test isn't counted. Colour codes are taken out before
+  reading, so `CARGO_TERM_COLOR=always` and `eslint --color` are fine.
 - The MCP `run` tool runs whatever command the agent asks for, as the user
   the server runs as, the same as an agent's own shell tool would.
 

@@ -11,6 +11,8 @@ import (
 var (
 	javacDiag  = regexp.MustCompile(`^(.+\.(?:java|groovy|scala)):([0-9]+): (error|warning): (.*)$`)
 	kotlinDiag = regexp.MustCompile(`^([ew]): (?:file://)?(.+\.kts?):([0-9]+):([0-9]+):? (.*)$`)
+	// kotlinOld is the form before Kotlin 1.8: "e: /src/Shop.kt: (12, 5): ...".
+	kotlinOld  = regexp.MustCompile(`^([ew]): (.+\.kts?): \(([0-9]+), ([0-9]+)\): (.*)$`)
 	gradleTask = regexp.MustCompile(`^> Task :\S+`)
 	gradleTest = regexp.MustCompile(`^(\S.*?) > (.+) (FAILED|PASSED|SKIPPED)$`)
 	gradleDone = regexp.MustCompile(`^[0-9]+ tests? completed, [0-9]+ failed`)
@@ -20,6 +22,7 @@ var (
 type gradle struct {
 	b       block
 	section string // "", "wrong" (* What went wrong), "try" (* Try, * Get more help)
+	sawPass bool   // a PASSED line: Gradle's test logging names passing tests
 	summary []string
 }
 
@@ -30,8 +33,13 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 		// Everything up to "* Try:" is the failure, the compiler's
 		// messages repeated in it included.
 		if g.b.pend.Head == "* What went wrong:" && strings.TrimSpace(text) != "" {
-			// Show what failed, not the heading.
+			// Show what failed, not the heading. Its identity is that line
+			// alone: the compiler's messages repeated under it change
+			// whenever one of them does, and are items of their own.
 			g.b.pend.Head = strings.TrimSpace(text)
+			g.b.pend.GroupKey = "wrong\x00" + g.b.pend.Head
+			g.b.pend.addLine(n)
+			return
 		}
 		g.b.add(n, text)
 		return
@@ -44,8 +52,11 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 		g.b.start(n, levelKind(m[3]), m[1]+":"+m[2]+" "+m[3]+": "+m[4], emit)
 		g.section = ""
 		return
-	case kotlinDiag.MatchString(text):
+	case kotlinDiag.MatchString(text) || kotlinOld.MatchString(text):
 		m := kotlinDiag.FindStringSubmatch(text)
+		if m == nil {
+			m = kotlinOld.FindStringSubmatch(text)
+		}
 		level := "error"
 		if m[1] == "w" {
 			level = "warning"
@@ -59,6 +70,7 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 		switch m[3] {
 		case "PASSED":
 			k = KindPass
+			g.sawPass = true
 		case "SKIPPED":
 			k = KindSkip
 		}
@@ -108,6 +120,10 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 	}
 }
 
+// unnamedPasses: Gradle names passing tests only when its test logging is
+// set to; without it, a test missing from a run passed.
+func (g *gradle) unnamedPasses() bool { return !g.sawPass }
+
 func (g *gradle) finish(emit func(Record)) []string {
 	g.b.flush(emit)
 	return g.summary
@@ -144,6 +160,9 @@ var (
 	mvnDiag     = regexp.MustCompile(`^(.+\.(?:java|kt|groovy|scala)):\[([0-9]+),([0-9]+)\] (.*)$`)
 	mvnTestFail = regexp.MustCompile(`^(\S+) +-- Time elapsed: .*<<< (FAILURE|ERROR)!$`)
 	mvnTestOld  = regexp.MustCompile(`^(\S+)\((\S+)\) +Time elapsed: .*<<< (FAILURE|ERROR)!$`)
+	// mvnPlugin is a plugin's execution line: "[INFO] --- compiler:3.13.0:compile
+	// (default-compile) @ shop ---".
+	mvnPlugin   = regexp.MustCompile(`^\[INFO\] --- \S+ \(\S+\) @ \S+ ---$`)
 	mvnTestsRun = regexp.MustCompile(`^Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+`)
 )
 
@@ -167,7 +186,8 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 	}
 	// "Failed to execute goal" repeats the compiler's errors under it: they
 	// belong to that block, not new items. Maven's closing advice doesn't.
-	if m.b.open() && m.cont == "error" && level == "ERROR" && !mvnBoiler(msg) && !strings.HasPrefix(msg, "->") {
+	if m.b.open() && m.cont == "error" && level == "ERROR" && !mvnBoiler(msg) && !strings.HasPrefix(msg, "->") &&
+		!strings.HasPrefix(msg, "Failed to execute goal") {
 		if strings.TrimSpace(msg) == "" {
 			m.b.pend.addLine(n)
 		} else {
@@ -183,7 +203,11 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 	}
 	// Lines that start a block.
 	if d := mvnDiag.FindStringSubmatch(msg); d != nil && (level == "ERROR" || level == "WARNING" || level == "WARN") {
-		m.b.start(n, levelKind(level), d[1]+":"+d[2]+":"+d[3]+" "+strings.ToLower(strings.TrimSuffix(level, "ING"))+": "+d[4], emit)
+		word := "error"
+		if level != "ERROR" {
+			word = "warning"
+		}
+		m.b.start(n, levelKind(level), d[1]+":"+d[2]+":"+d[3]+" "+word+": "+d[4], emit)
 		m.cont, m.results = "indent", false
 		return
 	}
@@ -201,6 +225,9 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 	}
 	if level == "ERROR" && strings.HasPrefix(msg, "Failed to execute goal") {
 		m.b.start(n, KindError, msg, emit)
+		// Known by this line alone, not by the messages Maven repeats
+		// under it.
+		m.b.pend.GroupKey = "goal\x00" + msg
 		m.cont, m.results = "error", false
 		return
 	}
@@ -267,7 +294,7 @@ func mvnBoiler(msg string) bool {
 	msg = strings.TrimSpace(msg)
 	for _, p := range []string{"To see the full stack trace of the errors", "Re-run Maven using the -X switch",
 		"For more information about the errors and possible solutions", "[Help 1] http", "After correcting the problems, you can resume the build",
-		"COMPILATION ERROR :", "COMPILATION WARNING :"} {
+		"COMPILATION ERROR :", "COMPILATION WARNING :", "mvn <args> -rf "} {
 		if strings.HasPrefix(msg, p) {
 			return true
 		}
@@ -275,17 +302,18 @@ func mvnBoiler(msg string) bool {
 	return false
 }
 
+// unnamedPasses: Maven names only the tests that failed.
+func (m *maven) unnamedPasses() bool { return true }
+
+// looksMaven reports Maven's console by lines only Maven prints; a count of
+// "[INFO]" lines isn't enough, many logs have them.
 func looksMaven(sample []byte) bool {
-	levels := 0
-	for _, l := range strings.SplitN(string(sample), "\n", 400) {
+	for _, l := range strings.SplitN(string(sample), "\n", 4000) {
 		l = strings.TrimRight(l, "\r")
-		if strings.HasPrefix(l, "[INFO] Scanning for projects") || strings.HasPrefix(l, "[INFO] BUILD ") ||
-			strings.HasPrefix(l, "[INFO] --- ") || strings.HasPrefix(l, "[ERROR] Failed to execute goal") {
+		if strings.HasPrefix(l, "[INFO] Scanning for projects...") || l == "[INFO] BUILD SUCCESS" || l == "[INFO] BUILD FAILURE" ||
+			mvnPlugin.MatchString(l) || strings.HasPrefix(l, "[ERROR] Failed to execute goal ") || strings.HasPrefix(l, "[INFO] Reactor Summary") {
 			return true
 		}
-		if mvnLevel.MatchString(l) {
-			levels++
-		}
 	}
-	return levels >= 20
+	return false
 }

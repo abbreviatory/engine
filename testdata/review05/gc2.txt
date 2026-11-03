@@ -1,0 +1,94 @@
+> Task :clean
+
+> Task :compileJava FAILED
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: List
+    private final List items = new ArrayList();
+                  ^
+  missing type arguments for generic class List<E>
+  where E is a type-variable:
+    E extends Object declared in interface List
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: ArrayList
+    private final List items = new ArrayList();
+                                   ^
+  missing type arguments for generic class ArrayList<E>
+  where E is a type-variable:
+    E extends Object declared in class ArrayList
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:10: warning: [unchecked] unchecked call to add(E) as a member of the raw type List
+        items.add(sku + ":" + cents);
+                 ^
+  where E is a type-variable:
+    E extends Object declared in interface List
+/work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14: warning: [deprecation] format(long) in Money has been deprecated
+        return Money.format(total());
+                    ^
+/work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:8: error: incompatible types: possible lossy conversion from long to int
+        int discount = coupon.length() > 0 ? 100L : 0;
+                                           ^
+/work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:9: error: cannot find symbol
+        return total - discount + shipping(cart);
+                                  ^
+  symbol:   method shipping(Cart)
+  location: class Checkout
+/work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:21: error: cannot find symbol
+        return cart.tot1();
+                   ^
+  symbol:   method totl()
+  location: variable cart of type Cart
+3 errors
+4 warnings
+
+[Incubating] Problems report is available at: file:///work/test/fixtures/src/javasample/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:14: warning: [deprecation] format(long) in Money has been deprecated
+          return Money.format(total());
+                      ^
+  /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:8: error: incompatible types: possible lossy conversion from long to int
+          int discount = coupon.length() > 0 ? 100L : 0;
+                                             ^
+  /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: List
+      private final List items = new ArrayList();
+                    ^
+    missing type arguments for generic class List<E>
+    where E is a type-variable:
+      E extends Object declared in interface List
+  /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:7: warning: [rawtypes] found raw type: ArrayList
+      private final List items = new ArrayList();
+                                     ^
+    missing type arguments for generic class ArrayList<E>
+    where E is a type-variable:
+      E extends Object declared in class ArrayList
+  /work/test/fixtures/src/javasample/src/main/java/shop/Cart.java:10: warning: [unchecked] unchecked call to add(E) as a member of the raw type List
+          items.add(sku + ":" + cents);
+                   ^
+    where E is a type-variable:
+      E extends Object declared in interface List
+  /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:9: error: cannot find symbol
+          return total - discount + shipping(cart);
+                                    ^
+    symbol:   method shipping(Cart)
+    location: class Checkout
+  /work/test/fixtures/src/javasample/src/broken/java/shop/Checkout.java:21: error: cannot find symbol
+          return cart.tot1();
+                     ^
+    symbol:   method totl()
+    location: variable cart of type Cart
+  3 errors
+  4 warnings
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 751ms
+2 actionable tasks: 2 executed

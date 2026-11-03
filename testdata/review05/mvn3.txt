@@ -1,0 +1,46 @@
+[INFO] Building module 1
+[INFO] Building module 2
+[INFO] Building module 3
+[INFO] Building module 4
+[INFO] Building module 5
+[INFO] Building module 6
+[INFO] Building module 7
+[INFO] Building module 8
+[INFO] Building module 9
+[INFO] Building module 10
+[INFO] Building module 11
+[INFO] Building module 12
+[INFO] Building module 13
+[INFO] Building module 14
+[INFO] Building module 15
+[INFO] Building module 16
+[INFO] Building module 17
+[INFO] Building module 18
+[INFO] Building module 19
+[INFO] Building module 20
+[INFO] Building module 21
+[INFO] Building module 22
+[INFO] Building module 23
+[INFO] Building module 24
+[INFO] Building module 25
+[INFO] Building module 26
+[INFO] Building module 27
+[INFO] Building module 28
+[INFO] Building module 29
+[INFO] Building module 30
+[INFO] Building module 31
+[INFO] Building module 32
+[INFO] Building module 33
+[INFO] Building module 34
+[INFO] Building module 35
+[INFO] Building module 36
+[INFO] Building module 37
+[INFO] Building module 38
+[INFO] Building module 39
+[INFO] Building module 40
+[INFO] Scanning for projects...
+[INFO] BUILD FAILURE
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.2:test (default-test) on project core: There are test failures.
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.13.0:compile (default-compile) on project web: Compilation failure
+[ERROR] /x/web/src/main/java/A.java:[3,5] cannot find symbol
+[ERROR] -> [Help 1]

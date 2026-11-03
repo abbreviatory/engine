@@ -38,6 +38,8 @@ const MinBudget = 512
 const (
 	maxWhole = 256 << 20
 	maxJSON  = 16 << 20
+	// sampleSize is how much of the input detection looks at.
+	sampleSize = 1 << 20
 )
 
 // Options control a reduction.
@@ -159,7 +161,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 	}
 
 	br := bufio.NewReaderSize(r, 1<<20)
-	sample, _ := br.Peek(1 << 20)
+	sample, _ := br.Peek(sampleSize)
 	if isBinary(sample[:min(len(sample), 64<<10)]) {
 		return nil, ErrBinary
 	}
@@ -212,8 +214,17 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 		} else if auto {
 			// It looked like a JSON document or a JUnit report and isn't
 			// one (a log that starts with "[", JSON lines, a report too
-			// damaged to read): read it as a log instead.
-			fi, _ = lookupFormat("logs")
+			// damaged to read): read it as a build tool's output if it is
+			// one (tsc --watch starts with "[10:00:01 AM]"), else as a log.
+			head := data
+			if len(head) > sampleSize {
+				head = head[:sampleSize]
+			}
+			name := detectBuild(head)
+			if name == "" {
+				name = "logs"
+			}
+			fi, _ = lookupFormat(name)
 			g = newGrouper(rules, opt.Keep)
 			if opt.Track {
 				g.passIDs, g.passNames = map[string]bool{}, map[string]bool{}
@@ -335,7 +346,7 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 // under the header and notes on the items.
 func trackRun(res *Result, opt Options, groups []*group, passIDs, passNames map[string]bool, unnamed bool, ranPkgs []string, doc *jsonDoc, rules preserve, budget int, refs bool,
 	renderAt func(int) (string, bool, bool, error)) error {
-	tests := res.Family == FamilyTests
+	tests := tracksTests(res)
 	bad, good := runItems(res, groups, passIDs, doc, rules)
 	cur := &Run{ID: res.ID, Format: res.Format, Command: opt.Command, Exit: opt.Exit, Records: res.Records, Bad: map[string]RunItem{}, Full: true}
 	cur.N = 1
