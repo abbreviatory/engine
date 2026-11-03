@@ -28,7 +28,7 @@ expression, a budget under 512).
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `-format` | `auto` | `auto`, a family (`test-output`, `logs`, `json`) or a format name (below) |
+| `-format` | `auto` | `auto`, a family (`test-output`, `build`, `logs`, `json`) or a format name (below) |
 | `-budget` | `4096` | most bytes of output; at least 512 |
 | `-preserve` | `errors,failures,warnings` | what is always shown or referenced; empty for nothing |
 | `-keep REGEX` | | also preserve lines matching the regular expression, a passing test's output included; repeatable |
@@ -164,6 +164,13 @@ defaults at most once an hour.
 | `gotest` | test-output | `=== RUN`, `--- FAIL:` or `--- PASS:` lines |
 | `pytest` | test-output | "test session starts" or a "short test summary info" banner |
 | `junit` | test-output | an XML file with `<testsuite>` or `<testcase>` |
+| `cargo-test` | test-output | a `running N tests` line and `test ... ok` lines or a `test result:` line |
+| `cargo` | build | a rustc `error[...]:` or `warning:` line followed by its `-->` location, or cargo's `Compiling` or `Finished` lines |
+| `tsc` | build | `file(line,col): error TS1234:` or `file:line:col - error TS1234:` lines |
+| `eslint` | build | a file path followed by `line:col  error` rows, a `✖ N problems` count, or compact or unix lines |
+| `gradle` | build | `> Task :` lines, `BUILD FAILED in` or `BUILD SUCCESSFUL in` |
+| `maven` | build | `[INFO] Scanning for projects`, `[INFO] BUILD`, `[INFO] ---` or `[ERROR] Failed to execute goal` lines, or 20 bracketed level lines |
+| `npm` | build | `npm error`, `npm ERR!` or `npm warn` lines, `ERR_PNPM_` errors or pnpm's `Progress: resolved` |
 | `http` | http | a status line first (`HTTP/1.1 200 OK`), or curl `-v`'s `*` and `>` lines before one |
 | `diff` | diff | a `diff --git` line, or `---`, `+++` and `@@ -` lines in a row, in the first 400 lines |
 | `listing` | listing | nearly every line a path, an `ls -l` row, a `tree` line or a `du` row |
@@ -171,7 +178,9 @@ defaults at most once an hour.
 | `json` | json | a single JSON object or array (not JSON lines) |
 
 `-format test-output` picks the runner, and reads the input as a log if it
-finds none. JSON lines (one object per line) are read as a log, with the level
+finds none; `-format build` does the same for the build tools. Detection
+tries HTTP, test runners, JSON, build tools, diffs and listings, in that
+order. JSON lines (one object per line) are read as a log, with the level
 taken from `"level"` or `"severity"`. Detection looks at the first megabyte.
 When auto-detection picks `json` or `junit` and the input turns out not to be
 one (a log whose lines start with `[`, a damaged report), or is too big to

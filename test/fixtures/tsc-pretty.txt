@@ -1,0 +1,51 @@
+[96msrc/cart.ts[0m:[93m9[0m:[93m7[0m - [91merror[0m[90m TS2322: [0mType 'string' is not assignable to type 'number'.
+
+[7m9[0m   let sum: number = "0";
+[7m [0m [91m      ~~~[0m
+
+[96msrc/cart.ts[0m:[93m11[0m:[93m26[0m - [91merror[0m[90m TS2339: [0mProperty 'quantity' does not exist on type 'Item'.
+
+[7m11[0m     sum += it.cents * it.quantity;
+[7m  [0m [91m                         ~~~~~~~~[0m
+
+[96msrc/cart.ts[0m:[93m17[0m:[93m9[0m - [91merror[0m[90m TS6133: [0m'unused' is declared but its value is never read.
+
+[7m17[0m   const unused = 1;
+[7m  [0m [91m        ~~~~~~[0m
+
+[96msrc/cart.ts[0m:[93m18[0m:[93m51[0m - [91merror[0m[90m TS2339: [0mProperty 'padStart' does not exist on type 'number'.
+
+[7m18[0m   return item.sku.toUpperCase() + " x" + item.qty.padStart(2);
+[7m  [0m [91m                                                  ~~~~~~~~[0m
+
+[96msrc/cart.ts[0m:[93m21[0m:[93m43[0m - [91merror[0m[90m TS2322: [0mType 'string' is not assignable to type 'number'.
+
+[7m21[0m export const sample: Item = { sku: "A-1", cents: "250", qty: 1 };
+[7m  [0m [91m                                          ~~~~~[0m
+
+  [96msrc/cart.ts[0m:[93m4[0m:[93m3[0m - The expected type comes from property 'cents' which is declared here on type 'Item'
+    [7m4[0m   cents: number;
+    [7m [0m [96m  ~~~~~[0m
+
+[96msrc/checkout.ts[0m:[93m6[0m:[93m20[0m - [91merror[0m[90m TS18048: [0m'coupon' is possibly 'undefined'.
+
+[7m6[0m   const discount = coupon.length > 0 ? 100 : 0;
+[7m [0m [91m                   ~~~~~~[0m
+
+[96msrc/checkout.ts[0m:[93m7[0m:[93m43[0m - [91merror[0m[90m TS2554: [0mExpected 2 arguments, but got 3.
+
+[7m7[0m   return formatMoney(t - discount, "EUR", true);
+[7m [0m [91m                                          ~~~~[0m
+
+[96msrc/checkout.ts[0m:[93m11[0m:[93m44[0m - [91merror[0m[90m TS2339: [0mProperty 'price' does not exist on type 'Item'.
+
+[7m11[0m   return items.map((i) => i.sku + ": " + i.price).join("\n");
+[7m  [0m [91m                                           ~~~~~[0m
+
+
+Found 8 errors in 2 files.
+
+Errors  Files
+     5  src/cart.ts[90m:9[0m
+     3  src/checkout.ts[90m:6[0m
+

@@ -72,6 +72,16 @@ var wantFormat = map[string]string{
 	"http-verbose-404.txt": "http",
 	"find-listing.txt":     "listing",
 	"ls-recursive.txt":     "listing",
+	"cargo-build.txt":      "cargo",
+	"cargo-test.txt":       "cargo-test",
+	"tsc.txt":              "tsc",
+	"tsc-pretty.txt":       "tsc",
+	"eslint.txt":           "eslint",
+	"gradle-compile.txt":   "gradle",
+	"gradle-test.txt":      "gradle",
+	"npm-install.txt":      "npm",
+	"npm-conflict.txt":     "npm",
+	"pnpm-install.txt":     "npm",
 }
 
 func TestDetection(t *testing.T) {
@@ -358,6 +368,19 @@ func TestExpectedContent(t *testing.T) {
 		"app.log": {"x486", "connection to 10.0.4.", "IllegalStateException", "FileNotFoundError",
 			"nil pointer dereference", "x1952", `config key "timeout" is deprecated`},
 		"api-response.json": {"array of 2,500 objects", "PRICE_STALE", `"index": 311`, `"index": 2210`, "3 error fields"},
+		"cargo-build.txt": {"error[E0425]: cannot find value `currency` in this scope at src/main.rs:12:27",
+			"error[E0308]: mismatched types at src/parse.rs:12:26", "unused import", "could not compile `ledger`"},
+		"cargo-test.txt": {"tests: 61 passed, 4 failed, 1 skipped", "tests::parses_comma - called `Result::unwrap()`",
+			"tests::negative_amounts - index out of bounds", "test result: FAILED"},
+		"tsc.txt":        {"src/cart.ts(9,7): error TS2322"},
+		"tsc-pretty.txt": {"src/cart.ts:9:7 - error TS2322", "Found 8 errors"},
+		"eslint.txt":     {"orders.js:25:10 error 'rate' is not defined (no-undef)", "money.js:12:12 error 'undefinedValue' is not defined", "54 problems"},
+		"gradle-compile.txt": {"Checkout.java:8 error: incompatible types", "Checkout.java:21 error: cannot find symbol",
+			"Execution failed for task ':compileJava'.", "[rawtypes] found raw type"},
+		"gradle-test.txt":  {"MoneyTest > parsesComma FAILED", "46 tests completed, 4 failed, 1 skipped"},
+		"npm-conflict.txt": {"npm error code ERESOLVE"},
+		"npm-install.txt":  {"9 vulnerabilities", "npm warn deprecated"},
+		"pnpm-install.txt": {"ERR_PNPM_FETCH_404"},
 	}
 	data := fixtures(t)
 	for name, wants := range cases {
@@ -390,5 +413,39 @@ func TestRatios(t *testing.T) {
 		in, out := len(data[n]), len(res.Text)
 		t.Logf("ratio %-20s %-12s %9d bytes %6d lines -> %5d bytes %3d lines (%.2f%% of the input)",
 			n, res.Format, in, res.InputLines, out, strings.Count(res.Text, "\n"), 100*float64(out)/float64(in))
+	}
+}
+
+// TestBuildHeads checks the build adapters' reductions where they have to
+// shorten: each error and failure is named by its file and line (or test),
+// and the tool's own count is kept.
+func TestBuildHeads(t *testing.T) {
+	cases := map[string][]string{
+		"tsc-pretty.txt": {"src/cart.ts:9:7 error TS2322: Type 'string' is not assignable", "src/cart.ts:11:26 error TS2339",
+			"runner: Found 8 errors in 2 files."},
+		"gradle-test.txt": {"MoneyTest > parsesComma - java.lang.NumberFormatException at MoneyTest.java:50",
+			"MoneyTest > roundsHalfUp - java.lang.AssertionError at MoneyTest.java:52", "runner: 46 tests completed, 4 failed, 1 skipped"},
+		"gradle-compile.txt": {"Checkout.java:9 error: cannot find symbol", "Execution failed for task ':compileJava'."},
+		"npm-conflict.txt":   {"npm error code ERESOLVE: unable to resolve dependency tree"},
+		"cargo-test.txt":     {"tests::rounds_half_up - assertion `left == right` failed"},
+	}
+	data := fixtures(t)
+	for name, wants := range cases {
+		budget := 1100
+		if len(data[name]) < 1500 {
+			budget = 600
+		}
+		res, err := Reduce(bytes.NewReader(data[name]), Options{Budget: budget})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res.Whole {
+			t.Errorf("%s: shown whole at %d bytes; the test needs a reduction", name, budget)
+		}
+		for _, w := range wants {
+			if !strings.Contains(res.Text, w) {
+				t.Errorf("%s: output lacks %q:\n%s", name, w, res.Text)
+			}
+		}
 	}
 }

@@ -2,7 +2,7 @@ name: test
 
 # Every push to main and every pull request: formatting, vet, the full test
 # suite (the promise tests on every fixture at every budget, robustness,
-# the store and the command) on Linux and macOS, the race detector and the
+# the store and the command) on Linux, macOS and Windows, the race detector and the
 # browser demo's WebAssembly build on Linux,
 # the release plan's cases, and the smoke check on a Windows binary on a
 # Windows runner. A passing run on main starts the release workflow, which
@@ -21,16 +21,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
+      # Byte-exact fixtures and gofmt need the files as committed.
+      - run: git config --global core.autocrlf false
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: "1.26.x"
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
-      - run: go test -count=1 ./...
+      - run: |
+          set -o pipefail
+          go test -count=1 ./... 2>&1 | tee test-output.txt
+      - name: Report test failures as annotations
+        # Job logs can't always be downloaded where this repo is worked on;
+        # annotations can.
+        if: failure()
+        run: |
+          grep -E -- '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:' test-output.txt | head -n 10 |
+            while IFS= read -r line; do echo "::error title=go test::$line"; done || true
       - if: runner.os == 'Linux'
         run: go test -race -count=1 ./...
       - run: go build ./...
@@ -40,8 +54,10 @@ jobs:
           GOOS: js
           GOARCH: wasm
         run: go vet ./cmd/abbreviatory-wasm && go build -o /dev/null ./cmd/abbreviatory-wasm
-      - run: python3 -B -m unittest discover -s scripts -p '*_test.py'
+      - if: runner.os != 'Windows'
+        run: python3 -B -m unittest discover -s scripts -p '*_test.py'
       - name: Smoke check
+        if: runner.os != 'Windows'
         run: |
           mkdir bin
           CGO_ENABLED=0 go build -trimpath -ldflags '-s -w' -o bin/abbreviatory ./cmd/abbreviatory

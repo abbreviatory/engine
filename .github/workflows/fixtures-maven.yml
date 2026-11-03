@@ -1,0 +1,49 @@
+name: fixtures-maven
+
+# Records Maven's fixtures, which need plugins from Maven Central (cloud
+# sessions can't reach it): a compile that fails with errors and warnings,
+# and a test run with failing tests, from test/fixtures/src/javasample. The
+# output is committed to test/fixtures/maven-compile.txt and
+# maven-test.txt. Run by hand:
+#   gh api -X POST repos/abbreviatory/engine/actions/workflows/fixtures-maven.yml/dispatches -f ref=main
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Record
+        run: |
+          set -u
+          root=$(pwd)
+          tidy() { sed -e "s|$root/|/work/|g" -e "s|$root|/work|g" -e "s|$HOME/|/home/user/|g" -e 's/ ([0-9.]* [kM]\?B at [0-9.]* [kM]\?B\/s)//'; }
+          cd test/fixtures/src/javasample
+          # Plugins and JUnit first, so the recordings don't list every download.
+          mvn -B -q -Pbroken dependency:go-offline > /dev/null 2>&1 || true
+          mvn -B -q test -DskipTests > /dev/null 2>&1 || true
+          mvn -B -Pbroken clean compile > /tmp/compile.txt 2>&1 || true
+          mvn -B clean test > /tmp/test.txt 2>&1 || true
+          mvn -B -q clean > /dev/null 2>&1 || true
+          tidy < /tmp/compile.txt > "$root/test/fixtures/maven-compile.txt"
+          tidy < /tmp/test.txt > "$root/test/fixtures/maven-test.txt"
+          cd "$root"
+          wc -l test/fixtures/maven-*.txt
+          grep -c '\[ERROR\]' test/fixtures/maven-compile.txt test/fixtures/maven-test.txt
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/fixtures/maven-compile.txt test/fixtures/maven-test.txt
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "Record Maven's fixtures (fixtures-maven workflow)"
+          git push

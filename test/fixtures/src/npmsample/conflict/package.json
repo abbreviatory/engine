@@ -1,0 +1,2 @@
+{ "name": "shop-web", "version": "1.0.0", "private": true,
+  "dependencies": { "react": "17.0.2", "react-dom": "18.2.0" } }

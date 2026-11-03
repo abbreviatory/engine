@@ -122,7 +122,7 @@ v0.4.0 adds three formats:
 - `listing.go`: find/fd paths, ls -l, ls -R, tree, du; grouped by directory
   and extension; own summary (files, directories, size, extensions,
   largest); tree's own count wins.
-- Detection order: http, tests, json, diff, listing, logs.
+- Detection order: http, tests, json, build tools (0.5), diff, listing, logs.
 - An independent review of 0.4 found: diff lines outside files dropped
   uncounted, combined diffs, hunks folded by their first 200 lines,
   generated files swallowing a shared change, HTTP history keyed by
@@ -186,8 +186,44 @@ subdomain): the engine compiled to WebAssembly (`cmd/abbreviatory-wasm`),
 built by `scripts/build-demo.sh` into the site repo's `static/demo/`. Rebuild
 and push it to the site after each release.
 
-The approved plan is done with v0.4.0. What comes next is to be decided with
-the owner.
+The approved plan is done with v0.4.0.
+
+## Next: 0.5 and 0.6, item 9 of softdev-plan.md
+
+Approved by YK on 2026-11-03 ("Go"): item 9 of softdev-plan.md in
+photozeitgeist/jollyroger.biz, Phases A and B and the upkeep, each phase
+its own release.
+
+Phase A, 0.5.0: adapters for the build tools, family `build`
+(`build.go`: `block`, `plainLine`, `infoLine`, `detectBuild`, npm):
+- `cargo.go`: `cargo` (rustc diagnostics: level line, `-->` location in
+  the head, snippet and notes to the blank line) and `cargo-test`
+  (test-output family: each `test ... ok/FAILED/ignored`, the failure
+  sections as detail, panic message in the head, `test result:` as runner).
+- `tsc.go`: `tsc` (plain and pretty) and `eslint` (stylish, compact, unix).
+- `jvm.go`: `gradle` (javac/kotlinc diagnostics, `X > y FAILED` tests,
+  "What went wrong" as one error) and `maven` (levels in brackets,
+  compiler messages, Surefire failures, "Failed to execute goal").
+- npm and pnpm in `build.go`.
+- Fixtures recorded from samples in `test/fixtures/src` (rustsample,
+  tssample, jssample, javasample, npmsample, pnpmsample) by
+  `scripts/record-fixtures.sh`; Maven's by the fixtures-maven workflow
+  (Maven Central is blocked here). Paths are written as /work.
+- Done when the promise tests pass on every fixture at every budget
+  (TestPromise, TestGroupsCoverInput) and TestBuildHeads holds.
+- Upkeep: full test suite on Windows in test.yml (autocrlf off,
+  .gitattributes), this Next heading, README on actions/cache v5, go.mod
+  1.26 (stdlib only, so the sandbox's Go 1.26 builds it), the demo rebuilt
+  after the release.
+
+Phase B, 0.6.0: warning history behind a flag (new warnings since the last
+run) and a GitHub Action wrapping `run` with the cache and the step summary.
+
+Steps:
+1. [x] Phase A adapters, fixtures, tests, README, reference
+2. [ ] Maven fixture from CI; independent review (two rounds), fixes; record-tests.sh
+3. [ ] release 0.5.0; demo; site post and pages; softdevstudio note; softdev-plan.md
+4. [ ] Phase B
 
 ## Test results
 

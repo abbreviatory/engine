@@ -43,6 +43,13 @@ var formats = []formatInfo{
 	{name: "gotest", family: FamilyTests, display: "go test output", new: func() lineAdapter { return newGoTestText() }},
 	{name: "pytest", family: FamilyTests, display: "pytest output", new: func() lineAdapter { return newPytest() }},
 	{name: "junit", family: FamilyTests, display: "JUnit XML report", whole: true},
+	{name: "cargo-test", family: FamilyTests, display: "cargo test output", new: func() lineAdapter { return newCargoTest() }},
+	{name: "cargo", family: FamilyBuild, display: "cargo / rustc output", new: func() lineAdapter { return newCargo() }},
+	{name: "tsc", family: FamilyBuild, display: "TypeScript compiler output", new: func() lineAdapter { return newTsc() }},
+	{name: "eslint", family: FamilyBuild, display: "ESLint output", new: func() lineAdapter { return newEslint() }},
+	{name: "gradle", family: FamilyBuild, display: "Gradle output", new: func() lineAdapter { return newGradle() }},
+	{name: "maven", family: FamilyBuild, display: "Maven output", new: func() lineAdapter { return newMaven() }},
+	{name: "npm", family: FamilyBuild, display: "npm / pnpm output", new: func() lineAdapter { return newNpm() }},
 	{name: "diff", family: FamilyDiff, display: "diff", new: func() lineAdapter { return newDiff() }},
 	{name: "http", family: FamilyHTTP, display: "HTTP response", new: func() lineAdapter { return newHTTP() }},
 	{name: "listing", family: FamilyListing, display: "directory listing", new: func() lineAdapter { return newListing() }},
@@ -84,6 +91,13 @@ func detect(sample []byte, want string) (formatInfo, error) {
 		// errors, warnings and repeats.
 		fi, _ := lookupFormat("logs")
 		return fi, nil
+	case FamilyBuild:
+		if f := detectBuild(sample); f != "" {
+			fi, _ := lookupFormat(f)
+			return fi, nil
+		}
+		fi, _ := lookupFormat("logs")
+		return fi, nil
 	case FamilyLogs, "log", "text":
 		fi, _ := lookupFormat("logs")
 		return fi, nil
@@ -104,6 +118,10 @@ func detect(sample []byte, want string) (formatInfo, error) {
 	}
 	if looksJSONDocument(sample) {
 		fi, _ := lookupFormat("json")
+		return fi, nil
+	}
+	if f := detectBuild(sample); f != "" {
+		fi, _ := lookupFormat(f)
 		return fi, nil
 	}
 	if looksDiff(sample) {
@@ -139,7 +157,7 @@ func looksDiff(sample []byte) bool {
 type FormatError struct{ Name string }
 
 func (e *FormatError) Error() string {
-	return "unknown format " + quote(e.Name) + "; known: auto, test-output, logs, json, " + strings.Join(FormatNames(), ", ")
+	return "unknown format " + quote(e.Name) + "; known: auto, test-output, build, logs, json, " + strings.Join(FormatNames(), ", ")
 }
 
 func quote(s string) string { return "\"" + s + "\"" }
@@ -171,6 +189,9 @@ func detectTests(sample []byte) string {
 	}
 	if events > 0 && events >= plain {
 		return "gotest-json"
+	}
+	if looksCargoTest(sample) {
+		return "cargo-test"
 	}
 	if bytes.Contains(sample, []byte("test session starts")) || bytes.Contains(sample, []byte("\n=========================== short test summary info")) {
 		return "pytest"

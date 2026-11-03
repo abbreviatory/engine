@@ -189,8 +189,12 @@ func levelOf(s string) Kind {
 	}
 	if strings.HasPrefix(s, "panic: ") || strings.HasPrefix(s, "fatal error: ") ||
 		strings.HasPrefix(s, "Traceback (most recent call last)") ||
-		strings.HasPrefix(s, "Exception in thread ") || strings.HasPrefix(s, "npm ERR!") {
+		strings.HasPrefix(s, "Exception in thread ") || strings.HasPrefix(s, "npm ERR!") || strings.HasPrefix(s, "npm error") ||
+		strings.HasPrefix(strings.TrimLeft(s, " "), "ERR_PNPM_") {
 		return KindError
+	}
+	if strings.HasPrefix(s, "npm warn ") {
+		return KindWarn
 	}
 	p := s
 	if len(p) > levelScan {

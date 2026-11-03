@@ -2,8 +2,8 @@
 
 Less output. Same essential information.
 
-Abbreviatory turns large tool output (a test run, a log, a JSON document, a
-diff, an HTTP response, a directory listing) into a short report. It keeps the failures, errors and warnings, folds repeats into
+Abbreviatory turns large tool output (a test run, a build, a log, a JSON
+document, a diff, an HTTP response, a directory listing) into a short report. It keeps the failures, errors and warnings, folds repeats into
 one line with a count, and fits the result in a byte budget you set. Anything
 it leaves out stays one command away, byte for byte.
 
@@ -43,7 +43,8 @@ A summary written by a model can drop the one line that mattered, and you
 can't check it. Abbreviatory works the other way. It only removes what its
 rules say is safe to remove, it says what it removed, and every removed part
 has a reference you can expand. It can't judge free prose; it reads formats it
-knows (test runners, logs, JSON, diffs, HTTP responses, listings) and says so when it falls back to reading
+knows (test runners, build tools, logs, JSON, diffs, HTTP responses,
+listings) and says so when it falls back to reading
 plain lines.
 
 ## Install
@@ -59,7 +60,7 @@ Download a binary for your system from the
 | macOS, Intel | [abbreviatory_darwin_amd64.tar.gz](https://github.com/abbreviatory/engine/releases/latest/download/abbreviatory_darwin_amd64.tar.gz) |
 | Windows, x86-64 | [abbreviatory_windows_amd64.zip](https://github.com/abbreviatory/engine/releases/latest/download/abbreviatory_windows_amd64.zip) |
 
-Or with Go 1.24 or later:
+Or with Go 1.26 or later:
 
 ```
 go install github.com/abbreviatory/engine/cmd/abbreviatory@latest
@@ -196,14 +197,48 @@ OTHER (7 kinds, 55,804 lines):
   total size, the most common extensions and the largest files. "Permission
   denied" and "No such file" lines are errors.
 
+## Build tools
+
+The output coding agents and CI read most: compilers, linters, build tools
+and package managers. Each error and warning is one item named by its file
+and line, with the code snippet and notes under it as detail; the tool's own
+count ("Found 8 errors", "test result: FAILED. 61 passed; 4 failed") is kept
+as the runner line.
+
+- **Rust** (`cargo build`, `check`, `clippy`): rustc's diagnostics
+  (`error[E0308]: mismatched types at src/parse.rs:12:26`) with their code,
+  notes and help. **`cargo test`**: every test by name, a failing test with
+  its panic message in the head and its output as detail, the counts.
+- **TypeScript** (`tsc`): plain output (`src/cart.ts(9,7): error TS2322`,
+  as in CI) and pretty output (with the code under each error).
+- **ESLint**: the default stylish output, one item per problem with its
+  rule (`orders.js:25:10 error 'rate' is not defined (no-undef)`), and the
+  compact and unix formats.
+- **Gradle**: javac's and kotlinc's errors and warnings, failed tests
+  (`MoneyTest > parsesComma - java.lang.NumberFormatException at
+  MoneyTest.java:50`), and "What went wrong" as one error with the
+  messages repeated in it.
+- **Maven**: compiler errors and warnings (`Checkout.java:21:20 error:
+  cannot find symbol`), failed tests with their stack traces, "Failed to
+  execute goal" blocks; every other line takes its kind from its `[ERROR]`,
+  `[WARNING]` or `[INFO]`.
+- **npm and pnpm**: an npm error block (`npm error code ERESOLVE: unable to
+  resolve dependency tree`) or a pnpm `ERR_PNPM_` error with its explanation
+  as one error, deprecation warnings, the audit count; progress and update
+  notices are information.
+
+Their history works as for logs: an error is known by its text with numbers
+aside, a failed test by its name.
+
 ## Options
 
 ```
 -budget N        most bytes of output (default 4096, at least 512)
 -preserve LIST   errors,failures,warnings by default; empty for none
 -keep REGEX      also keep lines matching this (repeatable)
--format NAME     auto, test-output, logs, json, or one of gotest-json, gotest,
-                 pytest, junit, diff, http, listing
+-format NAME     auto, test-output, build, logs, json, or one of
+                 gotest-json, gotest, pytest, junit, cargo-test, cargo, tsc,
+                 eslint, gradle, maven, npm, diff, http, listing
 -key NAME        keep a run history under NAME and report what changed
 -full            with history, the whole report even when nothing changed
 -json            a JSON object with the counts, the changes and the text
@@ -227,7 +262,7 @@ history to work. On GitHub Actions, with the cache saved whether the tests
 pass or not:
 
 ```yaml
-- uses: actions/cache/restore@v4
+- uses: actions/cache/restore@v5
   with:
     path: .abbreviatory
     key: abbreviatory-${{ github.ref_name }}-${{ github.run_id }}
@@ -236,7 +271,7 @@ pass or not:
 - if: always()
   run: abbreviatory prune -store .abbreviatory -max-size 50MB
 - if: always()
-  uses: actions/cache/save@v4
+  uses: actions/cache/save@v5
   with:
     path: .abbreviatory
     key: abbreviatory-${{ github.ref_name }}-${{ github.run_id }}
@@ -380,7 +415,7 @@ references in them expanded through each, and run histories built through
 each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
 [tests.txt](test/results/tests.txt)).
 
-## Limits in v0.4.0
+## Limits in v0.5.0
 
 - It reads formats it knows. Free prose, or a log format it doesn't
   recognise, is reduced only by folding repeats and finding level words.
@@ -429,6 +464,13 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
 - Listings: `du -a` can't tell a file without an extension from a
   directory, and counts it as one. In `tree` output a directory is known by
   the deeper line after it, so an empty directory counts as a file.
+- Build tools: Rust is read in cargo's human format, not
+  `--message-format=json`; ESLint in its stylish, compact and unix formats,
+  not JSON or SARIF; Gradle's tests only as its console prints them (failures
+  by default; passes and skips with `testLogging`). A tool's output wrapped
+  by another (tsc run by `npm run build`) is read as the first one found, and
+  the other tool's lines by their level words. Yarn's output is read as a
+  log.
 - The MCP `run` tool runs whatever command the agent asks for, as the user
   the server runs as, the same as an agent's own shell tool would.
 

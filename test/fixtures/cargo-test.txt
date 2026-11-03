@@ -1,0 +1,109 @@
+   Compiling money v0.1.0 (/work/test/fixtures/src/rustsample/tests)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.33s
+     Running unittests src/lib.rs (target/debug/deps/money-03ca40f40b1a9b08)
+
+running 66 tests
+test tests::huge_amounts ... ignored
+test tests::parses_1 ... ok
+test tests::negative_amounts ... FAILED
+test tests::parses_10 ... ok
+test tests::parses_11 ... ok
+test tests::parses_12 ... ok
+test tests::parses_13 ... ok
+test tests::parses_14 ... ok
+test tests::parses_15 ... ok
+test tests::parses_16 ... ok
+test tests::parses_17 ... ok
+test tests::parses_18 ... ok
+test tests::parses_19 ... ok
+test tests::parses_2 ... ok
+test tests::parses_20 ... ok
+test tests::parses_21 ... ok
+test tests::parses_22 ... ok
+test tests::parses_23 ... ok
+test tests::parses_24 ... ok
+test tests::parses_25 ... ok
+test tests::parses_26 ... ok
+test tests::parses_27 ... ok
+test tests::parses_28 ... ok
+test tests::parses_29 ... ok
+test tests::parses_3 ... ok
+test tests::parses_30 ... ok
+test tests::parses_31 ... ok
+test tests::parses_32 ... ok
+test tests::parses_33 ... ok
+test tests::parses_34 ... ok
+test tests::parses_35 ... ok
+test tests::parses_36 ... ok
+test tests::parses_37 ... ok
+test tests::parses_38 ... ok
+test tests::parses_39 ... ok
+test tests::parses_4 ... ok
+test tests::parses_40 ... ok
+test tests::parses_41 ... ok
+test tests::parses_42 ... ok
+test tests::parses_43 ... ok
+test tests::parses_44 ... ok
+test tests::parses_45 ... ok
+test tests::parses_46 ... ok
+test tests::parses_47 ... ok
+test tests::parses_48 ... ok
+test tests::parses_49 ... ok
+test tests::parses_5 ... ok
+test tests::parses_50 ... ok
+test tests::parses_51 ... ok
+test tests::parses_52 ... ok
+test tests::parses_53 ... ok
+test tests::parses_54 ... ok
+test tests::parses_55 ... ok
+test tests::parses_56 ... ok
+test tests::parses_57 ... ok
+test tests::parses_58 ... ok
+test tests::parses_59 ... ok
+test tests::parses_6 ... ok
+test tests::parses_60 ... ok
+test tests::parses_7 ... ok
+test tests::parses_8 ... ok
+test tests::parses_9 ... ok
+test tests::parses_one_digit_cents ... FAILED
+test tests::parses_comma ... FAILED
+test tests::rounds_down ... ok
+test tests::rounds_half_up ... FAILED
+
+failures:
+
+---- tests::negative_amounts stdout ----
+
+thread 'tests::negative_amounts' (2358) panicked at src/lib.rs:345:21:
+index out of bounds: the len is 0 but the index is 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- tests::parses_one_digit_cents stdout ----
+
+thread 'tests::parses_one_digit_cents' (2420) panicked at src/lib.rs:329:9:
+assertion `left == right` failed
+  left: 105
+ right: 150
+
+---- tests::parses_comma stdout ----
+
+thread 'tests::parses_comma' (2419) panicked at src/lib.rs:324:40:
+called `Result::unwrap()` on an `Err` value: "bad amount \"1,50\": invalid digit found in string"
+
+---- tests::rounds_half_up stdout ----
+
+thread 'tests::rounds_half_up' (2422) panicked at src/lib.rs:334:9:
+assertion `left == right` failed
+  left: 10
+ right: 20
+
+
+failures:
+    tests::negative_amounts
+    tests::parses_comma
+    tests::parses_one_digit_cents
+    tests::rounds_half_up
+
+test result: FAILED. 61 passed; 4 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `--lib`
