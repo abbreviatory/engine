@@ -10,8 +10,10 @@ import (
 // ("src/cart.ts:9:7 - error TS2322: ..." with the code under it).
 
 var (
-	tscPlain  = regexp.MustCompile(`^(.+?)\(([0-9]+),([0-9]+)\): (error|warning|message) (TS[0-9]+): (.*)$`)
-	tscPretty = regexp.MustCompile(`^(.+?):([0-9]+):([0-9]+) - (error|warning|message) (TS[0-9]+): (.*)$`)
+	// The path starts the line: not a quote, a brace or a space, so a JSON
+	// log quoting tsc isn't taken for it.
+	tscPlain  = regexp.MustCompile(`^([^\s"'{\[][^"]*?)\(([0-9]+),([0-9]+)\): (error|warning|message) (TS[0-9]+): (.*)$`)
+	tscPretty = regexp.MustCompile(`^([^\s"'{\[][^"]*?):([0-9]+):([0-9]+) - (error|warning|message) (TS[0-9]+): (.*)$`)
 	tscFound  = regexp.MustCompile(`^(?:\[[^\]]{1,40}\] )?Found [0-9]+ errors?\b`)
 	// tscStamp starts a line of tsc --watch or -b --verbose: "[10:00:01 AM] ".
 	tscStamp = regexp.MustCompile(`^\[[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?: ?[AaPp][Mm])?\] `)
@@ -69,11 +71,12 @@ func (t *tsc) line(n int64, text string, emit func(Record)) {
 		return
 	}
 	if tscStamp.MatchString(text) {
-		// A new compilation in watch mode, or a build step: information,
-		// and the end of the diagnostic before it.
+		// A new compilation in watch mode, or a build step: the end of the
+		// diagnostic before it, and information unless its words say
+		// otherwise (gulp's "[10:00:03] Error: ...").
 		t.b.flush(emit)
 		t.table = false
-		infoLine(n, text, emit)
+		plainLine(n, text, emit)
 		return
 	}
 	if t.b.open() {
@@ -85,8 +88,8 @@ func (t *tsc) line(n int64, text string, emit func(Record)) {
 		}
 		t.b.flush(emit)
 	}
-	if t.table || strings.HasPrefix(text, "[") && strings.Contains(text, "] ") {
-		// The table of counts per file, and the timestamps of --watch.
+	if t.table {
+		// The table of counts per file.
 		infoLine(n, text, emit)
 		return
 	}
@@ -184,8 +187,12 @@ func looksPath(s string) bool {
 	if strings.ContainsAny(s, " \t") && !strings.Contains(s, "/") && !strings.Contains(s, "\\") {
 		return false
 	}
+	if strings.Contains(s, ": ") {
+		// "/bin/sh: prettier: command not found" is a message.
+		return false
+	}
 	abs := strings.HasPrefix(s, "/") || len(s) > 2 && s[1] == ':' && (s[2] == '\\' || s[2] == '/')
-	if abs && !strings.HasSuffix(s, "/") && !strings.HasSuffix(s, ":") {
+	if abs && !strings.ContainsAny(s, " \t") && !strings.HasSuffix(s, "/") && !strings.HasSuffix(s, ":") {
 		return true
 	}
 	return (strings.HasPrefix(s, "./") || strings.HasPrefix(s, "../") || strings.Contains(s, "/")) &&

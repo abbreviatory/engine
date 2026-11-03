@@ -31,12 +31,14 @@ func review05Reduce(t *testing.T, data []byte, opt Options) *Result {
 }
 
 func TestReview05Promise(t *testing.T) {
-	files, _ := filepath.Glob(filepath.Join("testdata", "review05", "*"))
+	files, _ := filepath.Glob(filepath.Join("testdata", "review05", "*.txt"))
+	more, _ := filepath.Glob(filepath.Join("testdata", "review05", "b", "*.txt"))
+	files = append(files, more...)
 	if len(files) == 0 {
 		t.Fatal("no review inputs")
 	}
 	for _, f := range files {
-		name := filepath.Base(f)
+		name, _ := filepath.Rel(filepath.Join("testdata", "review05"), f)
 		data := review05(t, name)
 		checkCoverage(t, name, data, review05Reduce(t, data, Options{}))
 		for _, b := range []int{512, 1000, 4096} {
@@ -220,4 +222,93 @@ func readFixture(t *testing.T, name string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// Second round of the review.
+
+// 1. A run whose tests never ran (a compile error) leaves the earlier
+// failing tests "not run", not fixed; modules sharing test names stay apart.
+func TestReview05bCompileAfterTests(t *testing.T) {
+	for _, pair := range [][2]string{{"maven-test.txt", "maven-compile.txt"}, {"gradle-test.txt", "gradle-compile.txt"}} {
+		first := review05Reduce(t, readFixture(t, pair[0]), Options{Track: true})
+		res := review05Reduce(t, readFixture(t, pair[1]), Options{Track: true, History: []Run{*first.Run}})
+		for _, it := range res.Delta.Fixed {
+			if strings.Contains(it.Head, "MoneyTest") {
+				t.Errorf("%s then %s: test counted fixed: %s", pair[0], pair[1], it.Head)
+			}
+		}
+		if len(res.Delta.NotRun) != 4 {
+			t.Errorf("%s then %s: not run %v", pair[0], pair[1], res.Delta.NotRun)
+		}
+	}
+	g := newGradle()
+	var ids []string
+	for i, l := range []string{"> Task :core:test FAILED", "MoneyTest > parsesComma FAILED", "> Task :web:test", "MoneyTest > parsesComma FAILED"} {
+		g.line(int64(i+1), l, func(r Record) {
+			if r.ID != "" {
+				ids = append(ids, r.ID)
+			}
+		})
+	}
+	g.finish(func(r Record) { ids = append(ids, r.ID) })
+	if strings.Join(ids, "|") != ":core:test.MoneyTest > parsesComma|:web:test.MoneyTest > parsesComma" {
+		t.Errorf("gradle IDs %q", ids)
+	}
+}
+
+// 2. tsc and the other compilers and linters keep the words of logs.
+func TestReview05bErrorWording(t *testing.T) {
+	data := readFixture(t, "tsc.txt")
+	first := review05Reduce(t, data, Options{Track: true})
+	lines := bytes.SplitAfter(data, []byte("\n"))
+	res := review05Reduce(t, bytes.Join(lines[:2], nil), Options{Track: true, History: []Run{*first.Run}})
+	if res.Delta.Tests || strings.Contains(res.Text, "fixed") {
+		t.Errorf("tsc errors worded as tests:\n%s", res.Text)
+	}
+}
+
+// 3. -format build and -format test-output find cargo test, Gradle and Maven.
+func TestReview05bFamilyFormats(t *testing.T) {
+	if res := review05Reduce(t, readFixture(t, "cargo-test.txt"), Options{Format: "build"}); res.Format != "cargo-test" {
+		t.Errorf("-format build on cargo test: %s", res.Format)
+	}
+	if res := review05Reduce(t, readFixture(t, "maven-test.txt"), Options{Format: "test-output"}); res.Format != "maven" {
+		t.Errorf("-format test-output on maven: %s", res.Format)
+	}
+}
+
+// 4. Messages that start with an absolute path aren't ESLint file lines.
+func TestReview05bEslintMessages(t *testing.T) {
+	for _, s := range []string{"/bin/sh: prettier: command not found", `C:\Users\ci\run.cmd failed with ERROR code 1`,
+		"/home/ci/app/node_modules/.bin/eslint exited with Error 2"} {
+		if looksPath(s) {
+			t.Errorf("%q taken for a file", s)
+		}
+	}
+	res := review05Reduce(t, review05(t, "b/es2.txt"), Options{Budget: 4096})
+	if !strings.Contains(res.Text, `- C:\Users\ci\run.cmd failed with ERROR code 1`) {
+		t.Errorf("error line lost:\n%s", res.Text)
+	}
+}
+
+// 5. Lines with a timestamp keep the level their words give them.
+func TestReview05bTscStampLevel(t *testing.T) {
+	res := review05Reduce(t, review05(t, "b/gulp.txt"), Options{Budget: 900})
+	if !strings.Contains(res.Text, "- [10:00:03] FATAL ERROR: out of memory") {
+		t.Errorf("stamped error lost:\n%s", res.Text)
+	}
+}
+
+// 6. JSON lines quoting tsc are a log.
+func TestReview05bJSONLinesQuotingTsc(t *testing.T) {
+	if res := review05Reduce(t, review05(t, "b/jl3.txt"), Options{}); res.Format != "logs" {
+		t.Errorf("read as %s", res.Format)
+	}
+}
+
+// Minor: cargo's older Running lines without a description.
+func TestReview05bOldRunningLine(t *testing.T) {
+	if got := cargoTarget("Running target/debug/deps/core-1a2b3c4d"); got != "core" {
+		t.Errorf("target %q", got)
+	}
 }

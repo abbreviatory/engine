@@ -1,0 +1,72 @@
+
+/work/test/fixtures/src/jssample/src/money.js
+   2:3   warning  Unexpected var, use let or const instead          no-var
+   3:3   warning  Unexpected var, use let or const instead          no-var
+   4:3   warning  Unexpected console statement                      no-console
+   9:7   warning  'value' is never reassigned. Use 'const' instead  prefer-const
+  11:5   warning  Unexpected console statement                      no-console
+  12:12  error    'undefinedValue' is not defined                   no-undef
+
+/work/test/fixtures/src/jssample/src/orders.js
+   5:3   warning  Unexpected var, use let or const instead          no-var
+   6:7   error    'count' is assigned a value but never used        no-unused-vars
+   6:7   warning  'count' is never reassigned. Use 'const' instead  prefer-const
+  10:20  error    Expected '===' and instead saw '=='               eqeqeq
+  11:5   warning  Unexpected console statement                      no-console
+  17:7   warning  'label' is never reassigned. Use 'const' instead  prefer-const
+  18:9   error    'config' is assigned a value but never used       no-unused-vars
+  18:37  error    Duplicate key 'currency'                          no-dupe-keys
+  20:3   error    Unreachable code                                  no-unreachable
+  20:3   warning  Unexpected console statement                      no-console
+  24:20  error    Expected '===' and instead saw '=='               eqeqeq
+  25:10  error    'rate' is not defined                             no-undef
+
+/work/test/fixtures/src/jssample/src/orders1.js
+   5:3   warning  Unexpected var, use let or const instead          no-var
+   6:7   error    'count' is assigned a value but never used        no-unused-vars
+   6:7   warning  'count' is never reassigned. Use 'const' instead  prefer-const
+  10:20  error    Expected '===' and instead saw '=='               eqeqeq
+  11:5   warning  Unexpected console statement                      no-console
+  17:7   warning  'label' is never reassigned. Use 'const' instead  prefer-const
+  18:9   error    'config' is assigned a value but never used       no-unused-vars
+  18:37  error    Duplicate key 'currency'                          no-dupe-keys
+  20:3   error    Unreachable code                                  no-unreachable
+  20:3   warning  Unexpected console statement                      no-console
+  24:20  error    Expected '===' and instead saw '=='               eqeqeq
+  25:10  error    'rate' is not defined                             no-undef
+
+/work/test/fixtures/src/jssample/src/orders2.js
+   5:3   warning  Unexpected var, use let or const instead          no-var
+   6:7   error    'count' is assigned a value but never used        no-unused-vars
+   6:7   warning  'count' is never reassigned. Use 'const' instead  prefer-const
+  10:20  error    Expected '===' and instead saw '=='               eqeqeq
+  11:5   warning  Unexpected console statement                      no-console
+  17:7   warning  'label' is never reassigned. Use 'const' instead  prefer-const
+  18:9   error    'config' is assigned a value but never used       no-unused-vars
+  18:37  error    Duplicate key 'currency'                          no-dupe-keys
+  20:3   error    Unreachable code                                  no-unreachable
+  20:3   warning  Unexpected console statement                      no-console
+  24:20  error    Expected '===' and instead saw '=='               eqeqeq
+  25:10  error    'rate' is not defined                             no-undef
+
+/work/test/fixtures/src/jssample/src/orders3.js
+   5:3   warning  Unexpected var, use let or const instead          no-var
+   6:7   error    'count' is assigned a value but never used        no-unused-vars
+   6:7   warning  'count' is never reassigned. Use 'const' instead  prefer-const
+  10:20  error    Expected '===' and instead saw '=='               eqeqeq
+  11:5   warning  Unexpected console statement                      no-console
+  17:7   warning  'label' is never reassigned. Use 'const' instead  prefer-const
+  18:9   error    'config' is assigned a value but never used       no-unused-vars
+  18:37  error    Duplicate key 'currency'                          no-dupe-keys
+  20:3   error    Unreachable code                                  no-unreachable
+  20:3   warning  Unexpected console statement                      no-console
+  24:20  error    Expected '===' and instead saw '=='               eqeqeq
+  25:10  error    'rate' is not defined                             no-undef
+
+✖ 54 problems (29 errors, 25 warnings)
+  0 errors and 15 warnings potentially fixable with the `--fix` option.
+
+
+/bin/sh: prettier: command not found
+C:\Users\ci\run.cmd failed with ERROR code 1
+/home/ci/app/node_modules/.bin/eslint exited with Error 2

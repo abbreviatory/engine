@@ -1,0 +1,39 @@
+[10:00:01] Using gulpfile /work/gulpfile.js
+[10:00:01] Starting 'build'...
+src/cart.ts(9,7): error TS2322: Type 'string' is not assignable to type 'number'.
+[10:00:03] TypeScript: 1 semantic error
+[10:00:03] TypeScript: emit failed
+[10:00:03] 'build' errored after 2.1 s
+[10:00:03] Error: TypeScript: Compilation failed
+    at Output.mightFinish (/work/node_modules/gulp-typescript/release/output.js:131:43)
+[10:00:03] FATAL ERROR: out of memory
+[10:00:01] Finished 'copy1' after 3 ms
+[10:00:02] Finished 'copy2' after 3 ms
+[10:00:03] Finished 'copy3' after 3 ms
+[10:00:04] Finished 'copy4' after 3 ms
+[10:00:05] Finished 'copy5' after 3 ms
+[10:00:06] Finished 'copy6' after 3 ms
+[10:00:07] Finished 'copy7' after 3 ms
+[10:00:08] Finished 'copy8' after 3 ms
+[10:00:09] Finished 'copy9' after 3 ms
+[10:00:00] Finished 'copy10' after 3 ms
+[10:00:01] Finished 'copy11' after 3 ms
+[10:00:02] Finished 'copy12' after 3 ms
+[10:00:03] Finished 'copy13' after 3 ms
+[10:00:04] Finished 'copy14' after 3 ms
+[10:00:05] Finished 'copy15' after 3 ms
+[10:00:06] Finished 'copy16' after 3 ms
+[10:00:07] Finished 'copy17' after 3 ms
+[10:00:08] Finished 'copy18' after 3 ms
+[10:00:09] Finished 'copy19' after 3 ms
+[10:00:00] Finished 'copy20' after 3 ms
+[10:00:01] Finished 'copy21' after 3 ms
+[10:00:02] Finished 'copy22' after 3 ms
+[10:00:03] Finished 'copy23' after 3 ms
+[10:00:04] Finished 'copy24' after 3 ms
+[10:00:05] Finished 'copy25' after 3 ms
+[10:00:06] Finished 'copy26' after 3 ms
+[10:00:07] Finished 'copy27' after 3 ms
+[10:00:08] Finished 'copy28' after 3 ms
+[10:00:09] Finished 'copy29' after 3 ms
+[10:00:00] Finished 'copy30' after 3 ms

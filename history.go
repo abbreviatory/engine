@@ -162,9 +162,11 @@ func innermostItems(items []string) []string {
 }
 
 // tracksTests reports a reduction whose failed tests run history knows by
-// name: test runners', and the build tools that run tests (Gradle, Maven).
+// name, with the words of tests ("fixed", "flaky"): test runners', and the
+// build tools that run tests (Gradle, Maven). A compiler's or linter's
+// errors keep the words of logs.
 func tracksTests(res *Result) bool {
-	return res.Family == FamilyTests || res.Family == FamilyBuild
+	return res.Family == FamilyTests || res.Format == "gradle" || res.Format == "maven"
 }
 
 func hashKey(s string) string {

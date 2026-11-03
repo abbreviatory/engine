@@ -329,8 +329,10 @@ it. What is compared are the failures and errors the report preserves (as
 `-preserve` sets them), each known by an identity:
 
 - a failed test by its name, with its package for go test (from the
-  package's `ok` or `FAIL` line in plain output) and its test binary for
-  cargo test; Gradle's and Maven's failed tests too;
+  package's `ok` or `FAIL` line in plain output), its test binary for cargo
+  test, its test task for Gradle and its module for Maven. Gradle (without
+  `testLogging`) and Maven don't name passing tests: one missing from a run
+  passed if its task or module ran tests, else it wasn't run;
 - an error from a test runner that has a name for it, such as a package or a
   build that failed, by that name;
 - anything else, such as a log error, by its text with numbers, hex runs and
@@ -353,7 +355,7 @@ is matched by its name with the same test in the other run. Against the previous
 | In the report | Meaning |
 |---|---|
 | new | failing now, not failing in the previous run |
-| fixed (logs: gone) | failing in the previous run, passing now |
+| fixed (logs and compilers: gone) | failing in the previous run, passing now |
 | not run | a test failing in the previous run that is skipped or absent now |
 | still failing (logs: recurring) | failing in both; marked with how many runs in a row |
 | flaky (logs: intermittent) | changed between failing and passing at least 3 times in the last 10 runs, unknown runs skipped, and failing now or in the previous run |

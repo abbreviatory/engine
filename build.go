@@ -76,6 +76,9 @@ func infoLine(n int64, text string, emit func(Record)) {
 func detectBuild(sample []byte) string {
 	sample = cleanLines(sample)
 	switch {
+	case looksCargoTest(sample):
+		// cargo test compiles first; its tests are what it's about.
+		return "cargo-test"
 	case looksCargo(sample):
 		return "cargo"
 	case looksTsc(sample):

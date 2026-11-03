@@ -261,7 +261,12 @@ func (tc *cargoCase) record() Record {
 func cargoTarget(line string) string {
 	desc, bin, ok := strings.Cut(line, " (")
 	if !ok {
-		return line
+		// Older cargo: "Running target/debug/deps/core-1a2b3c".
+		if p := strings.TrimPrefix(line, "Running "); p != line && strings.ContainsAny(p, "/\\") {
+			desc, bin = "", p
+		} else {
+			return line
+		}
 	}
 	bin = strings.TrimSuffix(bin, ")")
 	if i := strings.LastIndexAny(bin, "/\\"); i >= 0 {
@@ -274,6 +279,9 @@ func cargoTarget(line string) string {
 	desc = strings.TrimPrefix(desc, "Running ")
 	if bin == "" {
 		return desc
+	}
+	if desc == "" {
+		return bin
 	}
 	return bin + " " + desc
 }

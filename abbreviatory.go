@@ -220,7 +220,11 @@ func Reduce(r io.Reader, opt Options) (*Result, error) {
 			if len(head) > sampleSize {
 				head = head[:sampleSize]
 			}
-			name := detectBuild(head)
+			name := ""
+			if t := bytes.TrimLeft(head, " \t\r\n\xef\xbb\xbf"); len(t) > 0 && t[0] == '[' {
+				// Not JSON lines, whose messages may quote a compiler.
+				name = detectBuild(head)
+			}
 			if name == "" {
 				name = "logs"
 			}

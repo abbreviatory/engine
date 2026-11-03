@@ -2,6 +2,7 @@ package abbreviatory
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -21,8 +22,10 @@ var (
 
 type gradle struct {
 	b       block
-	section string // "", "wrong" (* What went wrong), "try" (* Try, * Get more help)
-	sawPass bool   // a PASSED line: Gradle's test logging names passing tests
+	section string          // "", "wrong" (* What went wrong), "try" (* Try, * Get more help)
+	sawPass bool            // a PASSED line: Gradle's test logging names passing tests
+	task    string          // the test task running (":test", ":core:test")
+	ran     map[string]bool // test tasks that ran
 	summary []string
 }
 
@@ -43,6 +46,19 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 		}
 		g.b.add(n, text)
 		return
+	}
+	if gradleTask.MatchString(text) {
+		// A task starts: the "Try" advice of an earlier build is over, and
+		// a test task names the tests that follow.
+		g.section = ""
+		task := strings.Fields(text)[2]
+		if last := task[strings.LastIndexByte(task, ':')+1:]; last == "test" || strings.HasSuffix(last, "Test") {
+			g.task = task
+			if g.ran == nil {
+				g.ran = map[string]bool{}
+			}
+			g.ran[task] = true
+		}
 	}
 	switch {
 	case strings.HasPrefix(text, " ") || strings.HasPrefix(text, "\t"):
@@ -74,8 +90,14 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 		case "SKIPPED":
 			k = KindSkip
 		}
-		g.b.start(n, k, m[1]+" > "+m[2], emit)
-		g.b.pend.ID = m[1] + " > " + m[2]
+		name := m[1] + " > " + m[2]
+		g.b.start(n, k, name, emit)
+		// Known by its task too: modules of one build often share test
+		// names. The task is its "package" in run history.
+		g.b.pend.ID, g.b.pend.Name = name, name
+		if g.task != "" {
+			g.b.pend.ID = g.task + "." + name
+		}
 		g.section = ""
 		return
 	case text == "* What went wrong:":
@@ -121,8 +143,11 @@ func (g *gradle) line(n int64, text string, emit func(Record)) {
 }
 
 // unnamedPasses: Gradle names passing tests only when its test logging is
-// set to; without it, a test missing from a run passed.
-func (g *gradle) unnamedPasses() bool { return !g.sawPass }
+// set to; without it, a test missing from a run passed if its test task ran.
+// A run whose tests never ran (a compile error) claims nothing.
+func (g *gradle) unnamedPasses() bool { return !g.sawPass && len(g.ran) > 0 }
+
+func (g *gradle) ranPackages() []string { return sortedKeys(g.ran) }
 
 func (g *gradle) finish(emit func(Record)) []string {
 	g.b.flush(emit)
@@ -162,7 +187,7 @@ var (
 	mvnTestOld  = regexp.MustCompile(`^(\S+)\((\S+)\) +Time elapsed: .*<<< (FAILURE|ERROR)!$`)
 	// mvnPlugin is a plugin's execution line: "[INFO] --- compiler:3.13.0:compile
 	// (default-compile) @ shop ---".
-	mvnPlugin   = regexp.MustCompile(`^\[INFO\] --- \S+ \(\S+\) @ \S+ ---$`)
+	mvnPlugin   = regexp.MustCompile(`^\[INFO\] --- (\S+) \(\S+\) @ (\S+) ---$`)
 	mvnTestsRun = regexp.MustCompile(`^Tests run: [0-9]+, Failures: [0-9]+, Errors: [0-9]+, Skipped: [0-9]+`)
 )
 
@@ -173,6 +198,8 @@ type maven struct {
 	b       block
 	cont    string // what continues the open block: "indent" or "error"
 	results bool   // in Surefire's "Results:" section
+	module  string // the module whose tests Surefire or Failsafe is running
+	ran     map[string]bool
 	summary []string
 }
 
@@ -211,16 +238,18 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 		m.cont, m.results = "indent", false
 		return
 	}
+	if p := mvnPlugin.FindStringSubmatch(text); p != nil {
+		m.module = ""
+		if strings.HasPrefix(p[1], "surefire:") || strings.HasPrefix(p[1], "failsafe:") {
+			m.module = p[2]
+		}
+	}
 	if t := mvnTestFail.FindStringSubmatch(msg); t != nil {
-		m.b.start(n, KindFail, t[1], emit)
-		m.b.pend.ID = t[1]
-		m.cont = "trace"
+		m.startTest(n, t[1], emit)
 		return
 	}
 	if t := mvnTestOld.FindStringSubmatch(msg); t != nil {
-		m.b.start(n, KindFail, t[2]+"."+t[1], emit)
-		m.b.pend.ID = t[2] + "." + t[1]
-		m.cont = "trace"
+		m.startTest(n, t[2]+"."+t[1], emit)
 		return
 	}
 	if level == "ERROR" && strings.HasPrefix(msg, "Failed to execute goal") {
@@ -257,6 +286,12 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 		m.results = true
 		infoLine(n, text, emit)
 	case mvnTestsRun.MatchString(msg):
+		if m.module != "" {
+			if m.ran == nil {
+				m.ran = map[string]bool{}
+			}
+			m.ran[m.module] = true
+		}
 		if m.results {
 			m.summary = append(m.summary, msg)
 		}
@@ -302,8 +337,32 @@ func mvnBoiler(msg string) bool {
 	return false
 }
 
-// unnamedPasses: Maven names only the tests that failed.
-func (m *maven) unnamedPasses() bool { return true }
+// startTest begins a failed test, known by its module too (the "package"
+// run history checks against the modules whose tests ran).
+func (m *maven) startTest(n int64, name string, emit func(Record)) {
+	m.b.start(n, KindFail, name, emit)
+	m.b.pend.ID, m.b.pend.Name = name, name
+	if m.module != "" {
+		m.b.pend.ID = m.module + "." + name
+	}
+	m.cont = "trace"
+}
+
+// unnamedPasses: Maven names only the tests that failed, so a test missing
+// from a run passed if its module's tests ran. A run whose tests never ran
+// (a compile error, a skipped module) claims nothing.
+func (m *maven) unnamedPasses() bool { return len(m.ran) > 0 }
+
+func (m *maven) ranPackages() []string { return sortedKeys(m.ran) }
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // looksMaven reports Maven's console by lines only Maven prints; a count of
 // "[INFO]" lines isn't enough, many logs have them.

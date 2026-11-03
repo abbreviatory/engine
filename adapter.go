@@ -87,6 +87,11 @@ func detect(sample []byte, want string) (formatInfo, error) {
 			fi, _ := lookupFormat(f)
 			return fi, nil
 		}
+		// The build tools that run tests.
+		if f := detectBuild(sample); f == "gradle" || f == "maven" {
+			fi, _ := lookupFormat(f)
+			return fi, nil
+		}
 		// Not a test runner we know: treat it as a log, which still finds
 		// errors, warnings and repeats.
 		fi, _ := lookupFormat("logs")

@@ -231,13 +231,19 @@ as the runner line.
   notices are information.
 
 Their history works as for logs: an error is known by its text with numbers
-aside, a failed test (cargo, Gradle, Maven) by its name. A failure that sums
-up others (Gradle's "What went wrong", Maven's "Failed to execute goal") is
+aside. A failed test (cargo, Gradle, Maven) is known by its name, with its
+crate's test binary (`core unittests src/lib.rs tests::parses`), Gradle test
+task (`:core:test`) or Maven module, so modules with the same test names
+stay apart, and the report uses the words of tests (fixed, flaky). Gradle
+without `testLogging` and Maven name only the tests that failed: a test
+missing from the next run counts as passed when its task or module ran its
+tests, and as not run otherwise (a compile error). A failure that sums up
+others (Gradle's "What went wrong", Maven's "Failed to execute goal") is
 known by its first line, so fixing one compiler error under it doesn't make
-it new. In a cargo workspace a test is named with its crate's test binary
-(`core unittests src/lib.rs tests::parses`), so crates with the same test
-names stay apart. tsc in watch mode ends each compilation with a count; the
-last one is the runner line.
+it new; a different failure with the same first line (Gradle's "A problem
+occurred evaluating root project") reads as the same one. tsc in watch mode
+ends each compilation with a count; the last one is the runner line, but the
+errors of earlier compilations stay in the report.
 
 ## Options
 
