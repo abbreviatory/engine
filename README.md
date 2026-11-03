@@ -219,8 +219,11 @@ as the runner line.
   MoneyTest.java:50`), and "What went wrong" as one error with the
   messages repeated in it.
 - **Maven**: compiler errors and warnings (`Checkout.java:21:20 error:
-  cannot find symbol`), failed tests with their stack traces, "Failed to
-  execute goal" blocks; every other line takes its kind from its `[ERROR]`,
+  cannot find symbol` with its `symbol:` and `location:` notes), failed
+  tests with the exception in the head and the stack trace as detail, and
+  "Failed to execute goal" as one error with the messages Maven repeats under
+  it; its closing advice ("Re-run Maven using the -X switch") is
+  information, and every other line takes its kind from its `[ERROR]`,
   `[WARNING]` or `[INFO]`.
 - **npm and pnpm**: an npm error block (`npm error code ERESOLVE: unable to
   resolve dependency tree`) or a pnpm `ERR_PNPM_` error with its explanation

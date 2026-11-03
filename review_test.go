@@ -19,7 +19,9 @@ func TestReviewLogStartingWithBracket(t *testing.T) { // H1
 		"{\"level\":\"info\",\"msg\":\"a\"}\n\n{\"level\":\"error\",\"msg\":\"b\"}\n",
 	} {
 		res := reduceString(t, in, Options{})
-		if res.Format != "logs" {
+		// Maven's own output has been read as Maven since 0.5; the point
+		// here is that none of these is taken for JSON.
+		if res.Format != "logs" && !(res.Format == "maven" && strings.HasPrefix(in, "[INFO]")) {
 			t.Errorf("%q: format %s", in, res.Format)
 		}
 		checkCoverage(t, "bracket", []byte(in), res)

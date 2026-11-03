@@ -116,6 +116,12 @@ func detect(sample []byte, want string) (formatInfo, error) {
 		fi, _ := lookupFormat(f)
 		return fi, nil
 	}
+	// Maven's lines start with "[INFO]", which would otherwise be taken
+	// for the start of a JSON array.
+	if looksMaven(sample) {
+		fi, _ := lookupFormat("maven")
+		return fi, nil
+	}
 	if looksJSONDocument(sample) {
 		fi, _ := lookupFormat("json")
 		return fi, nil

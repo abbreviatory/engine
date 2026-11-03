@@ -165,6 +165,22 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 	if lv != nil {
 		level, msg = lv[1], lv[2]
 	}
+	// "Failed to execute goal" repeats the compiler's errors under it: they
+	// belong to that block, not new items. Maven's closing advice doesn't.
+	if m.b.open() && m.cont == "error" && level == "ERROR" && !mvnBoiler(msg) && !strings.HasPrefix(msg, "->") {
+		if strings.TrimSpace(msg) == "" {
+			m.b.pend.addLine(n)
+		} else {
+			m.b.add(n, text)
+		}
+		return
+	}
+	if lv != nil && strings.TrimSpace(msg) == "" {
+		// A level with nothing after it spaces the output out.
+		m.b.flush(emit)
+		infoLine(n, "", emit)
+		return
+	}
 	// Lines that start a block.
 	if d := mvnDiag.FindStringSubmatch(msg); d != nil && (level == "ERROR" || level == "WARNING" || level == "WARN") {
 		m.b.start(n, levelKind(level), d[1]+":"+d[2]+":"+d[3]+" "+strings.ToLower(strings.TrimSuffix(level, "ING"))+": "+d[4], emit)
@@ -191,7 +207,9 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 	if m.b.open() {
 		switch m.cont {
 		case "indent":
-			if lv != nil && strings.HasPrefix(msg, "  ") && !mvnDiag.MatchString(strings.TrimSpace(msg)) {
+			// javac's notes ("symbol:", "location:", "missing type
+			// arguments ..."): indented, with or without a level.
+			if strings.HasPrefix(msg, "  ") && strings.TrimSpace(msg) != "" && !mvnDiag.MatchString(strings.TrimSpace(msg)) {
 				m.b.add(n, text)
 				return
 			}
@@ -202,11 +220,6 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 				if len(m.b.pend.Detail) == 1 {
 					m.b.pend.Head += " - " + strings.TrimSpace(text)
 				}
-				return
-			}
-		case "error":
-			if level == "ERROR" && !strings.HasPrefix(msg, "->") {
-				m.b.add(n, text)
 				return
 			}
 		}
@@ -225,6 +238,10 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 		m.results = false
 		m.summary = append(m.summary, msg)
 		infoLine(n, text, emit)
+	case lv != nil && (mvnBoiler(msg) || strings.TrimSpace(msg) == "" || strings.HasPrefix(msg, "-> [Help")):
+		// Maven's closing advice, its headings over the compiler's messages
+		// and its empty lines.
+		infoLine(n, text, emit)
 	case m.results && (level == "ERROR" || level == "WARNING"):
 		// The list of failed tests repeats the ones already read.
 		infoLine(n, text, emit)
@@ -242,6 +259,20 @@ func (m *maven) line(n int64, text string, emit func(Record)) {
 func (m *maven) finish(emit func(Record)) []string {
 	m.b.flush(emit)
 	return m.summary
+}
+
+// mvnBoiler is a line Maven prints after every failure, or a heading over
+// the compiler's messages.
+func mvnBoiler(msg string) bool {
+	msg = strings.TrimSpace(msg)
+	for _, p := range []string{"To see the full stack trace of the errors", "Re-run Maven using the -X switch",
+		"For more information about the errors and possible solutions", "[Help 1] http", "After correcting the problems, you can resume the build",
+		"COMPILATION ERROR :", "COMPILATION WARNING :"} {
+		if strings.HasPrefix(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 func looksMaven(sample []byte) bool {

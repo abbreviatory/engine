@@ -122,7 +122,8 @@ v0.4.0 adds three formats:
 - `listing.go`: find/fd paths, ls -l, ls -R, tree, du; grouped by directory
   and extension; own summary (files, directories, size, extensions,
   largest); tree's own count wins.
-- Detection order: http, tests, json, build tools (0.5), diff, listing, logs.
+- Detection order: http, tests, Maven (its `[INFO]` lines look like a JSON
+  array), json, build tools (0.5), diff, listing, logs.
 - An independent review of 0.4 found: diff lines outside files dropped
   uncounted, combined diffs, hunks folded by their first 200 lines,
   generated files swallowing a shared change, HTTP history keyed by

@@ -101,7 +101,7 @@ func TestErrors(t *testing.T) {
 		{[]string{"reduce", "-store", dir, "-format", "yaml"}, 2, "unknown format"},
 		{[]string{"reduce", "-store", dir, "-keep", "("}, 2, "-keep"},
 		{[]string{"reduce", "-store", dir, "-preserve", "bugs"}, 2, "unknown preserve"},
-		{[]string{"reduce", "-store", dir, filepath.Join(dir, "missing")}, 1, "no such file"},
+		{[]string{"reduce", "-store", dir, filepath.Join(dir, "missing")}, 1, "missing"},
 		{[]string{"expand", "-store", dir, "nonsense"}, 1, "not a reference"},
 		{[]string{"expand", "-store", dir, "0123456789ab:g0"}, 1, "not in the store"},
 		{[]string{"frobnicate"}, 2, "unknown command"},

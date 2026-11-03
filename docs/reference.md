@@ -180,7 +180,8 @@ defaults at most once an hour.
 `-format test-output` picks the runner, and reads the input as a log if it
 finds none; `-format build` does the same for the build tools. Detection
 tries HTTP, test runners, JSON, build tools, diffs and listings, in that
-order. JSON lines (one object per line) are read as a log, with the level
+order, except that Maven's console is tried before JSON (its lines start
+with `[INFO]`). JSON lines (one object per line) are read as a log, with the level
 taken from `"level"` or `"severity"`. Detection looks at the first megabyte.
 When auto-detection picks `json` or `junit` and the input turns out not to be
 one (a log whose lines start with `[`, a damaged report), or is too big to

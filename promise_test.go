@@ -79,6 +79,8 @@ var wantFormat = map[string]string{
 	"eslint.txt":           "eslint",
 	"gradle-compile.txt":   "gradle",
 	"gradle-test.txt":      "gradle",
+	"maven-compile.txt":    "maven",
+	"maven-test.txt":       "maven",
 	"npm-install.txt":      "npm",
 	"npm-conflict.txt":     "npm",
 	"pnpm-install.txt":     "npm",
@@ -377,10 +379,12 @@ func TestExpectedContent(t *testing.T) {
 		"eslint.txt":     {"orders.js:25:10 error 'rate' is not defined (no-undef)", "money.js:12:12 error 'undefinedValue' is not defined", "54 problems"},
 		"gradle-compile.txt": {"Checkout.java:8 error: incompatible types", "Checkout.java:21 error: cannot find symbol",
 			"Execution failed for task ':compileJava'.", "[rawtypes] found raw type"},
-		"gradle-test.txt":  {"MoneyTest > parsesComma FAILED", "46 tests completed, 4 failed, 1 skipped"},
-		"npm-conflict.txt": {"npm error code ERESOLVE"},
-		"npm-install.txt":  {"9 vulnerabilities", "npm warn deprecated"},
-		"pnpm-install.txt": {"ERR_PNPM_FETCH_404"},
+		"gradle-test.txt":   {"MoneyTest > parsesComma FAILED", "46 tests completed, 4 failed, 1 skipped"},
+		"maven-compile.txt": {"Checkout.java:21:20 error: cannot find symbol", "symbol:   method totl()", "BUILD FAILURE"},
+		"maven-test.txt":    {"shop.MoneyTest.parsesComma", "Tests run: 46, Failures: 2, Errors: 2, Skipped: 1"},
+		"npm-conflict.txt":  {"npm error code ERESOLVE"},
+		"npm-install.txt":   {"9 vulnerabilities", "npm warn deprecated"},
+		"pnpm-install.txt":  {"ERR_PNPM_FETCH_404"},
 	}
 	data := fixtures(t)
 	for name, wants := range cases {
@@ -427,7 +431,10 @@ func TestBuildHeads(t *testing.T) {
 			"MoneyTest > roundsHalfUp - java.lang.AssertionError at MoneyTest.java:52", "runner: 46 tests completed, 4 failed, 1 skipped"},
 		"gradle-compile.txt": {"Checkout.java:9 error: cannot find symbol", "Execution failed for task ':compileJava'."},
 		"npm-conflict.txt":   {"npm error code ERESOLVE: unable to resolve dependency tree"},
-		"cargo-test.txt":     {"tests::rounds_half_up - assertion `left == right` failed"},
+		"maven-compile.txt":  {"Checkout.java:8:44 error: incompatible types", "Checkout.java:21:20 error: cannot find symbol", "runner: BUILD FAILURE"},
+		"maven-test.txt": {"shop.MoneyTest.roundsHalfUp - java.lang.AssertionError: expected:<20> but was:<10>",
+			"shop.MoneyTest.parsesComma - java.lang.NumberFormatException", "runner: Tests run: 46, Failures: 2, Errors: 2, Skipped: 1"},
+		"cargo-test.txt": {"tests::rounds_half_up - assertion `left == right` failed"},
 	}
 	data := fixtures(t)
 	for name, wants := range cases {
