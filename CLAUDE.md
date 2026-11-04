@@ -12,7 +12,8 @@ has the procedure and the checks to run afterwards.
 
 ## Where things stand
 
-v0.5.0 (November 2026) adds the build family (cargo, cargo test, tsc,
+v0.6.0 (November 2026) adds warning history (`-warnings`) and the GitHub
+Action (action.yml, tested by action-test.yml), v0.5.0 the build family (cargo, cargo test, tsc,
 ESLint, Gradle, Maven, npm/pnpm), v0.4.0 adapters for diffs, HTTP responses
 and directory listings, v0.3.0 the HTTP service and the MCP server, v0.2.0 run history (all
 below). v0.1.0 was the first
@@ -190,7 +191,7 @@ and push it to the site after each release.
 
 The approved plan is done with v0.4.0.
 
-## Next: 0.5 and 0.6, item 9 of softdev-plan.md
+## Done: 0.5 and 0.6, item 9 of softdev-plan.md
 
 Approved by YK on 2026-11-03 ("Go"): item 9 of softdev-plan.md in
 photozeitgeist/jollyroger.biz, Phases A and B and the upkeep, each phase
@@ -238,7 +239,15 @@ with "[" and isn't JSON is tried for build tools before logs; history uses
 test words only for test runners, Gradle and Maven (tracksTests); Gradle
 and Maven test IDs carry the task or module, and unnamed passes are
 claimed only for tasks or modules that ran tests (ranPackages).
-4. [ ] Phase B
+4. [x] Phase B: -warnings and the Action; two reviews (6, then 4 defects),
+       fixed with tests (warnings_test.go, action-test.yml); 133 tests
+       recorded; released 0.6.0 (79263f2, run 41747324365; Linux binary
+       checked); abbreviatory.com post 0f266a4; softdevstudio note 1918bab;
+       softdev-plan.md. Item 9 is complete; what's next is the owner's call.
+
+Things to keep in mind from 0.6: composite action bash steps run with -e
+(the run step uses set +e); each step has its own GITHUB_STEP_SUMMARY, so a
+later step can't check it; only a history's newest run keeps Warn.
 
 ## Test results
 
