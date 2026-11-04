@@ -1,5 +1,5 @@
 # Every test, verbose
-# recorded 2026-11-03 23:19 UTC at ca139de, Abbreviatory 0.4.0, go1.26.8 linux/amd64
+# recorded 2026-11-04 00:13 UTC at f0b2c97, Abbreviatory 0.5.0, go1.26.8 linux/amd64
 # Linux 6.18.44-fc-v230, Intel(R) Xeon(R) Processor @ 2.30GHz, 2 CPUs
 # command: go test -count=1 -v ./...
 
@@ -9,9 +9,9 @@
 --- PASS: TestPlainUnifiedDiff (0.01s)
 === RUN   TestExpandToMatchesExpand
     expandto_test.go:60: 6508 selectors checked
---- PASS: TestExpandToMatchesExpand (2.66s)
+--- PASS: TestExpandToMatchesExpand (2.67s)
 === RUN   TestTrackedPromise
---- PASS: TestTrackedPromise (15.56s)
+--- PASS: TestTrackedPromise (32.24s)
 === RUN   TestFirstRunAndNoChange
 --- PASS: TestFirstRunAndNoChange (0.00s)
 === RUN   TestTrimmedHistory
@@ -51,7 +51,7 @@
 === RUN   TestListingNotLogs
 --- PASS: TestListingNotLogs (0.00s)
 === RUN   TestDetection
---- PASS: TestDetection (0.25s)
+--- PASS: TestDetection (0.28s)
 === RUN   TestPromise
 === RUN   TestPromise/eslint.txt/256
 === PAUSE TestPromise/eslint.txt/256
@@ -67,272 +67,6 @@
 === PAUSE TestPromise/eslint.txt/4096
 === RUN   TestPromise/eslint.txt/16384
 === PAUSE TestPromise/eslint.txt/16384
-=== RUN   TestPromise/http-redirect.txt/256
-=== PAUSE TestPromise/http-redirect.txt/256
-=== RUN   TestPromise/http-redirect.txt/512
-=== PAUSE TestPromise/http-redirect.txt/512
-=== RUN   TestPromise/http-redirect.txt/700
-=== PAUSE TestPromise/http-redirect.txt/700
-=== RUN   TestPromise/http-redirect.txt/1024
-=== PAUSE TestPromise/http-redirect.txt/1024
-=== RUN   TestPromise/http-redirect.txt/2048
-=== PAUSE TestPromise/http-redirect.txt/2048
-=== RUN   TestPromise/http-redirect.txt/4096
-=== PAUSE TestPromise/http-redirect.txt/4096
-=== RUN   TestPromise/http-redirect.txt/16384
-=== PAUSE TestPromise/http-redirect.txt/16384
-=== RUN   TestPromise/junit-pytest.xml/256
-=== PAUSE TestPromise/junit-pytest.xml/256
-=== RUN   TestPromise/junit-pytest.xml/512
-=== PAUSE TestPromise/junit-pytest.xml/512
-=== RUN   TestPromise/junit-pytest.xml/700
-=== PAUSE TestPromise/junit-pytest.xml/700
-=== RUN   TestPromise/junit-pytest.xml/1024
-=== PAUSE TestPromise/junit-pytest.xml/1024
-=== RUN   TestPromise/junit-pytest.xml/2048
-=== PAUSE TestPromise/junit-pytest.xml/2048
-=== RUN   TestPromise/junit-pytest.xml/4096
-=== PAUSE TestPromise/junit-pytest.xml/4096
-=== RUN   TestPromise/junit-pytest.xml/16384
-=== PAUSE TestPromise/junit-pytest.xml/16384
-=== RUN   TestPromise/maven-test.txt/256
-=== PAUSE TestPromise/maven-test.txt/256
-=== RUN   TestPromise/maven-test.txt/512
-=== PAUSE TestPromise/maven-test.txt/512
-=== RUN   TestPromise/maven-test.txt/700
-=== PAUSE TestPromise/maven-test.txt/700
-=== RUN   TestPromise/maven-test.txt/1024
-=== PAUSE TestPromise/maven-test.txt/1024
-=== RUN   TestPromise/maven-test.txt/2048
-=== PAUSE TestPromise/maven-test.txt/2048
-=== RUN   TestPromise/maven-test.txt/4096
-=== PAUSE TestPromise/maven-test.txt/4096
-=== RUN   TestPromise/maven-test.txt/16384
-=== PAUSE TestPromise/maven-test.txt/16384
-=== RUN   TestPromise/npm-conflict.txt/256
-=== PAUSE TestPromise/npm-conflict.txt/256
-=== RUN   TestPromise/npm-conflict.txt/512
-=== PAUSE TestPromise/npm-conflict.txt/512
-=== RUN   TestPromise/npm-conflict.txt/700
-=== PAUSE TestPromise/npm-conflict.txt/700
-=== RUN   TestPromise/npm-conflict.txt/1024
-=== PAUSE TestPromise/npm-conflict.txt/1024
-=== RUN   TestPromise/npm-conflict.txt/2048
-=== PAUSE TestPromise/npm-conflict.txt/2048
-=== RUN   TestPromise/npm-conflict.txt/4096
-=== PAUSE TestPromise/npm-conflict.txt/4096
-=== RUN   TestPromise/npm-conflict.txt/16384
-=== PAUSE TestPromise/npm-conflict.txt/16384
-=== RUN   TestPromise/npm-install.txt/256
-=== PAUSE TestPromise/npm-install.txt/256
-=== RUN   TestPromise/npm-install.txt/512
-=== PAUSE TestPromise/npm-install.txt/512
-=== RUN   TestPromise/npm-install.txt/700
-=== PAUSE TestPromise/npm-install.txt/700
-=== RUN   TestPromise/npm-install.txt/1024
-=== PAUSE TestPromise/npm-install.txt/1024
-=== RUN   TestPromise/npm-install.txt/2048
-=== PAUSE TestPromise/npm-install.txt/2048
-=== RUN   TestPromise/npm-install.txt/4096
-=== PAUSE TestPromise/npm-install.txt/4096
-=== RUN   TestPromise/npm-install.txt/16384
-=== PAUSE TestPromise/npm-install.txt/16384
-=== RUN   TestPromise/pnpm-install.txt/256
-=== PAUSE TestPromise/pnpm-install.txt/256
-=== RUN   TestPromise/pnpm-install.txt/512
-=== PAUSE TestPromise/pnpm-install.txt/512
-=== RUN   TestPromise/pnpm-install.txt/700
-=== PAUSE TestPromise/pnpm-install.txt/700
-=== RUN   TestPromise/pnpm-install.txt/1024
-=== PAUSE TestPromise/pnpm-install.txt/1024
-=== RUN   TestPromise/pnpm-install.txt/2048
-=== PAUSE TestPromise/pnpm-install.txt/2048
-=== RUN   TestPromise/pnpm-install.txt/4096
-=== PAUSE TestPromise/pnpm-install.txt/4096
-=== RUN   TestPromise/pnpm-install.txt/16384
-=== PAUSE TestPromise/pnpm-install.txt/16384
-=== RUN   TestPromise/gotest-verbose.txt/256
-=== PAUSE TestPromise/gotest-verbose.txt/256
-=== RUN   TestPromise/gotest-verbose.txt/512
-=== PAUSE TestPromise/gotest-verbose.txt/512
-=== RUN   TestPromise/gotest-verbose.txt/700
-=== PAUSE TestPromise/gotest-verbose.txt/700
-=== RUN   TestPromise/gotest-verbose.txt/1024
-=== PAUSE TestPromise/gotest-verbose.txt/1024
-=== RUN   TestPromise/gotest-verbose.txt/2048
-=== PAUSE TestPromise/gotest-verbose.txt/2048
-=== RUN   TestPromise/gotest-verbose.txt/4096
-=== PAUSE TestPromise/gotest-verbose.txt/4096
-=== RUN   TestPromise/gotest-verbose.txt/16384
-=== PAUSE TestPromise/gotest-verbose.txt/16384
-=== RUN   TestPromise/gradle-compile.txt/256
-=== PAUSE TestPromise/gradle-compile.txt/256
-=== RUN   TestPromise/gradle-compile.txt/512
-=== PAUSE TestPromise/gradle-compile.txt/512
-=== RUN   TestPromise/gradle-compile.txt/700
-=== PAUSE TestPromise/gradle-compile.txt/700
-=== RUN   TestPromise/gradle-compile.txt/1024
-=== PAUSE TestPromise/gradle-compile.txt/1024
-=== RUN   TestPromise/gradle-compile.txt/2048
-=== PAUSE TestPromise/gradle-compile.txt/2048
-=== RUN   TestPromise/gradle-compile.txt/4096
-=== PAUSE TestPromise/gradle-compile.txt/4096
-=== RUN   TestPromise/gradle-compile.txt/16384
-=== PAUSE TestPromise/gradle-compile.txt/16384
-=== RUN   TestPromise/gradle-test.txt/256
-=== PAUSE TestPromise/gradle-test.txt/256
-=== RUN   TestPromise/gradle-test.txt/512
-=== PAUSE TestPromise/gradle-test.txt/512
-=== RUN   TestPromise/gradle-test.txt/700
-=== PAUSE TestPromise/gradle-test.txt/700
-=== RUN   TestPromise/gradle-test.txt/1024
-=== PAUSE TestPromise/gradle-test.txt/1024
-=== RUN   TestPromise/gradle-test.txt/2048
-=== PAUSE TestPromise/gradle-test.txt/2048
-=== RUN   TestPromise/gradle-test.txt/4096
-=== PAUSE TestPromise/gradle-test.txt/4096
-=== RUN   TestPromise/gradle-test.txt/16384
-=== PAUSE TestPromise/gradle-test.txt/16384
-=== RUN   TestPromise/pytest-verbose.txt/256
-=== PAUSE TestPromise/pytest-verbose.txt/256
-=== RUN   TestPromise/pytest-verbose.txt/512
-=== PAUSE TestPromise/pytest-verbose.txt/512
-=== RUN   TestPromise/pytest-verbose.txt/700
-=== PAUSE TestPromise/pytest-verbose.txt/700
-=== RUN   TestPromise/pytest-verbose.txt/1024
-=== PAUSE TestPromise/pytest-verbose.txt/1024
-=== RUN   TestPromise/pytest-verbose.txt/2048
-=== PAUSE TestPromise/pytest-verbose.txt/2048
-=== RUN   TestPromise/pytest-verbose.txt/4096
-=== PAUSE TestPromise/pytest-verbose.txt/4096
-=== RUN   TestPromise/pytest-verbose.txt/16384
-=== PAUSE TestPromise/pytest-verbose.txt/16384
-=== RUN   TestPromise/tsc.txt/256
-=== PAUSE TestPromise/tsc.txt/256
-=== RUN   TestPromise/tsc.txt/512
-=== PAUSE TestPromise/tsc.txt/512
-=== RUN   TestPromise/tsc.txt/700
-=== PAUSE TestPromise/tsc.txt/700
-=== RUN   TestPromise/tsc.txt/1024
-=== PAUSE TestPromise/tsc.txt/1024
-=== RUN   TestPromise/tsc.txt/2048
-=== PAUSE TestPromise/tsc.txt/2048
-=== RUN   TestPromise/tsc.txt/4096
-=== PAUSE TestPromise/tsc.txt/4096
-=== RUN   TestPromise/tsc.txt/16384
-=== PAUSE TestPromise/tsc.txt/16384
-=== RUN   TestPromise/find-listing.txt/256
-=== PAUSE TestPromise/find-listing.txt/256
-=== RUN   TestPromise/find-listing.txt/512
-=== PAUSE TestPromise/find-listing.txt/512
-=== RUN   TestPromise/find-listing.txt/700
-=== PAUSE TestPromise/find-listing.txt/700
-=== RUN   TestPromise/find-listing.txt/1024
-=== PAUSE TestPromise/find-listing.txt/1024
-=== RUN   TestPromise/find-listing.txt/2048
-=== PAUSE TestPromise/find-listing.txt/2048
-=== RUN   TestPromise/find-listing.txt/4096
-=== PAUSE TestPromise/find-listing.txt/4096
-=== RUN   TestPromise/find-listing.txt/16384
-=== PAUSE TestPromise/find-listing.txt/16384
-=== RUN   TestPromise/gotest-short.txt/256
-=== PAUSE TestPromise/gotest-short.txt/256
-=== RUN   TestPromise/gotest-short.txt/512
-=== PAUSE TestPromise/gotest-short.txt/512
-=== RUN   TestPromise/gotest-short.txt/700
-=== PAUSE TestPromise/gotest-short.txt/700
-=== RUN   TestPromise/gotest-short.txt/1024
-=== PAUSE TestPromise/gotest-short.txt/1024
-=== RUN   TestPromise/gotest-short.txt/2048
-=== PAUSE TestPromise/gotest-short.txt/2048
-=== RUN   TestPromise/gotest-short.txt/4096
-=== PAUSE TestPromise/gotest-short.txt/4096
-=== RUN   TestPromise/gotest-short.txt/16384
-=== PAUSE TestPromise/gotest-short.txt/16384
-=== RUN   TestPromise/http-verbose-404.txt/256
-=== PAUSE TestPromise/http-verbose-404.txt/256
-=== RUN   TestPromise/http-verbose-404.txt/512
-=== PAUSE TestPromise/http-verbose-404.txt/512
-=== RUN   TestPromise/http-verbose-404.txt/700
-=== PAUSE TestPromise/http-verbose-404.txt/700
-=== RUN   TestPromise/http-verbose-404.txt/1024
-=== PAUSE TestPromise/http-verbose-404.txt/1024
-=== RUN   TestPromise/http-verbose-404.txt/2048
-=== PAUSE TestPromise/http-verbose-404.txt/2048
-=== RUN   TestPromise/http-verbose-404.txt/4096
-=== PAUSE TestPromise/http-verbose-404.txt/4096
-=== RUN   TestPromise/http-verbose-404.txt/16384
-=== PAUSE TestPromise/http-verbose-404.txt/16384
-=== RUN   TestPromise/pytest-short.txt/256
-=== PAUSE TestPromise/pytest-short.txt/256
-=== RUN   TestPromise/pytest-short.txt/512
-=== PAUSE TestPromise/pytest-short.txt/512
-=== RUN   TestPromise/pytest-short.txt/700
-=== PAUSE TestPromise/pytest-short.txt/700
-=== RUN   TestPromise/pytest-short.txt/1024
-=== PAUSE TestPromise/pytest-short.txt/1024
-=== RUN   TestPromise/pytest-short.txt/2048
-=== PAUSE TestPromise/pytest-short.txt/2048
-=== RUN   TestPromise/pytest-short.txt/4096
-=== PAUSE TestPromise/pytest-short.txt/4096
-=== RUN   TestPromise/pytest-short.txt/16384
-=== PAUSE TestPromise/pytest-short.txt/16384
-=== RUN   TestPromise/tsc-pretty.txt/256
-=== PAUSE TestPromise/tsc-pretty.txt/256
-=== RUN   TestPromise/tsc-pretty.txt/512
-=== PAUSE TestPromise/tsc-pretty.txt/512
-=== RUN   TestPromise/tsc-pretty.txt/700
-=== PAUSE TestPromise/tsc-pretty.txt/700
-=== RUN   TestPromise/tsc-pretty.txt/1024
-=== PAUSE TestPromise/tsc-pretty.txt/1024
-=== RUN   TestPromise/tsc-pretty.txt/2048
-=== PAUSE TestPromise/tsc-pretty.txt/2048
-=== RUN   TestPromise/tsc-pretty.txt/4096
-=== PAUSE TestPromise/tsc-pretty.txt/4096
-=== RUN   TestPromise/tsc-pretty.txt/16384
-=== PAUSE TestPromise/tsc-pretty.txt/16384
-=== RUN   TestPromise/api-response.json/256
-=== PAUSE TestPromise/api-response.json/256
-=== RUN   TestPromise/api-response.json/512
-=== PAUSE TestPromise/api-response.json/512
-=== RUN   TestPromise/api-response.json/700
-=== PAUSE TestPromise/api-response.json/700
-=== RUN   TestPromise/api-response.json/1024
-=== PAUSE TestPromise/api-response.json/1024
-=== RUN   TestPromise/api-response.json/2048
-=== PAUSE TestPromise/api-response.json/2048
-=== RUN   TestPromise/api-response.json/4096
-=== PAUSE TestPromise/api-response.json/4096
-=== RUN   TestPromise/api-response.json/16384
-=== PAUSE TestPromise/api-response.json/16384
-=== RUN   TestPromise/app.log/256
-=== PAUSE TestPromise/app.log/256
-=== RUN   TestPromise/app.log/512
-=== PAUSE TestPromise/app.log/512
-=== RUN   TestPromise/app.log/700
-=== PAUSE TestPromise/app.log/700
-=== RUN   TestPromise/app.log/1024
-=== PAUSE TestPromise/app.log/1024
-=== RUN   TestPromise/app.log/2048
-=== PAUSE TestPromise/app.log/2048
-=== RUN   TestPromise/app.log/4096
-=== PAUSE TestPromise/app.log/4096
-=== RUN   TestPromise/app.log/16384
-=== PAUSE TestPromise/app.log/16384
-=== RUN   TestPromise/cargo-build.txt/256
-=== PAUSE TestPromise/cargo-build.txt/256
-=== RUN   TestPromise/cargo-build.txt/512
-=== PAUSE TestPromise/cargo-build.txt/512
-=== RUN   TestPromise/cargo-build.txt/700
-=== PAUSE TestPromise/cargo-build.txt/700
-=== RUN   TestPromise/cargo-build.txt/1024
-=== PAUSE TestPromise/cargo-build.txt/1024
-=== RUN   TestPromise/cargo-build.txt/2048
-=== PAUSE TestPromise/cargo-build.txt/2048
-=== RUN   TestPromise/cargo-build.txt/4096
-=== PAUSE TestPromise/cargo-build.txt/4096
-=== RUN   TestPromise/cargo-build.txt/16384
-=== PAUSE TestPromise/cargo-build.txt/16384
 === RUN   TestPromise/git-diff.txt/256
 === PAUSE TestPromise/git-diff.txt/256
 === RUN   TestPromise/git-diff.txt/512
@@ -361,20 +95,104 @@
 === PAUSE TestPromise/gotest-json.txt/4096
 === RUN   TestPromise/gotest-json.txt/16384
 === PAUSE TestPromise/gotest-json.txt/16384
-=== RUN   TestPromise/http-json.txt/256
-=== PAUSE TestPromise/http-json.txt/256
-=== RUN   TestPromise/http-json.txt/512
-=== PAUSE TestPromise/http-json.txt/512
-=== RUN   TestPromise/http-json.txt/700
-=== PAUSE TestPromise/http-json.txt/700
-=== RUN   TestPromise/http-json.txt/1024
-=== PAUSE TestPromise/http-json.txt/1024
-=== RUN   TestPromise/http-json.txt/2048
-=== PAUSE TestPromise/http-json.txt/2048
-=== RUN   TestPromise/http-json.txt/4096
-=== PAUSE TestPromise/http-json.txt/4096
-=== RUN   TestPromise/http-json.txt/16384
-=== PAUSE TestPromise/http-json.txt/16384
+=== RUN   TestPromise/gradle-test.txt/256
+=== PAUSE TestPromise/gradle-test.txt/256
+=== RUN   TestPromise/gradle-test.txt/512
+=== PAUSE TestPromise/gradle-test.txt/512
+=== RUN   TestPromise/gradle-test.txt/700
+=== PAUSE TestPromise/gradle-test.txt/700
+=== RUN   TestPromise/gradle-test.txt/1024
+=== PAUSE TestPromise/gradle-test.txt/1024
+=== RUN   TestPromise/gradle-test.txt/2048
+=== PAUSE TestPromise/gradle-test.txt/2048
+=== RUN   TestPromise/gradle-test.txt/4096
+=== PAUSE TestPromise/gradle-test.txt/4096
+=== RUN   TestPromise/gradle-test.txt/16384
+=== PAUSE TestPromise/gradle-test.txt/16384
+=== RUN   TestPromise/npm-install.txt/256
+=== PAUSE TestPromise/npm-install.txt/256
+=== RUN   TestPromise/npm-install.txt/512
+=== PAUSE TestPromise/npm-install.txt/512
+=== RUN   TestPromise/npm-install.txt/700
+=== PAUSE TestPromise/npm-install.txt/700
+=== RUN   TestPromise/npm-install.txt/1024
+=== PAUSE TestPromise/npm-install.txt/1024
+=== RUN   TestPromise/npm-install.txt/2048
+=== PAUSE TestPromise/npm-install.txt/2048
+=== RUN   TestPromise/npm-install.txt/4096
+=== PAUSE TestPromise/npm-install.txt/4096
+=== RUN   TestPromise/npm-install.txt/16384
+=== PAUSE TestPromise/npm-install.txt/16384
+=== RUN   TestPromise/gotest-short.txt/256
+=== PAUSE TestPromise/gotest-short.txt/256
+=== RUN   TestPromise/gotest-short.txt/512
+=== PAUSE TestPromise/gotest-short.txt/512
+=== RUN   TestPromise/gotest-short.txt/700
+=== PAUSE TestPromise/gotest-short.txt/700
+=== RUN   TestPromise/gotest-short.txt/1024
+=== PAUSE TestPromise/gotest-short.txt/1024
+=== RUN   TestPromise/gotest-short.txt/2048
+=== PAUSE TestPromise/gotest-short.txt/2048
+=== RUN   TestPromise/gotest-short.txt/4096
+=== PAUSE TestPromise/gotest-short.txt/4096
+=== RUN   TestPromise/gotest-short.txt/16384
+=== PAUSE TestPromise/gotest-short.txt/16384
+=== RUN   TestPromise/gotest-verbose.txt/256
+=== PAUSE TestPromise/gotest-verbose.txt/256
+=== RUN   TestPromise/gotest-verbose.txt/512
+=== PAUSE TestPromise/gotest-verbose.txt/512
+=== RUN   TestPromise/gotest-verbose.txt/700
+=== PAUSE TestPromise/gotest-verbose.txt/700
+=== RUN   TestPromise/gotest-verbose.txt/1024
+=== PAUSE TestPromise/gotest-verbose.txt/1024
+=== RUN   TestPromise/gotest-verbose.txt/2048
+=== PAUSE TestPromise/gotest-verbose.txt/2048
+=== RUN   TestPromise/gotest-verbose.txt/4096
+=== PAUSE TestPromise/gotest-verbose.txt/4096
+=== RUN   TestPromise/gotest-verbose.txt/16384
+=== PAUSE TestPromise/gotest-verbose.txt/16384
+=== RUN   TestPromise/gradle-compile.txt/256
+=== PAUSE TestPromise/gradle-compile.txt/256
+=== RUN   TestPromise/gradle-compile.txt/512
+=== PAUSE TestPromise/gradle-compile.txt/512
+=== RUN   TestPromise/gradle-compile.txt/700
+=== PAUSE TestPromise/gradle-compile.txt/700
+=== RUN   TestPromise/gradle-compile.txt/1024
+=== PAUSE TestPromise/gradle-compile.txt/1024
+=== RUN   TestPromise/gradle-compile.txt/2048
+=== PAUSE TestPromise/gradle-compile.txt/2048
+=== RUN   TestPromise/gradle-compile.txt/4096
+=== PAUSE TestPromise/gradle-compile.txt/4096
+=== RUN   TestPromise/gradle-compile.txt/16384
+=== PAUSE TestPromise/gradle-compile.txt/16384
+=== RUN   TestPromise/http-verbose-404.txt/256
+=== PAUSE TestPromise/http-verbose-404.txt/256
+=== RUN   TestPromise/http-verbose-404.txt/512
+=== PAUSE TestPromise/http-verbose-404.txt/512
+=== RUN   TestPromise/http-verbose-404.txt/700
+=== PAUSE TestPromise/http-verbose-404.txt/700
+=== RUN   TestPromise/http-verbose-404.txt/1024
+=== PAUSE TestPromise/http-verbose-404.txt/1024
+=== RUN   TestPromise/http-verbose-404.txt/2048
+=== PAUSE TestPromise/http-verbose-404.txt/2048
+=== RUN   TestPromise/http-verbose-404.txt/4096
+=== PAUSE TestPromise/http-verbose-404.txt/4096
+=== RUN   TestPromise/http-verbose-404.txt/16384
+=== PAUSE TestPromise/http-verbose-404.txt/16384
+=== RUN   TestPromise/junit-pytest.xml/256
+=== PAUSE TestPromise/junit-pytest.xml/256
+=== RUN   TestPromise/junit-pytest.xml/512
+=== PAUSE TestPromise/junit-pytest.xml/512
+=== RUN   TestPromise/junit-pytest.xml/700
+=== PAUSE TestPromise/junit-pytest.xml/700
+=== RUN   TestPromise/junit-pytest.xml/1024
+=== PAUSE TestPromise/junit-pytest.xml/1024
+=== RUN   TestPromise/junit-pytest.xml/2048
+=== PAUSE TestPromise/junit-pytest.xml/2048
+=== RUN   TestPromise/junit-pytest.xml/4096
+=== PAUSE TestPromise/junit-pytest.xml/4096
+=== RUN   TestPromise/junit-pytest.xml/16384
+=== PAUSE TestPromise/junit-pytest.xml/16384
 === RUN   TestPromise/ls-recursive.txt/256
 === PAUSE TestPromise/ls-recursive.txt/256
 === RUN   TestPromise/ls-recursive.txt/512
@@ -389,6 +207,104 @@
 === PAUSE TestPromise/ls-recursive.txt/4096
 === RUN   TestPromise/ls-recursive.txt/16384
 === PAUSE TestPromise/ls-recursive.txt/16384
+=== RUN   TestPromise/npm-conflict.txt/256
+=== PAUSE TestPromise/npm-conflict.txt/256
+=== RUN   TestPromise/npm-conflict.txt/512
+=== PAUSE TestPromise/npm-conflict.txt/512
+=== RUN   TestPromise/npm-conflict.txt/700
+=== PAUSE TestPromise/npm-conflict.txt/700
+=== RUN   TestPromise/npm-conflict.txt/1024
+=== PAUSE TestPromise/npm-conflict.txt/1024
+=== RUN   TestPromise/npm-conflict.txt/2048
+=== PAUSE TestPromise/npm-conflict.txt/2048
+=== RUN   TestPromise/npm-conflict.txt/4096
+=== PAUSE TestPromise/npm-conflict.txt/4096
+=== RUN   TestPromise/npm-conflict.txt/16384
+=== PAUSE TestPromise/npm-conflict.txt/16384
+=== RUN   TestPromise/tsc.txt/256
+=== PAUSE TestPromise/tsc.txt/256
+=== RUN   TestPromise/tsc.txt/512
+=== PAUSE TestPromise/tsc.txt/512
+=== RUN   TestPromise/tsc.txt/700
+=== PAUSE TestPromise/tsc.txt/700
+=== RUN   TestPromise/tsc.txt/1024
+=== PAUSE TestPromise/tsc.txt/1024
+=== RUN   TestPromise/tsc.txt/2048
+=== PAUSE TestPromise/tsc.txt/2048
+=== RUN   TestPromise/tsc.txt/4096
+=== PAUSE TestPromise/tsc.txt/4096
+=== RUN   TestPromise/tsc.txt/16384
+=== PAUSE TestPromise/tsc.txt/16384
+=== RUN   TestPromise/http-json.txt/256
+=== PAUSE TestPromise/http-json.txt/256
+=== RUN   TestPromise/http-json.txt/512
+=== PAUSE TestPromise/http-json.txt/512
+=== RUN   TestPromise/http-json.txt/700
+=== PAUSE TestPromise/http-json.txt/700
+=== RUN   TestPromise/http-json.txt/1024
+=== PAUSE TestPromise/http-json.txt/1024
+=== RUN   TestPromise/http-json.txt/2048
+=== PAUSE TestPromise/http-json.txt/2048
+=== RUN   TestPromise/http-json.txt/4096
+=== PAUSE TestPromise/http-json.txt/4096
+=== RUN   TestPromise/http-json.txt/16384
+=== PAUSE TestPromise/http-json.txt/16384
+=== RUN   TestPromise/tsc-pretty.txt/256
+=== PAUSE TestPromise/tsc-pretty.txt/256
+=== RUN   TestPromise/tsc-pretty.txt/512
+=== PAUSE TestPromise/tsc-pretty.txt/512
+=== RUN   TestPromise/tsc-pretty.txt/700
+=== PAUSE TestPromise/tsc-pretty.txt/700
+=== RUN   TestPromise/tsc-pretty.txt/1024
+=== PAUSE TestPromise/tsc-pretty.txt/1024
+=== RUN   TestPromise/tsc-pretty.txt/2048
+=== PAUSE TestPromise/tsc-pretty.txt/2048
+=== RUN   TestPromise/tsc-pretty.txt/4096
+=== PAUSE TestPromise/tsc-pretty.txt/4096
+=== RUN   TestPromise/tsc-pretty.txt/16384
+=== PAUSE TestPromise/tsc-pretty.txt/16384
+=== RUN   TestPromise/api-response.json/256
+=== PAUSE TestPromise/api-response.json/256
+=== RUN   TestPromise/api-response.json/512
+=== PAUSE TestPromise/api-response.json/512
+=== RUN   TestPromise/api-response.json/700
+=== PAUSE TestPromise/api-response.json/700
+=== RUN   TestPromise/api-response.json/1024
+=== PAUSE TestPromise/api-response.json/1024
+=== RUN   TestPromise/api-response.json/2048
+=== PAUSE TestPromise/api-response.json/2048
+=== RUN   TestPromise/api-response.json/4096
+=== PAUSE TestPromise/api-response.json/4096
+=== RUN   TestPromise/api-response.json/16384
+=== PAUSE TestPromise/api-response.json/16384
+=== RUN   TestPromise/find-listing.txt/256
+=== PAUSE TestPromise/find-listing.txt/256
+=== RUN   TestPromise/find-listing.txt/512
+=== PAUSE TestPromise/find-listing.txt/512
+=== RUN   TestPromise/find-listing.txt/700
+=== PAUSE TestPromise/find-listing.txt/700
+=== RUN   TestPromise/find-listing.txt/1024
+=== PAUSE TestPromise/find-listing.txt/1024
+=== RUN   TestPromise/find-listing.txt/2048
+=== PAUSE TestPromise/find-listing.txt/2048
+=== RUN   TestPromise/find-listing.txt/4096
+=== PAUSE TestPromise/find-listing.txt/4096
+=== RUN   TestPromise/find-listing.txt/16384
+=== PAUSE TestPromise/find-listing.txt/16384
+=== RUN   TestPromise/http-redirect.txt/256
+=== PAUSE TestPromise/http-redirect.txt/256
+=== RUN   TestPromise/http-redirect.txt/512
+=== PAUSE TestPromise/http-redirect.txt/512
+=== RUN   TestPromise/http-redirect.txt/700
+=== PAUSE TestPromise/http-redirect.txt/700
+=== RUN   TestPromise/http-redirect.txt/1024
+=== PAUSE TestPromise/http-redirect.txt/1024
+=== RUN   TestPromise/http-redirect.txt/2048
+=== PAUSE TestPromise/http-redirect.txt/2048
+=== RUN   TestPromise/http-redirect.txt/4096
+=== PAUSE TestPromise/http-redirect.txt/4096
+=== RUN   TestPromise/http-redirect.txt/16384
+=== PAUSE TestPromise/http-redirect.txt/16384
 === RUN   TestPromise/maven-compile.txt/256
 === PAUSE TestPromise/maven-compile.txt/256
 === RUN   TestPromise/maven-compile.txt/512
@@ -403,6 +319,90 @@
 === PAUSE TestPromise/maven-compile.txt/4096
 === RUN   TestPromise/maven-compile.txt/16384
 === PAUSE TestPromise/maven-compile.txt/16384
+=== RUN   TestPromise/maven-test.txt/256
+=== PAUSE TestPromise/maven-test.txt/256
+=== RUN   TestPromise/maven-test.txt/512
+=== PAUSE TestPromise/maven-test.txt/512
+=== RUN   TestPromise/maven-test.txt/700
+=== PAUSE TestPromise/maven-test.txt/700
+=== RUN   TestPromise/maven-test.txt/1024
+=== PAUSE TestPromise/maven-test.txt/1024
+=== RUN   TestPromise/maven-test.txt/2048
+=== PAUSE TestPromise/maven-test.txt/2048
+=== RUN   TestPromise/maven-test.txt/4096
+=== PAUSE TestPromise/maven-test.txt/4096
+=== RUN   TestPromise/maven-test.txt/16384
+=== PAUSE TestPromise/maven-test.txt/16384
+=== RUN   TestPromise/pnpm-install.txt/256
+=== PAUSE TestPromise/pnpm-install.txt/256
+=== RUN   TestPromise/pnpm-install.txt/512
+=== PAUSE TestPromise/pnpm-install.txt/512
+=== RUN   TestPromise/pnpm-install.txt/700
+=== PAUSE TestPromise/pnpm-install.txt/700
+=== RUN   TestPromise/pnpm-install.txt/1024
+=== PAUSE TestPromise/pnpm-install.txt/1024
+=== RUN   TestPromise/pnpm-install.txt/2048
+=== PAUSE TestPromise/pnpm-install.txt/2048
+=== RUN   TestPromise/pnpm-install.txt/4096
+=== PAUSE TestPromise/pnpm-install.txt/4096
+=== RUN   TestPromise/pnpm-install.txt/16384
+=== PAUSE TestPromise/pnpm-install.txt/16384
+=== RUN   TestPromise/pytest-short.txt/256
+=== PAUSE TestPromise/pytest-short.txt/256
+=== RUN   TestPromise/pytest-short.txt/512
+=== PAUSE TestPromise/pytest-short.txt/512
+=== RUN   TestPromise/pytest-short.txt/700
+=== PAUSE TestPromise/pytest-short.txt/700
+=== RUN   TestPromise/pytest-short.txt/1024
+=== PAUSE TestPromise/pytest-short.txt/1024
+=== RUN   TestPromise/pytest-short.txt/2048
+=== PAUSE TestPromise/pytest-short.txt/2048
+=== RUN   TestPromise/pytest-short.txt/4096
+=== PAUSE TestPromise/pytest-short.txt/4096
+=== RUN   TestPromise/pytest-short.txt/16384
+=== PAUSE TestPromise/pytest-short.txt/16384
+=== RUN   TestPromise/pytest-verbose.txt/256
+=== PAUSE TestPromise/pytest-verbose.txt/256
+=== RUN   TestPromise/pytest-verbose.txt/512
+=== PAUSE TestPromise/pytest-verbose.txt/512
+=== RUN   TestPromise/pytest-verbose.txt/700
+=== PAUSE TestPromise/pytest-verbose.txt/700
+=== RUN   TestPromise/pytest-verbose.txt/1024
+=== PAUSE TestPromise/pytest-verbose.txt/1024
+=== RUN   TestPromise/pytest-verbose.txt/2048
+=== PAUSE TestPromise/pytest-verbose.txt/2048
+=== RUN   TestPromise/pytest-verbose.txt/4096
+=== PAUSE TestPromise/pytest-verbose.txt/4096
+=== RUN   TestPromise/pytest-verbose.txt/16384
+=== PAUSE TestPromise/pytest-verbose.txt/16384
+=== RUN   TestPromise/app.log/256
+=== PAUSE TestPromise/app.log/256
+=== RUN   TestPromise/app.log/512
+=== PAUSE TestPromise/app.log/512
+=== RUN   TestPromise/app.log/700
+=== PAUSE TestPromise/app.log/700
+=== RUN   TestPromise/app.log/1024
+=== PAUSE TestPromise/app.log/1024
+=== RUN   TestPromise/app.log/2048
+=== PAUSE TestPromise/app.log/2048
+=== RUN   TestPromise/app.log/4096
+=== PAUSE TestPromise/app.log/4096
+=== RUN   TestPromise/app.log/16384
+=== PAUSE TestPromise/app.log/16384
+=== RUN   TestPromise/cargo-build.txt/256
+=== PAUSE TestPromise/cargo-build.txt/256
+=== RUN   TestPromise/cargo-build.txt/512
+=== PAUSE TestPromise/cargo-build.txt/512
+=== RUN   TestPromise/cargo-build.txt/700
+=== PAUSE TestPromise/cargo-build.txt/700
+=== RUN   TestPromise/cargo-build.txt/1024
+=== PAUSE TestPromise/cargo-build.txt/1024
+=== RUN   TestPromise/cargo-build.txt/2048
+=== PAUSE TestPromise/cargo-build.txt/2048
+=== RUN   TestPromise/cargo-build.txt/4096
+=== PAUSE TestPromise/cargo-build.txt/4096
+=== RUN   TestPromise/cargo-build.txt/16384
+=== PAUSE TestPromise/cargo-build.txt/16384
 === RUN   TestPromise/cargo-test.txt/256
 === PAUSE TestPromise/cargo-test.txt/256
 === RUN   TestPromise/cargo-test.txt/512
@@ -419,49 +419,14 @@
 === PAUSE TestPromise/cargo-test.txt/16384
 === CONT  TestPromise/eslint.txt/256
 === CONT  TestPromise/cargo-test.txt/16384
-=== CONT  TestPromise/gotest-short.txt/256
+=== CONT  TestPromise/http-json.txt/256
 === CONT  TestPromise/cargo-test.txt/4096
 === CONT  TestPromise/cargo-test.txt/2048
 === CONT  TestPromise/cargo-test.txt/1024
 === CONT  TestPromise/cargo-test.txt/700
 === CONT  TestPromise/cargo-test.txt/512
-=== CONT  TestPromise/cargo-test.txt/256
-=== CONT  TestPromise/maven-compile.txt/16384
-=== CONT  TestPromise/maven-compile.txt/4096
-=== CONT  TestPromise/maven-compile.txt/2048
-=== CONT  TestPromise/maven-compile.txt/700
-=== CONT  TestPromise/maven-compile.txt/1024
-=== CONT  TestPromise/maven-compile.txt/512
-=== CONT  TestPromise/maven-compile.txt/256
-=== CONT  TestPromise/ls-recursive.txt/16384
-=== CONT  TestPromise/ls-recursive.txt/4096
-=== CONT  TestPromise/ls-recursive.txt/2048
-=== CONT  TestPromise/ls-recursive.txt/1024
-=== CONT  TestPromise/ls-recursive.txt/700
-=== CONT  TestPromise/ls-recursive.txt/512
-=== CONT  TestPromise/ls-recursive.txt/256
-=== CONT  TestPromise/http-json.txt/16384
-=== CONT  TestPromise/http-json.txt/4096
-=== CONT  TestPromise/http-json.txt/2048
-=== CONT  TestPromise/http-json.txt/1024
-=== CONT  TestPromise/http-json.txt/700
-=== CONT  TestPromise/http-json.txt/512
-=== CONT  TestPromise/gotest-json.txt/16384
-=== CONT  TestPromise/http-json.txt/256
-=== CONT  TestPromise/gotest-json.txt/4096
-=== CONT  TestPromise/gotest-json.txt/2048
-=== CONT  TestPromise/gotest-json.txt/1024
-=== CONT  TestPromise/gotest-json.txt/700
-=== CONT  TestPromise/gotest-json.txt/512
-=== CONT  TestPromise/gotest-json.txt/256
-=== CONT  TestPromise/git-diff.txt/16384
-=== CONT  TestPromise/git-diff.txt/4096
-=== CONT  TestPromise/git-diff.txt/2048
-=== CONT  TestPromise/git-diff.txt/1024
-=== CONT  TestPromise/git-diff.txt/700
-=== CONT  TestPromise/git-diff.txt/512
-=== CONT  TestPromise/git-diff.txt/256
 === CONT  TestPromise/cargo-build.txt/16384
+=== CONT  TestPromise/cargo-test.txt/256
 === CONT  TestPromise/cargo-build.txt/4096
 === CONT  TestPromise/cargo-build.txt/2048
 === CONT  TestPromise/cargo-build.txt/1024
@@ -475,6 +440,55 @@
 === CONT  TestPromise/app.log/700
 === CONT  TestPromise/app.log/512
 === CONT  TestPromise/app.log/256
+=== CONT  TestPromise/pytest-verbose.txt/16384
+=== CONT  TestPromise/pytest-verbose.txt/4096
+=== CONT  TestPromise/pytest-verbose.txt/2048
+=== CONT  TestPromise/pytest-verbose.txt/1024
+=== CONT  TestPromise/pytest-verbose.txt/700
+=== CONT  TestPromise/pytest-verbose.txt/512
+=== CONT  TestPromise/pytest-verbose.txt/256
+=== CONT  TestPromise/pytest-short.txt/16384
+=== CONT  TestPromise/pytest-short.txt/4096
+=== CONT  TestPromise/pytest-short.txt/2048
+=== CONT  TestPromise/pytest-short.txt/1024
+=== CONT  TestPromise/pytest-short.txt/700
+=== CONT  TestPromise/pytest-short.txt/512
+=== CONT  TestPromise/pytest-short.txt/256
+=== CONT  TestPromise/pnpm-install.txt/16384
+=== CONT  TestPromise/pnpm-install.txt/4096
+=== CONT  TestPromise/pnpm-install.txt/2048
+=== CONT  TestPromise/pnpm-install.txt/1024
+=== CONT  TestPromise/pnpm-install.txt/700
+=== CONT  TestPromise/pnpm-install.txt/512
+=== CONT  TestPromise/pnpm-install.txt/256
+=== CONT  TestPromise/maven-test.txt/16384
+=== CONT  TestPromise/maven-test.txt/4096
+=== CONT  TestPromise/maven-test.txt/2048
+=== CONT  TestPromise/maven-test.txt/1024
+=== CONT  TestPromise/maven-test.txt/700
+=== CONT  TestPromise/maven-test.txt/512
+=== CONT  TestPromise/maven-test.txt/256
+=== CONT  TestPromise/maven-compile.txt/16384
+=== CONT  TestPromise/maven-compile.txt/4096
+=== CONT  TestPromise/maven-compile.txt/2048
+=== CONT  TestPromise/maven-compile.txt/1024
+=== CONT  TestPromise/maven-compile.txt/700
+=== CONT  TestPromise/maven-compile.txt/512
+=== CONT  TestPromise/maven-compile.txt/256
+=== CONT  TestPromise/http-redirect.txt/16384
+=== CONT  TestPromise/http-redirect.txt/4096
+=== CONT  TestPromise/http-redirect.txt/2048
+=== CONT  TestPromise/http-redirect.txt/1024
+=== CONT  TestPromise/http-redirect.txt/700
+=== CONT  TestPromise/http-redirect.txt/512
+=== CONT  TestPromise/http-redirect.txt/256
+=== CONT  TestPromise/find-listing.txt/16384
+=== CONT  TestPromise/find-listing.txt/4096
+=== CONT  TestPromise/find-listing.txt/2048
+=== CONT  TestPromise/find-listing.txt/1024
+=== CONT  TestPromise/find-listing.txt/700
+=== CONT  TestPromise/find-listing.txt/512
+=== CONT  TestPromise/find-listing.txt/256
 === CONT  TestPromise/api-response.json/16384
 === CONT  TestPromise/api-response.json/4096
 === CONT  TestPromise/api-response.json/2048
@@ -489,34 +503,13 @@
 === CONT  TestPromise/tsc-pretty.txt/700
 === CONT  TestPromise/tsc-pretty.txt/512
 === CONT  TestPromise/tsc-pretty.txt/256
-=== CONT  TestPromise/pytest-short.txt/16384
-=== CONT  TestPromise/pytest-short.txt/4096
-=== CONT  TestPromise/pytest-short.txt/2048
-=== CONT  TestPromise/pytest-short.txt/1024
-=== CONT  TestPromise/pytest-short.txt/700
-=== CONT  TestPromise/pytest-short.txt/512
-=== CONT  TestPromise/pytest-short.txt/256
-=== CONT  TestPromise/http-verbose-404.txt/16384
-=== CONT  TestPromise/http-verbose-404.txt/4096
-=== CONT  TestPromise/http-verbose-404.txt/2048
-=== CONT  TestPromise/http-verbose-404.txt/1024
-=== CONT  TestPromise/http-verbose-404.txt/700
-=== CONT  TestPromise/http-verbose-404.txt/512
-=== CONT  TestPromise/http-verbose-404.txt/256
-=== CONT  TestPromise/gotest-short.txt/16384
-=== CONT  TestPromise/gotest-short.txt/4096
-=== CONT  TestPromise/gotest-short.txt/2048
-=== CONT  TestPromise/gotest-short.txt/1024
-=== CONT  TestPromise/gotest-short.txt/700
-=== CONT  TestPromise/gotest-short.txt/512
-=== CONT  TestPromise/pnpm-install.txt/1024
-=== CONT  TestPromise/find-listing.txt/16384
-=== CONT  TestPromise/find-listing.txt/4096
-=== CONT  TestPromise/find-listing.txt/2048
-=== CONT  TestPromise/find-listing.txt/1024
-=== CONT  TestPromise/find-listing.txt/700
-=== CONT  TestPromise/find-listing.txt/512
-=== CONT  TestPromise/find-listing.txt/256
+=== CONT  TestPromise/http-json.txt/16384
+=== CONT  TestPromise/http-json.txt/4096
+=== CONT  TestPromise/http-json.txt/2048
+=== CONT  TestPromise/http-json.txt/1024
+=== CONT  TestPromise/http-json.txt/700
+=== CONT  TestPromise/http-json.txt/512
+=== CONT  TestPromise/gotest-verbose.txt/2048
 === CONT  TestPromise/tsc.txt/16384
 === CONT  TestPromise/tsc.txt/4096
 === CONT  TestPromise/tsc.txt/2048
@@ -524,20 +517,34 @@
 === CONT  TestPromise/tsc.txt/700
 === CONT  TestPromise/tsc.txt/512
 === CONT  TestPromise/tsc.txt/256
-=== CONT  TestPromise/pytest-verbose.txt/16384
-=== CONT  TestPromise/pytest-verbose.txt/4096
-=== CONT  TestPromise/pytest-verbose.txt/2048
-=== CONT  TestPromise/pytest-verbose.txt/1024
-=== CONT  TestPromise/pytest-verbose.txt/700
-=== CONT  TestPromise/pytest-verbose.txt/512
-=== CONT  TestPromise/pytest-verbose.txt/256
-=== CONT  TestPromise/gradle-test.txt/16384
-=== CONT  TestPromise/gradle-test.txt/4096
-=== CONT  TestPromise/gradle-test.txt/2048
-=== CONT  TestPromise/gradle-test.txt/1024
-=== CONT  TestPromise/gradle-test.txt/700
-=== CONT  TestPromise/gradle-test.txt/512
-=== CONT  TestPromise/gradle-test.txt/256
+=== CONT  TestPromise/npm-conflict.txt/16384
+=== CONT  TestPromise/npm-conflict.txt/4096
+=== CONT  TestPromise/npm-conflict.txt/2048
+=== CONT  TestPromise/npm-conflict.txt/1024
+=== CONT  TestPromise/npm-conflict.txt/700
+=== CONT  TestPromise/npm-conflict.txt/512
+=== CONT  TestPromise/npm-conflict.txt/256
+=== CONT  TestPromise/ls-recursive.txt/16384
+=== CONT  TestPromise/ls-recursive.txt/4096
+=== CONT  TestPromise/ls-recursive.txt/2048
+=== CONT  TestPromise/ls-recursive.txt/1024
+=== CONT  TestPromise/ls-recursive.txt/700
+=== CONT  TestPromise/ls-recursive.txt/512
+=== CONT  TestPromise/ls-recursive.txt/256
+=== CONT  TestPromise/junit-pytest.xml/16384
+=== CONT  TestPromise/junit-pytest.xml/4096
+=== CONT  TestPromise/junit-pytest.xml/2048
+=== CONT  TestPromise/junit-pytest.xml/1024
+=== CONT  TestPromise/junit-pytest.xml/700
+=== CONT  TestPromise/junit-pytest.xml/512
+=== CONT  TestPromise/junit-pytest.xml/256
+=== CONT  TestPromise/http-verbose-404.txt/16384
+=== CONT  TestPromise/http-verbose-404.txt/4096
+=== CONT  TestPromise/http-verbose-404.txt/2048
+=== CONT  TestPromise/http-verbose-404.txt/1024
+=== CONT  TestPromise/http-verbose-404.txt/700
+=== CONT  TestPromise/http-verbose-404.txt/512
+=== CONT  TestPromise/http-verbose-404.txt/256
 === CONT  TestPromise/gradle-compile.txt/16384
 === CONT  TestPromise/gradle-compile.txt/4096
 === CONT  TestPromise/gradle-compile.txt/2048
@@ -547,18 +554,18 @@
 === CONT  TestPromise/gradle-compile.txt/256
 === CONT  TestPromise/gotest-verbose.txt/16384
 === CONT  TestPromise/gotest-verbose.txt/4096
-=== CONT  TestPromise/gotest-verbose.txt/2048
+=== CONT  TestPromise/gradle-test.txt/700
 === CONT  TestPromise/gotest-verbose.txt/1024
 === CONT  TestPromise/gotest-verbose.txt/700
 === CONT  TestPromise/gotest-verbose.txt/512
 === CONT  TestPromise/gotest-verbose.txt/256
-=== CONT  TestPromise/pnpm-install.txt/16384
-=== CONT  TestPromise/pnpm-install.txt/4096
-=== CONT  TestPromise/pnpm-install.txt/2048
-=== CONT  TestPromise/maven-test.txt/512
-=== CONT  TestPromise/pnpm-install.txt/700
-=== CONT  TestPromise/pnpm-install.txt/512
-=== CONT  TestPromise/pnpm-install.txt/256
+=== CONT  TestPromise/gotest-short.txt/16384
+=== CONT  TestPromise/gotest-short.txt/4096
+=== CONT  TestPromise/gotest-short.txt/2048
+=== CONT  TestPromise/gotest-short.txt/1024
+=== CONT  TestPromise/gotest-short.txt/700
+=== CONT  TestPromise/gotest-short.txt/512
+=== CONT  TestPromise/gotest-short.txt/256
 === CONT  TestPromise/npm-install.txt/16384
 === CONT  TestPromise/npm-install.txt/4096
 === CONT  TestPromise/npm-install.txt/2048
@@ -566,103 +573,110 @@
 === CONT  TestPromise/npm-install.txt/700
 === CONT  TestPromise/npm-install.txt/512
 === CONT  TestPromise/npm-install.txt/256
-=== CONT  TestPromise/npm-conflict.txt/16384
-=== CONT  TestPromise/npm-conflict.txt/4096
-=== CONT  TestPromise/npm-conflict.txt/2048
-=== CONT  TestPromise/npm-conflict.txt/1024
-=== CONT  TestPromise/npm-conflict.txt/700
-=== CONT  TestPromise/npm-conflict.txt/512
-=== CONT  TestPromise/npm-conflict.txt/256
-=== CONT  TestPromise/maven-test.txt/16384
-=== CONT  TestPromise/maven-test.txt/4096
-=== CONT  TestPromise/maven-test.txt/2048
-=== CONT  TestPromise/maven-test.txt/1024
-=== CONT  TestPromise/maven-test.txt/700
-=== CONT  TestPromise/http-redirect.txt/2048
-=== CONT  TestPromise/maven-test.txt/256
-=== CONT  TestPromise/junit-pytest.xml/16384
-=== CONT  TestPromise/junit-pytest.xml/4096
-=== CONT  TestPromise/junit-pytest.xml/2048
-=== CONT  TestPromise/junit-pytest.xml/1024
-=== CONT  TestPromise/junit-pytest.xml/700
-=== CONT  TestPromise/junit-pytest.xml/512
-=== CONT  TestPromise/junit-pytest.xml/256
-=== CONT  TestPromise/http-redirect.txt/16384
-=== CONT  TestPromise/http-redirect.txt/4096
-=== CONT  TestPromise/eslint.txt/4096
-=== CONT  TestPromise/http-redirect.txt/1024
-=== CONT  TestPromise/http-redirect.txt/700
-=== CONT  TestPromise/http-redirect.txt/512
-=== CONT  TestPromise/http-redirect.txt/256
+=== CONT  TestPromise/gradle-test.txt/16384
+=== CONT  TestPromise/gradle-test.txt/4096
+=== CONT  TestPromise/gradle-test.txt/2048
+=== CONT  TestPromise/gradle-test.txt/1024
+=== CONT  TestPromise/git-diff.txt/4096
+=== CONT  TestPromise/gradle-test.txt/512
+=== CONT  TestPromise/gradle-test.txt/256
+=== CONT  TestPromise/gotest-json.txt/16384
+=== CONT  TestPromise/gotest-json.txt/4096
+=== CONT  TestPromise/gotest-json.txt/2048
+=== CONT  TestPromise/gotest-json.txt/1024
+=== CONT  TestPromise/gotest-json.txt/700
+=== CONT  TestPromise/gotest-json.txt/512
+=== CONT  TestPromise/gotest-json.txt/256
+=== CONT  TestPromise/git-diff.txt/16384
 === CONT  TestPromise/eslint.txt/16384
-=== CONT  TestPromise/eslint.txt/700
-=== CONT  TestPromise/eslint.txt/2048
+=== CONT  TestPromise/git-diff.txt/2048
+=== CONT  TestPromise/git-diff.txt/1024
+=== CONT  TestPromise/git-diff.txt/700
+=== CONT  TestPromise/git-diff.txt/512
+=== CONT  TestPromise/git-diff.txt/256
 === CONT  TestPromise/eslint.txt/1024
+=== CONT  TestPromise/eslint.txt/4096
+=== CONT  TestPromise/eslint.txt/2048
+=== CONT  TestPromise/eslint.txt/700
 === CONT  TestPromise/eslint.txt/512
 --- PASS: TestPromise (0.01s)
     --- PASS: TestPromise/eslint.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-short.txt/256 (0.00s)
+    --- PASS: TestPromise/http-json.txt/256 (0.00s)
     --- PASS: TestPromise/cargo-test.txt/4096 (0.01s)
     --- PASS: TestPromise/cargo-test.txt/16384 (0.02s)
-    --- PASS: TestPromise/cargo-test.txt/1024 (0.01s)
     --- PASS: TestPromise/cargo-test.txt/2048 (0.02s)
-    --- PASS: TestPromise/cargo-test.txt/700 (0.01s)
-    --- PASS: TestPromise/cargo-test.txt/256 (0.00s)
+    --- PASS: TestPromise/cargo-test.txt/1024 (0.02s)
+    --- PASS: TestPromise/cargo-test.txt/700 (0.02s)
     --- PASS: TestPromise/cargo-test.txt/512 (0.01s)
-    --- PASS: TestPromise/maven-compile.txt/16384 (0.01s)
-    --- PASS: TestPromise/maven-compile.txt/2048 (0.01s)
-    --- PASS: TestPromise/maven-compile.txt/4096 (0.02s)
-    --- PASS: TestPromise/maven-compile.txt/700 (0.02s)
-    --- PASS: TestPromise/maven-compile.txt/1024 (0.01s)
-    --- PASS: TestPromise/maven-compile.txt/256 (0.00s)
-    --- PASS: TestPromise/maven-compile.txt/512 (0.03s)
-    --- PASS: TestPromise/ls-recursive.txt/16384 (0.11s)
-    --- PASS: TestPromise/ls-recursive.txt/4096 (0.13s)
-    --- PASS: TestPromise/ls-recursive.txt/2048 (0.13s)
-    --- PASS: TestPromise/ls-recursive.txt/1024 (0.13s)
-    --- PASS: TestPromise/ls-recursive.txt/700 (0.12s)
-    --- PASS: TestPromise/ls-recursive.txt/256 (0.00s)
-    --- PASS: TestPromise/ls-recursive.txt/512 (0.11s)
-    --- PASS: TestPromise/http-json.txt/4096 (0.48s)
-    --- PASS: TestPromise/http-json.txt/16384 (0.56s)
-    --- PASS: TestPromise/http-json.txt/1024 (0.52s)
-    --- PASS: TestPromise/http-json.txt/2048 (0.55s)
-    --- PASS: TestPromise/http-json.txt/700 (0.52s)
-    --- PASS: TestPromise/http-json.txt/512 (0.53s)
-    --- PASS: TestPromise/http-json.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-json.txt/4096 (0.41s)
-    --- PASS: TestPromise/gotest-json.txt/16384 (0.46s)
-    --- PASS: TestPromise/gotest-json.txt/1024 (0.42s)
-    --- PASS: TestPromise/gotest-json.txt/2048 (0.48s)
-    --- PASS: TestPromise/gotest-json.txt/512 (0.48s)
-    --- PASS: TestPromise/gotest-json.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-json.txt/700 (0.52s)
-    --- PASS: TestPromise/git-diff.txt/4096 (0.25s)
-    --- PASS: TestPromise/git-diff.txt/16384 (0.31s)
-    --- PASS: TestPromise/git-diff.txt/2048 (0.19s)
-    --- PASS: TestPromise/git-diff.txt/1024 (0.20s)
-    --- PASS: TestPromise/git-diff.txt/700 (0.16s)
-    --- PASS: TestPromise/git-diff.txt/256 (0.00s)
-    --- PASS: TestPromise/git-diff.txt/512 (0.16s)
-    --- PASS: TestPromise/cargo-build.txt/16384 (0.03s)
+    --- PASS: TestPromise/cargo-test.txt/256 (0.00s)
+    --- PASS: TestPromise/cargo-build.txt/16384 (0.02s)
     --- PASS: TestPromise/cargo-build.txt/4096 (0.02s)
-    --- PASS: TestPromise/cargo-build.txt/2048 (0.02s)
     --- PASS: TestPromise/cargo-build.txt/1024 (0.02s)
-    --- PASS: TestPromise/cargo-build.txt/700 (0.02s)
+    --- PASS: TestPromise/cargo-build.txt/2048 (0.02s)
+    --- PASS: TestPromise/cargo-build.txt/512 (0.01s)
     --- PASS: TestPromise/cargo-build.txt/256 (0.00s)
-    --- PASS: TestPromise/cargo-build.txt/512 (0.02s)
-    --- PASS: TestPromise/app.log/4096 (5.27s)
-    --- PASS: TestPromise/app.log/16384 (5.36s)
-    --- PASS: TestPromise/app.log/2048 (10.95s)
-    --- PASS: TestPromise/app.log/1024 (13.31s)
-    --- PASS: TestPromise/app.log/700 (11.01s)
+    --- PASS: TestPromise/cargo-build.txt/700 (0.02s)
+    --- PASS: TestPromise/app.log/16384 (4.45s)
+    --- PASS: TestPromise/app.log/4096 (4.45s)
+    --- PASS: TestPromise/app.log/2048 (7.91s)
+    --- PASS: TestPromise/app.log/1024 (9.43s)
+    --- PASS: TestPromise/app.log/700 (9.77s)
     --- PASS: TestPromise/app.log/256 (0.00s)
-    --- PASS: TestPromise/api-response.json/16384 (0.34s)
-    --- PASS: TestPromise/api-response.json/4096 (0.37s)
-    --- PASS: TestPromise/api-response.json/2048 (0.42s)
-    --- PASS: TestPromise/api-response.json/1024 (0.46s)
-    --- PASS: TestPromise/app.log/512 (10.50s)
-    --- PASS: TestPromise/api-response.json/700 (0.48s)
+    --- PASS: TestPromise/pytest-verbose.txt/16384 (0.07s)
+    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.07s)
+    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.06s)
+    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.06s)
+    --- PASS: TestPromise/pytest-verbose.txt/700 (0.06s)
+    --- PASS: TestPromise/pytest-verbose.txt/512 (0.03s)
+    --- PASS: TestPromise/pytest-verbose.txt/256 (0.00s)
+    --- PASS: TestPromise/pytest-short.txt/16384 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/4096 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/2048 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/1024 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/700 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/512 (0.01s)
+    --- PASS: TestPromise/pytest-short.txt/256 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/16384 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/4096 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/2048 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/1024 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/700 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/512 (0.00s)
+    --- PASS: TestPromise/pnpm-install.txt/256 (0.00s)
+    --- PASS: TestPromise/maven-test.txt/16384 (0.02s)
+    --- PASS: TestPromise/maven-test.txt/4096 (0.02s)
+    --- PASS: TestPromise/maven-test.txt/2048 (0.02s)
+    --- PASS: TestPromise/maven-test.txt/1024 (0.02s)
+    --- PASS: TestPromise/maven-test.txt/700 (0.02s)
+    --- PASS: TestPromise/maven-test.txt/512 (0.01s)
+    --- PASS: TestPromise/maven-test.txt/256 (0.00s)
+    --- PASS: TestPromise/maven-compile.txt/16384 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/4096 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/2048 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/1024 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/700 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/512 (0.01s)
+    --- PASS: TestPromise/maven-compile.txt/256 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/16384 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/4096 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/2048 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/1024 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/700 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/512 (0.00s)
+    --- PASS: TestPromise/http-redirect.txt/256 (0.00s)
+    --- PASS: TestPromise/app.log/512 (9.65s)
+    --- PASS: TestPromise/find-listing.txt/16384 (1.12s)
+    --- PASS: TestPromise/find-listing.txt/4096 (1.23s)
+    --- PASS: TestPromise/find-listing.txt/2048 (1.17s)
+    --- PASS: TestPromise/find-listing.txt/1024 (1.14s)
+    --- PASS: TestPromise/find-listing.txt/700 (1.14s)
+    --- PASS: TestPromise/find-listing.txt/256 (0.00s)
+    --- PASS: TestPromise/api-response.json/16384 (0.41s)
+    --- PASS: TestPromise/api-response.json/4096 (0.41s)
+    --- PASS: TestPromise/find-listing.txt/512 (1.15s)
+    --- PASS: TestPromise/api-response.json/2048 (0.52s)
+    --- PASS: TestPromise/api-response.json/1024 (0.55s)
+    --- PASS: TestPromise/api-response.json/700 (0.54s)
     --- PASS: TestPromise/api-response.json/256 (0.00s)
     --- PASS: TestPromise/tsc-pretty.txt/16384 (0.01s)
     --- PASS: TestPromise/tsc-pretty.txt/4096 (0.01s)
@@ -671,117 +685,103 @@
     --- PASS: TestPromise/tsc-pretty.txt/700 (0.01s)
     --- PASS: TestPromise/tsc-pretty.txt/512 (0.01s)
     --- PASS: TestPromise/tsc-pretty.txt/256 (0.00s)
-    --- PASS: TestPromise/pytest-short.txt/16384 (0.02s)
-    --- PASS: TestPromise/pytest-short.txt/4096 (0.01s)
-    --- PASS: TestPromise/pytest-short.txt/2048 (0.02s)
-    --- PASS: TestPromise/pytest-short.txt/1024 (0.02s)
-    --- PASS: TestPromise/pytest-short.txt/700 (0.01s)
-    --- PASS: TestPromise/pytest-short.txt/512 (0.01s)
-    --- PASS: TestPromise/pytest-short.txt/256 (0.00s)
-    --- PASS: TestPromise/http-verbose-404.txt/16384 (0.00s)
+    --- PASS: TestPromise/api-response.json/512 (0.57s)
+    --- PASS: TestPromise/http-json.txt/16384 (0.34s)
+    --- PASS: TestPromise/http-json.txt/4096 (0.32s)
+    --- PASS: TestPromise/http-json.txt/2048 (0.32s)
+    --- PASS: TestPromise/http-json.txt/1024 (0.32s)
+    --- PASS: TestPromise/http-json.txt/700 (0.33s)
+    --- PASS: TestPromise/http-json.txt/512 (0.33s)
+    --- PASS: TestPromise/tsc.txt/16384 (0.01s)
+    --- PASS: TestPromise/tsc.txt/4096 (0.01s)
+    --- PASS: TestPromise/tsc.txt/2048 (0.01s)
+    --- PASS: TestPromise/tsc.txt/1024 (0.01s)
+    --- PASS: TestPromise/tsc.txt/700 (0.01s)
+    --- PASS: TestPromise/tsc.txt/512 (0.01s)
+    --- PASS: TestPromise/tsc.txt/256 (0.00s)
+    --- PASS: TestPromise/npm-conflict.txt/16384 (0.01s)
+    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.11s)
+    --- PASS: TestPromise/npm-conflict.txt/4096 (0.02s)
+    --- PASS: TestPromise/npm-conflict.txt/2048 (0.01s)
+    --- PASS: TestPromise/npm-conflict.txt/1024 (0.01s)
+    --- PASS: TestPromise/npm-conflict.txt/700 (0.01s)
+    --- PASS: TestPromise/npm-conflict.txt/256 (0.00s)
+    --- PASS: TestPromise/npm-conflict.txt/512 (0.01s)
+    --- PASS: TestPromise/ls-recursive.txt/16384 (0.08s)
+    --- PASS: TestPromise/ls-recursive.txt/4096 (0.08s)
+    --- PASS: TestPromise/ls-recursive.txt/2048 (0.08s)
+    --- PASS: TestPromise/ls-recursive.txt/1024 (0.09s)
+    --- PASS: TestPromise/ls-recursive.txt/700 (0.10s)
+    --- PASS: TestPromise/ls-recursive.txt/256 (0.00s)
+    --- PASS: TestPromise/ls-recursive.txt/512 (0.11s)
+    --- PASS: TestPromise/junit-pytest.xml/16384 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/4096 (0.08s)
+    --- PASS: TestPromise/junit-pytest.xml/2048 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/1024 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/700 (0.07s)
+    --- PASS: TestPromise/junit-pytest.xml/256 (0.00s)
+    --- PASS: TestPromise/http-verbose-404.txt/16384 (0.01s)
     --- PASS: TestPromise/http-verbose-404.txt/4096 (0.01s)
     --- PASS: TestPromise/http-verbose-404.txt/2048 (0.01s)
     --- PASS: TestPromise/http-verbose-404.txt/1024 (0.01s)
-    --- PASS: TestPromise/http-verbose-404.txt/700 (0.00s)
+    --- PASS: TestPromise/http-verbose-404.txt/700 (0.01s)
     --- PASS: TestPromise/http-verbose-404.txt/512 (0.01s)
     --- PASS: TestPromise/http-verbose-404.txt/256 (0.00s)
+    --- PASS: TestPromise/junit-pytest.xml/512 (0.09s)
+    --- PASS: TestPromise/gradle-compile.txt/16384 (0.02s)
+    --- PASS: TestPromise/gradle-compile.txt/4096 (0.02s)
+    --- PASS: TestPromise/gradle-compile.txt/2048 (0.02s)
+    --- PASS: TestPromise/gradle-compile.txt/1024 (0.03s)
+    --- PASS: TestPromise/gradle-compile.txt/700 (0.03s)
+    --- PASS: TestPromise/gradle-compile.txt/256 (0.00s)
+    --- PASS: TestPromise/gradle-compile.txt/512 (0.02s)
+    --- PASS: TestPromise/gotest-verbose.txt/4096 (0.08s)
+    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.08s)
+    --- PASS: TestPromise/gradle-test.txt/700 (0.02s)
+    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.09s)
+    --- PASS: TestPromise/gotest-verbose.txt/700 (0.08s)
+    --- PASS: TestPromise/gotest-verbose.txt/256 (0.00s)
     --- PASS: TestPromise/gotest-short.txt/16384 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/4096 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/2048 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/1024 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/700 (0.01s)
     --- PASS: TestPromise/gotest-short.txt/512 (0.01s)
-    --- PASS: TestPromise/pnpm-install.txt/1024 (0.00s)
-    --- PASS: TestPromise/api-response.json/512 (0.59s)
-    --- PASS: TestPromise/find-listing.txt/16384 (1.19s)
-    --- PASS: TestPromise/find-listing.txt/4096 (1.08s)
-    --- PASS: TestPromise/find-listing.txt/2048 (1.09s)
-    --- PASS: TestPromise/find-listing.txt/1024 (1.08s)
-    --- PASS: TestPromise/find-listing.txt/700 (1.15s)
-    --- PASS: TestPromise/find-listing.txt/256 (0.00s)
-    --- PASS: TestPromise/tsc.txt/16384 (0.01s)
-    --- PASS: TestPromise/tsc.txt/4096 (0.01s)
-    --- PASS: TestPromise/tsc.txt/2048 (0.01s)
-    --- PASS: TestPromise/tsc.txt/1024 (0.01s)
-    --- PASS: TestPromise/tsc.txt/700 (0.00s)
-    --- PASS: TestPromise/tsc.txt/512 (0.00s)
-    --- PASS: TestPromise/tsc.txt/256 (0.00s)
-    --- PASS: TestPromise/find-listing.txt/512 (1.18s)
-    --- PASS: TestPromise/pytest-verbose.txt/16384 (0.07s)
-    --- PASS: TestPromise/pytest-verbose.txt/4096 (0.08s)
-    --- PASS: TestPromise/pytest-verbose.txt/2048 (0.08s)
-    --- PASS: TestPromise/pytest-verbose.txt/1024 (0.08s)
-    --- PASS: TestPromise/pytest-verbose.txt/700 (0.07s)
-    --- PASS: TestPromise/pytest-verbose.txt/256 (0.00s)
+    --- PASS: TestPromise/gotest-short.txt/256 (0.00s)
+    --- PASS: TestPromise/npm-install.txt/16384 (0.01s)
+    --- PASS: TestPromise/npm-install.txt/4096 (0.01s)
+    --- PASS: TestPromise/gotest-verbose.txt/512 (0.11s)
+    --- PASS: TestPromise/npm-install.txt/2048 (0.01s)
+    --- PASS: TestPromise/npm-install.txt/1024 (0.01s)
+    --- PASS: TestPromise/npm-install.txt/700 (0.01s)
+    --- PASS: TestPromise/npm-install.txt/256 (0.00s)
+    --- PASS: TestPromise/npm-install.txt/512 (0.01s)
     --- PASS: TestPromise/gradle-test.txt/16384 (0.02s)
-    --- PASS: TestPromise/pytest-verbose.txt/512 (0.04s)
     --- PASS: TestPromise/gradle-test.txt/4096 (0.02s)
     --- PASS: TestPromise/gradle-test.txt/2048 (0.02s)
     --- PASS: TestPromise/gradle-test.txt/1024 (0.02s)
-    --- PASS: TestPromise/gradle-test.txt/700 (0.02s)
-    --- PASS: TestPromise/gradle-test.txt/256 (0.00s)
     --- PASS: TestPromise/gradle-test.txt/512 (0.02s)
-    --- PASS: TestPromise/gradle-compile.txt/16384 (0.02s)
-    --- PASS: TestPromise/gradle-compile.txt/4096 (0.03s)
-    --- PASS: TestPromise/gradle-compile.txt/1024 (0.02s)
-    --- PASS: TestPromise/gradle-compile.txt/2048 (0.03s)
-    --- PASS: TestPromise/gradle-compile.txt/512 (0.02s)
-    --- PASS: TestPromise/gradle-compile.txt/256 (0.00s)
-    --- PASS: TestPromise/gradle-compile.txt/700 (0.03s)
-    --- PASS: TestPromise/gotest-verbose.txt/16384 (0.09s)
-    --- PASS: TestPromise/gotest-verbose.txt/4096 (0.09s)
-    --- PASS: TestPromise/gotest-verbose.txt/1024 (0.09s)
-    --- PASS: TestPromise/gotest-verbose.txt/2048 (0.09s)
-    --- PASS: TestPromise/gotest-verbose.txt/700 (0.09s)
-    --- PASS: TestPromise/gotest-verbose.txt/256 (0.00s)
-    --- PASS: TestPromise/gotest-verbose.txt/512 (0.09s)
-    --- PASS: TestPromise/pnpm-install.txt/16384 (0.01s)
-    --- PASS: TestPromise/pnpm-install.txt/4096 (0.02s)
-    --- PASS: TestPromise/pnpm-install.txt/2048 (0.02s)
-    --- PASS: TestPromise/pnpm-install.txt/700 (0.02s)
-    --- PASS: TestPromise/pnpm-install.txt/512 (0.01s)
-    --- PASS: TestPromise/pnpm-install.txt/256 (0.00s)
-    --- PASS: TestPromise/maven-test.txt/512 (0.03s)
-    --- PASS: TestPromise/npm-install.txt/16384 (0.02s)
-    --- PASS: TestPromise/npm-install.txt/4096 (0.02s)
-    --- PASS: TestPromise/npm-install.txt/2048 (0.02s)
-    --- PASS: TestPromise/npm-install.txt/1024 (0.02s)
-    --- PASS: TestPromise/npm-install.txt/700 (0.02s)
-    --- PASS: TestPromise/npm-install.txt/256 (0.00s)
-    --- PASS: TestPromise/npm-install.txt/512 (0.02s)
-    --- PASS: TestPromise/npm-conflict.txt/16384 (0.02s)
-    --- PASS: TestPromise/npm-conflict.txt/4096 (0.01s)
-    --- PASS: TestPromise/npm-conflict.txt/2048 (0.01s)
-    --- PASS: TestPromise/npm-conflict.txt/1024 (0.02s)
-    --- PASS: TestPromise/npm-conflict.txt/700 (0.02s)
-    --- PASS: TestPromise/npm-conflict.txt/256 (0.00s)
-    --- PASS: TestPromise/npm-conflict.txt/512 (0.02s)
-    --- PASS: TestPromise/maven-test.txt/16384 (0.04s)
-    --- PASS: TestPromise/maven-test.txt/4096 (0.04s)
-    --- PASS: TestPromise/maven-test.txt/2048 (0.04s)
-    --- PASS: TestPromise/maven-test.txt/1024 (0.04s)
-    --- PASS: TestPromise/http-redirect.txt/2048 (0.01s)
-    --- PASS: TestPromise/maven-test.txt/256 (0.00s)
-    --- PASS: TestPromise/maven-test.txt/700 (0.04s)
-    --- PASS: TestPromise/junit-pytest.xml/16384 (0.09s)
-    --- PASS: TestPromise/junit-pytest.xml/4096 (0.09s)
-    --- PASS: TestPromise/junit-pytest.xml/2048 (0.09s)
-    --- PASS: TestPromise/junit-pytest.xml/1024 (0.10s)
-    --- PASS: TestPromise/junit-pytest.xml/700 (0.10s)
-    --- PASS: TestPromise/junit-pytest.xml/256 (0.00s)
-    --- PASS: TestPromise/http-redirect.txt/16384 (0.01s)
-    --- PASS: TestPromise/http-redirect.txt/4096 (0.01s)
-    --- PASS: TestPromise/junit-pytest.xml/512 (0.10s)
-    --- PASS: TestPromise/http-redirect.txt/1024 (0.01s)
-    --- PASS: TestPromise/http-redirect.txt/700 (0.01s)
-    --- PASS: TestPromise/eslint.txt/4096 (0.03s)
-    --- PASS: TestPromise/http-redirect.txt/256 (0.00s)
-    --- PASS: TestPromise/http-redirect.txt/512 (0.01s)
-    --- PASS: TestPromise/eslint.txt/16384 (0.03s)
-    --- PASS: TestPromise/eslint.txt/700 (0.02s)
+    --- PASS: TestPromise/gradle-test.txt/256 (0.00s)
+    --- PASS: TestPromise/git-diff.txt/4096 (0.16s)
+    --- PASS: TestPromise/gotest-json.txt/16384 (0.30s)
+    --- PASS: TestPromise/gotest-json.txt/4096 (0.29s)
+    --- PASS: TestPromise/gotest-json.txt/2048 (0.27s)
+    --- PASS: TestPromise/gotest-json.txt/1024 (0.28s)
+    --- PASS: TestPromise/gotest-json.txt/700 (0.29s)
+    --- PASS: TestPromise/gotest-json.txt/256 (0.00s)
+    --- PASS: TestPromise/gotest-json.txt/512 (0.29s)
+    --- PASS: TestPromise/eslint.txt/16384 (0.02s)
+    --- PASS: TestPromise/git-diff.txt/16384 (0.24s)
+    --- PASS: TestPromise/git-diff.txt/2048 (0.16s)
+    --- PASS: TestPromise/git-diff.txt/1024 (0.14s)
+    --- PASS: TestPromise/git-diff.txt/700 (0.14s)
+    --- PASS: TestPromise/git-diff.txt/256 (0.00s)
     --- PASS: TestPromise/eslint.txt/1024 (0.02s)
-    --- PASS: TestPromise/eslint.txt/2048 (0.03s)
+    --- PASS: TestPromise/eslint.txt/4096 (0.02s)
+    --- PASS: TestPromise/eslint.txt/2048 (0.02s)
+    --- PASS: TestPromise/eslint.txt/700 (0.02s)
     --- PASS: TestPromise/eslint.txt/512 (0.02s)
+    --- PASS: TestPromise/git-diff.txt/512 (0.16s)
 === RUN   TestGroupsCoverInput
 --- PASS: TestGroupsCoverInput (0.38s)
 === RUN   TestExpectedContent
@@ -813,11 +813,11 @@
     promise_test.go:418: ratio pytest-verbose.txt   pytest           79443 bytes   1072 lines ->  3893 bytes  88 lines (4.90% of the input)
     promise_test.go:418: ratio tsc-pretty.txt       tsc               2227 bytes     51 lines ->  1689 bytes  52 lines (75.84% of the input)
     promise_test.go:418: ratio tsc.txt              tsc                649 bytes      8 lines ->   739 bytes   9 lines (113.87% of the input)
---- PASS: TestRatios (0.22s)
+--- PASS: TestRatios (0.23s)
 === RUN   TestBuildHeads
 --- PASS: TestBuildHeads (0.01s)
 === RUN   TestReview04Promise
---- PASS: TestReview04Promise (0.38s)
+--- PASS: TestReview04Promise (0.36s)
 === RUN   TestReview04DiffOtherLines
     review04_test.go:55: shown whole
 --- SKIP: TestReview04DiffOtherLines (0.00s)
@@ -832,11 +832,11 @@
 === RUN   TestReview04HTTPHistory
 --- PASS: TestReview04HTTPHistory (0.00s)
 === RUN   TestReview04SecondPass
---- PASS: TestReview04SecondPass (0.00s)
+--- PASS: TestReview04SecondPass (0.01s)
 === RUN   TestReview05Promise
---- PASS: TestReview05Promise (0.07s)
+--- PASS: TestReview05Promise (0.08s)
 === RUN   TestReview05Colour
---- PASS: TestReview05Colour (0.01s)
+--- PASS: TestReview05Colour (0.00s)
 === RUN   TestReview05InfoLogNotMaven
 --- PASS: TestReview05InfoLogNotMaven (0.00s)
 === RUN   TestReview05TscWatch
@@ -844,7 +844,7 @@
 === RUN   TestReview05CargoWorkspace
 --- PASS: TestReview05CargoWorkspace (0.00s)
 === RUN   TestReview05BuildTestHistory
---- PASS: TestReview05BuildTestHistory (0.00s)
+--- PASS: TestReview05BuildTestHistory (0.01s)
 === RUN   TestReview05UmbrellaIdentity
 --- PASS: TestReview05UmbrellaIdentity (0.00s)
 === RUN   TestReview05MavenGoals
@@ -860,7 +860,7 @@
 === RUN   TestReview05bErrorWording
 --- PASS: TestReview05bErrorWording (0.00s)
 === RUN   TestReview05bFamilyFormats
---- PASS: TestReview05bFamilyFormats (0.00s)
+--- PASS: TestReview05bFamilyFormats (0.01s)
 === RUN   TestReview05bEslintMessages
 --- PASS: TestReview05bEslintMessages (0.00s)
 === RUN   TestReview05bTscStampLevel
@@ -906,7 +906,7 @@
 === RUN   TestTruncatedJUnit
 --- PASS: TestTruncatedJUnit (0.00s)
 === RUN   TestLongLine
---- PASS: TestLongLine (0.17s)
+--- PASS: TestLongLine (0.18s)
 === RUN   TestCRLFAndANSI
 --- PASS: TestCRLFAndANSI (0.00s)
 === RUN   TestInvalidUTF8
@@ -932,12 +932,26 @@
 === RUN   TestDedupe
 --- PASS: TestDedupe (0.01s)
 === RUN   TestManyDistinctBounded
---- PASS: TestManyDistinctBounded (0.09s)
+--- PASS: TestManyDistinctBounded (0.10s)
 === RUN   TestRandomLogs
---- PASS: TestRandomLogs (1.98s)
+--- PASS: TestRandomLogs (2.03s)
 === RUN   TestLargeInputMemory
-    robust_test.go:440: memory: 68 MB input, 780335 lines, peak heap in use 9.1 MB, output 619 bytes, 6.7 s (10 MB/s)
---- PASS: TestLargeInputMemory (6.71s)
+    robust_test.go:440: memory: 68 MB input, 780335 lines, peak heap in use 8.6 MB, output 619 bytes, 6.9 s (10 MB/s)
+--- PASS: TestLargeInputMemory (6.90s)
+=== RUN   TestWarningHistory
+--- PASS: TestWarningHistory (0.00s)
+=== RUN   TestWarningHistoryOff
+--- PASS: TestWarningHistoryOff (0.00s)
+=== RUN   TestWarningHistoryPreserve
+--- PASS: TestWarningHistoryPreserve (0.00s)
+=== RUN   TestWarningHistoryCargo
+--- PASS: TestWarningHistoryCargo (0.00s)
+=== RUN   TestWarningHistoryCap
+--- PASS: TestWarningHistoryCap (0.23s)
+=== RUN   TestWarningHistoryWording
+--- PASS: TestWarningHistoryWording (0.00s)
+=== RUN   TestWarningHistorySkippedNote
+--- PASS: TestWarningHistorySkippedNote (0.15s)
 === RUN   TestSimulatedRuns
 === RUN   TestSimulatedRuns/go_test_-v
     delta_test.go:438: 500 runs: map[fixed:508 flaky:1399 new:544 new notes:539 not run:45 one line:57 report:443 still:2386 streak notes:1858]
@@ -945,18 +959,18 @@
     delta_test.go:438: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
 === RUN   TestSimulatedRuns/log
     delta_test.go:438: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
---- PASS: TestSimulatedRuns (3.12s)
-    --- PASS: TestSimulatedRuns/go_test_-v (1.09s)
-    --- PASS: TestSimulatedRuns/go_test (0.96s)
-    --- PASS: TestSimulatedRuns/log (1.07s)
+--- PASS: TestSimulatedRuns (3.29s)
+    --- PASS: TestSimulatedRuns/go_test_-v (1.18s)
+    --- PASS: TestSimulatedRuns/go_test (0.99s)
+    --- PASS: TestSimulatedRuns/log (1.12s)
 PASS
-ok  	github.com/abbreviatory/engine	70.488s
+ok  	github.com/abbreviatory/engine	81.264s
 === RUN   TestReduceAndExpand
---- PASS: TestReduceAndExpand (0.01s)
+--- PASS: TestReduceAndExpand (0.02s)
 === RUN   TestReduceFileAndJSON
---- PASS: TestReduceFileAndJSON (0.01s)
+--- PASS: TestReduceFileAndJSON (0.02s)
 === RUN   TestNoStore
---- PASS: TestNoStore (0.01s)
+--- PASS: TestNoStore (0.00s)
 === RUN   TestErrors
 --- PASS: TestErrors (0.00s)
 === RUN   TestVersionFormatsPrune
@@ -964,15 +978,17 @@ ok  	github.com/abbreviatory/engine	70.488s
 === RUN   TestParseSize
 --- PASS: TestParseSize (0.00s)
 === RUN   TestReduceWithKeyAndHistory
---- PASS: TestReduceWithKeyAndHistory (0.02s)
+--- PASS: TestReduceWithKeyAndHistory (0.03s)
 === RUN   TestRunKeepsExitStatus
 --- PASS: TestRunKeepsExitStatus (0.03s)
 === RUN   TestRunEdgeCases
---- PASS: TestRunEdgeCases (0.33s)
+--- PASS: TestRunEdgeCases (0.32s)
 === RUN   TestRunPassesSignalsOn
---- PASS: TestRunPassesSignalsOn (1.24s)
+--- PASS: TestRunPassesSignalsOn (1.27s)
 === RUN   TestRunSignalDuringLockWait
---- PASS: TestRunSignalDuringLockWait (1.18s)
+--- PASS: TestRunSignalDuringLockWait (1.26s)
+=== RUN   TestWarningsNeedPreserve
+--- PASS: TestWarningsNeedPreserve (0.01s)
 === RUN   TestMCPProtocol
 --- PASS: TestMCPProtocol (0.01s)
 === RUN   TestMCPRun
@@ -980,8 +996,8 @@ ok  	github.com/abbreviatory/engine	70.488s
 === RUN   TestMCPMessagesAndShutdown
 --- PASS: TestMCPMessagesAndShutdown (0.51s)
 === RUN   TestFrontEndsAgree
-    parity_test.go:334: 26 fixtures: 130 reductions, 1280 expansions and 26 histories the same through the command line, HTTP and MCP
---- PASS: TestFrontEndsAgree (37.45s)
+    parity_test.go:343: 26 fixtures: 130 reductions, 1280 expansions and 26 histories the same through the command line, HTTP and MCP
+--- PASS: TestFrontEndsAgree (31.11s)
 === RUN   TestFrontEndsAgreeOnText
 --- PASS: TestFrontEndsAgreeOnText (0.19s)
 === RUN   TestHTTPService
@@ -991,17 +1007,17 @@ ok  	github.com/abbreviatory/engine	70.488s
 === RUN   TestServeAddress
 --- PASS: TestServeAddress (0.00s)
 === RUN   TestServeProcess
---- PASS: TestServeProcess (0.64s)
+--- PASS: TestServeProcess (0.70s)
 === RUN   TestHTTPLocalOnly
 --- PASS: TestHTTPLocalOnly (0.02s)
 === RUN   TestHTTPDetails
---- PASS: TestHTTPDetails (0.42s)
+--- PASS: TestHTTPDetails (0.35s)
 === RUN   TestHTTPSlowUploadsAndPointers
---- PASS: TestHTTPSlowUploadsAndPointers (0.71s)
+--- PASS: TestHTTPSlowUploadsAndPointers (0.20s)
 PASS
-ok  	github.com/abbreviatory/engine/cmd/abbreviatory	44.168s
+ok  	github.com/abbreviatory/engine/cmd/abbreviatory	37.474s
 === RUN   TestStoreRoundTrip
---- PASS: TestStoreRoundTrip (0.02s)
+--- PASS: TestStoreRoundTrip (0.01s)
 === RUN   TestStoreMissing
 --- PASS: TestStoreMissing (0.00s)
 === RUN   TestStoreAbortLeavesNothing
@@ -1021,8 +1037,10 @@ ok  	github.com/abbreviatory/engine/cmd/abbreviatory	44.168s
 === RUN   TestPruneOldHistory
 --- PASS: TestPruneOldHistory (0.00s)
 === RUN   TestHistoryUpdateTakesTurns
---- PASS: TestHistoryUpdateTakesTurns (0.25s)
+--- PASS: TestHistoryUpdateTakesTurns (0.26s)
 === RUN   TestLockKeptFresh
 --- PASS: TestLockKeptFresh (0.71s)
+=== RUN   TestHistoryKeepsLastWarnings
+--- PASS: TestHistoryKeepsLastWarnings (0.01s)
 PASS
-ok  	github.com/abbreviatory/engine/store	1.028s
+ok  	github.com/abbreviatory/engine/store	1.039s

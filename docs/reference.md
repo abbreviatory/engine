@@ -1,6 +1,6 @@
 # Abbreviatory reference
 
-This is the full reference for version 0.5. The [README](../README.md) has the
+This is the full reference for version 0.6. The [README](../README.md) has the
 overview and the quick start.
 
 ## Commands

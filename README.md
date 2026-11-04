@@ -415,7 +415,7 @@ source tree. On every fixture, at budgets from
 - every reference expands back to exactly the original bytes, and for line
   formats every input line belongs to exactly one group.
 
-Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 to v0.5.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go), [review04_test.go](review04_test.go), [review05_test.go](review05_test.go)). In all, 124 Go tests pass (with 185 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.30GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
+Seeded random logs go through the same checks, and every finding of the independent reviews before v0.1.0 to v0.6.0 has its own test ([review_test.go](review_test.go), [history_test.go](history_test.go), [review04_test.go](review04_test.go), [review05_test.go](review05_test.go), [warnings_test.go](warnings_test.go)). In all, 133 Go tests pass (with 185 subtests), with the race detector too, on a Linux machine with an Intel Xeon at 2.30GHz and 2 CPUs ([tests.txt](test/results/tests.txt), [race.txt](test/results/race.txt)).
 
 At the default budget ([ratios.txt](test/results/ratios.txt)):
 
@@ -450,7 +450,7 @@ At the default budget ([ratios.txt](test/results/ratios.txt)):
 
 The ones marked shown whole fit the budget, so they come back whole with a one-line header. Build output from a small project is short already; at the default budget it mostly loses its progress lines and repeated notes, and at smaller budgets each error keeps its file and line in the head.
 
-A generated log of 1,107 MB (12.5 million lines) streamed through in 106.2 seconds with a peak heap of 15.9 MB
+A generated log of 1,107 MB (12.5 million lines) streamed through in 106.0 seconds with a peak heap of 11.2 MB
 ([memory.txt](test/results/memory.txt)): for logs and test output, memory
 doesn't grow with the input.
 Before-and-after reports for each fixture are in
@@ -473,7 +473,7 @@ references in them expanded through each, and run histories built through
 each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
 [tests.txt](test/results/tests.txt)).
 
-## Limits in v0.5.0
+## Limits in v0.6.0
 
 - It reads formats it knows. Free prose, or a log format it doesn't
   recognise, is reduced only by folding repeats and finding level words.

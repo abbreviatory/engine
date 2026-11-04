@@ -1,5 +1,5 @@
 # 500 simulated CI runs with known changes, each delta checked against the known statuses
-# recorded 2026-11-03 23:25 UTC at ca139de, Abbreviatory 0.4.0, go1.26.8 linux/amd64
+# recorded 2026-11-04 00:20 UTC at f0b2c97, Abbreviatory 0.5.0, go1.26.8 linux/amd64
 # Linux 6.18.44-fc-v230, Intel(R) Xeon(R) Processor @ 2.30GHz, 2 CPUs
 # command: go test -count=1 -v -run TestSimulatedRuns .
 
@@ -10,9 +10,9 @@
     delta_test.go:438: 500 runs: map[fixed:518 flaky:1937 new:499 new notes:95 not run:0 one line:64 report:436 still:2194 streak notes:233]
 === RUN   TestSimulatedRuns/log
     delta_test.go:438: 500 runs: map[fixed:282 flaky:744 new:286 new notes:285 not run:0 one line:89 report:411 still:1450 streak notes:1070]
---- PASS: TestSimulatedRuns (2.88s)
-    --- PASS: TestSimulatedRuns/go_test_-v (0.98s)
-    --- PASS: TestSimulatedRuns/go_test (0.89s)
+--- PASS: TestSimulatedRuns (2.96s)
+    --- PASS: TestSimulatedRuns/go_test_-v (1.07s)
+    --- PASS: TestSimulatedRuns/go_test (0.87s)
     --- PASS: TestSimulatedRuns/log (1.02s)
 PASS
-ok  	github.com/abbreviatory/engine	2.887s
+ok  	github.com/abbreviatory/engine	2.963s
