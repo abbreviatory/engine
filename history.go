@@ -111,9 +111,11 @@ type Delta struct {
 	WarnCompared bool
 	NewWarnings  []DeltaItem
 	GoneWarnings []DeltaItem
-	// WarnCut is true when warnings weren't compared because this run or
-	// the last had more kinds of warning than are kept apart.
-	WarnCut bool
+	// WarnSkipped says why warnings weren't compared, when they were asked
+	// for and there was a last run: "too many kinds" (this run or the last
+	// had more kinds of warning than are kept apart) or "the last run didn't
+	// record them".
+	WarnSkipped string
 }
 
 // DeltaItem is one line of a delta.
@@ -519,20 +521,24 @@ func warnItems(groups []*group) (out []item, cut bool) {
 // changed.
 func compareWarnings(history []Run, cur *Run, warns []item, cut bool, d *Delta) {
 	cur.Warned, cur.Warn, cur.WarnCut = true, map[string]RunItem{}, cut
-	for _, it := range warns {
-		cur.Warn[it.key] = RunItem{Head: it.head, Sel: it.sel}
+	if !cut {
+		// A cut run can't be compared with, so its warnings aren't kept.
+		for _, it := range warns {
+			cur.Warn[it.key] = RunItem{Head: it.head, Sel: it.sel}
+		}
 	}
-	if len(history) == 0 {
+	if len(history) == 0 || d.Since == 0 {
 		return
 	}
 	prev := &history[len(history)-1]
-	if !prev.Full || !prev.Warned || d.Since == 0 {
+	if !prev.Full || !prev.Warned {
+		d.WarnSkipped = "the last run didn't record them"
 		return
 	}
 	if cut || prev.WarnCut {
 		// Warnings past the cap aren't kept apart: one that fell past it
 		// would read as gone, and a new one there wouldn't show.
-		d.WarnCut = true
+		d.WarnSkipped = "too many kinds"
 		return
 	}
 	d.WarnCompared = true
@@ -780,8 +786,8 @@ func blockLines(d *Delta, capN int, refs bool) []string {
 	add(len(d.Flaky), words.flaky)
 	add(len(d.NewWarnings), plainWord(len(d.NewWarnings), "new warning", "new warnings"))
 	add(len(d.GoneWarnings), plainWord(len(d.GoneWarnings), "warning gone", "warnings gone"))
-	if d.WarnCut {
-		parts = append(parts, "warnings not compared (too many kinds)")
+	if d.WarnSkipped != "" {
+		parts = append(parts, "warnings not compared ("+d.WarnSkipped+")")
 	}
 	since := "since run " + strconv.Itoa(d.Since)
 	if d.Identical {
@@ -867,8 +873,8 @@ func unchangedLine(res *Result, d *Delta, refs bool) string {
 		noun = "errors"
 	}
 	cutNote := ""
-	if d.WarnCut {
-		cutNote = "; warnings not compared (too many kinds)"
+	if d.WarnSkipped != "" {
+		cutNote = "; warnings not compared (" + d.WarnSkipped + ")"
 	}
 	if d.Failing == 0 {
 		return s + ": no " + noun + cutNote + "\n"

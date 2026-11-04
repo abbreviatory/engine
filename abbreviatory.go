@@ -434,6 +434,13 @@ func CheckFormat(name string) error {
 	return err
 }
 
+// PreservesWarnings reports whether a preserve list keeps warnings, which
+// Options.Warnings needs.
+func PreservesWarnings(names []string) bool {
+	p, err := preserveRules(names)
+	return err == nil && p.warnings
+}
+
 // CheckPreserve reports whether Reduce accepts a preserve list.
 func CheckPreserve(names []string) error {
 	_, err := preserveRules(names)

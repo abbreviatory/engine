@@ -133,8 +133,9 @@ The same run again:
 - **New warnings**, with `-warnings`: warnings are compared too. New ones are
   listed and marked `(new)` in the report, and those gone are listed too; either
   makes the run a change. A warning that only moved to another line is the
-  same warning. The comparison starts with the second run that has
-  `-warnings`.
+  same warning. A run is compared with the run just before it, so that run
+  needs `-warnings` too; when it didn't have it, the report says the
+  warnings weren't compared.
 
 For logs the same works on error kinds: new, gone, recurring and intermittent.
 `run` runs the command, reduces what it prints (standard output and standard
@@ -297,7 +298,7 @@ Inputs: `run` (one shell command line, run with bash), `working-directory`,
 `fail` (default true; false reports only) and `version` (default: the
 release the action is pinned to). Outputs: `exit-code`, `result` (pass or
 fail, or error when Abbreviatory itself couldn't run, which fails the step
-whatever `fail` says), `new`, `fixed`, `failing`, `report` (a text file) and
+whatever `fail` says), `new`, `fixed`, `failing`, `new-warnings`, `report` (a text file) and
 `json`. Each use of the action in a job, and each job of a matrix, keeps its
 own history. Each run saves a cache entry of up to 50 MB; GitHub removes the
 oldest entries when a repository's caches pass its limit.
@@ -491,8 +492,8 @@ each, all the same ([parity_test.go](cmd/abbreviatory/parity_test.go),
   as binary.
 - References need the stored original. With `-no-store`, or after pruning,
   they can't be expanded.
-- History compares failures and errors only: warnings and keep-rule matches
-  aren't tracked. A test is known by its name, anything else by its text
+- History compares failures and errors, and warnings with `-warnings`;
+  keep-rule matches aren't tracked. A test is known by its name, anything else by its text
   with numbers and IDs aside, so a log error whose wording changes counts as
   a new one, and the same error with a different stack trace too.
 - In a JSON document (and an HTTP response's JSON body), error fields are

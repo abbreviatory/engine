@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -77,7 +76,7 @@ func (q request) options() (abbreviatory.Options, error) {
 	if err := abbreviatory.CheckPreserve(opt.Preserve); err != nil {
 		return opt, &usageError{err.Error()}
 	}
-	if q.Warnings && !slices.Contains(opt.Preserve, "warnings") {
+	if q.Warnings && !abbreviatory.PreservesWarnings(opt.Preserve) {
 		return opt, usagef("warnings: there are no warnings to compare when -preserve leaves them out")
 	}
 	for _, k := range q.Keep {
@@ -155,6 +154,9 @@ func deltaJSON(d *abbreviatory.Delta) map[string]any {
 	if d.WarnCompared {
 		out["new_warnings"] = items(d.NewWarnings)
 		out["gone_warnings"] = items(d.GoneWarnings)
+	}
+	if d.WarnSkipped != "" {
+		out["warnings_not_compared"] = d.WarnSkipped
 	}
 	return out
 }

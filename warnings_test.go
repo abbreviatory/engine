@@ -103,7 +103,7 @@ func TestWarningHistoryCap(t *testing.T) {
 		t.Fatal("cut not recorded")
 	}
 	next := warnRun(t, []byte("WARN brand new thing\n"+b.String()), true, *first.Run)
-	if len(next.Delta.GoneWarnings) != 0 || len(next.Delta.NewWarnings) != 0 || !next.Delta.WarnCut {
+	if len(next.Delta.GoneWarnings) != 0 || len(next.Delta.NewWarnings) != 0 || next.Delta.WarnSkipped != "too many kinds" {
 		t.Errorf("compared past the cap: new %d, gone %d", len(next.Delta.NewWarnings), len(next.Delta.GoneWarnings))
 	}
 	if !strings.Contains(next.Text, "warnings not compared (too many kinds)") {
@@ -131,5 +131,27 @@ func TestWarningHistoryWording(t *testing.T) {
 	next := warnRun(t, []byte("WARN b\nERROR x\n"+pad), true, *first.Run)
 	if !strings.Contains(next.Text, "the same errors;") {
 		t.Errorf("wording:\n%s", next.Text)
+	}
+}
+
+// Against a last run that didn't record warnings, the report says they
+// weren't compared, and a cut run keeps no warnings.
+func TestWarningHistorySkippedNote(t *testing.T) {
+	pad := strings.Repeat("INFO tick\n", 300)
+	first := warnRun(t, []byte("WARN a\nERROR x\n"+pad), false)
+	res := warnRun(t, []byte("WARN b\nERROR y\n"+pad), true, *first.Run)
+	if res.Delta.WarnSkipped != "the last run didn't record them" || !strings.Contains(res.Text, "warnings not compared (the last run didn't record them)") {
+		t.Errorf("no note:\n%s", res.Text)
+	}
+	if !PreservesWarnings([]string{"errors", "warn"}) || PreservesWarnings([]string{"errors"}) || !PreservesWarnings(nil) {
+		t.Error("PreservesWarnings")
+	}
+	var b strings.Builder
+	for i := 0; i < maxDistinct+10; i++ {
+		b.WriteString("WARN w" + itoaLetters(i) + " bad\n")
+	}
+	cut := warnRun(t, []byte(b.String()), true)
+	if len(cut.Run.Warn) != 0 {
+		t.Errorf("cut run keeps %d warnings", len(cut.Run.Warn))
 	}
 }

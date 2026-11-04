@@ -46,7 +46,9 @@ budget). With a history it also has `run` (this run's number) and `delta`:
 `since`, `identical`, `unchanged`, `failing`, `new`, `fixed`, `not_run` and
 `flaky` (lists of `{head, ref}`, flaky ones with `now`, `changes` and
 `window`), `still` and `longest`; with `-warnings`, once the last run had
-them too, `new_warnings` and `gone_warnings` (lists of `{head, ref}`). From `run` it also has `exit`, the
+them too, `new_warnings` and `gone_warnings` (lists of `{head, ref}`), or,
+when they couldn't be compared, `warnings_not_compared` with the reason ("too
+many kinds", "the last run didn't record them"). From `run` it also has `exit`, the
 command's exit status, and `warnings` lists any warnings (an original that
 couldn't be stored, a history that couldn't be read).
 
@@ -385,8 +387,9 @@ the last run are listed under the summary line (`new warning: ...`) and
 marked `(new)`, first among the warnings; those gone are listed as `warning
 gone: ...` with a reference into the last run. Either makes the run a change,
 so the one-line report needs the same warnings as well as the same failures.
-A run records its warnings only with `-warnings`, so the comparison starts
-with the second such run. With `-preserve` leaving warnings out there are
+A run records its warnings only with `-warnings`, and is compared with the
+run just before it: when that one didn't record them, the summary line says
+"warnings not compared (the last run didn't record them)". With `-preserve` leaving warnings out there are
 none to compare, so `-warnings` with such a `-preserve` is refused. Past
 50,000 kinds of warning in this run or the last one, warnings aren't
 compared (a kind past the cap would read as gone); the report says

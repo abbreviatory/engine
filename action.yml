@@ -78,6 +78,9 @@ outputs:
   failing:
     description: How many distinct failures and errors this run has.
     value: ${{ steps.run.outputs.failing }}
+  new-warnings:
+    description: With warnings true, how many warnings are new since the last run (empty when they weren't compared).
+    value: ${{ steps.run.outputs.new-warnings }}
   report:
     description: The report as a text file.
     value: ${{ steps.run.outputs.report }}
@@ -169,6 +172,7 @@ runs:
         IN_WD: ${{ inputs.working-directory }}
         JOB: ${{ github.job }}
         JOB_INDEX: ${{ strategy.job-index }}
+        WORKFLOW: ${{ github.workflow }}
         REF: ${{ github.ref_name }}
       run: |
         set -euo pipefail
@@ -176,7 +180,7 @@ runs:
         # Each use of the action keeps its own store and cache, so two in one
         # job don't overwrite each other's history when restoring.
         if command -v sha256sum >/dev/null; then sum=sha256sum; else sum="shasum -a 256"; fi
-        id=$(printf '%s\n%s\n%s\n%s' "$IN_KEY" "$IN_HKEY" "$IN_WD" "$IN_RUN" | $sum | cut -c1-12)
+        id=$(printf '%s\n%s\n%s\n%s\n%s' "$WORKFLOW" "$IN_KEY" "$IN_HKEY" "$IN_WD" "$IN_RUN" | $sum | cut -c1-12)
         # Matrix jobs share the job id: the default key tells them apart.
         prefix="${IN_KEY:-abbreviatory-$JOB-${JOB_INDEX:-0}}-$RUNNER_OS-$id"
         echo "store=$RUNNER_TEMP/abbreviatory-store-$id" >> "$GITHUB_OUTPUT"
@@ -214,8 +218,14 @@ runs:
         bin="$AB_DIR/abbreviatory"
         [ -x "$bin" ] || bin="$AB_DIR/abbreviatory.exe"
         for v in "$IN_KEY" "$IN_BUDGET" "$IN_FORMAT"; do
-          case "$v" in *$'\n'*|*$'\r'*) echo "::error::key, budget and format can't hold line breaks"; exit 1 ;; esac
+          case "$v" in *$'\n'*|*$'\r'*)
+            echo "::error::key, budget and format can't hold line breaks"
+            { echo "exit-code="; echo "result=error"; } >> "$GITHUB_OUTPUT"
+            exit 0 ;;
+          esac
         done
+        lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+        IN_WARNINGS=$(lower "$IN_WARNINGS"); IN_FULL=$(lower "$IN_FULL"); IN_SUMMARY=$(lower "$IN_SUMMARY")
         args=(run -json -store "$AB_STORE" -budget "$IN_BUDGET" -format "$IN_FORMAT")
         [ -n "$IN_KEY" ] && args+=(-key "$IN_KEY")
         [ "$IN_WARNINGS" = true ] && args+=(-warnings)
@@ -245,6 +255,7 @@ runs:
           echo "new=$(jq '.delta.new // [] | length' "$out.json")"
           echo "fixed=$(jq '.delta.fixed // [] | length' "$out.json")"
           echo "failing=$(jq '.delta.failing // 0' "$out.json")"
+          echo "new-warnings=$(jq -r 'if .delta.new_warnings then (.delta.new_warnings | length) else "" end' "$out.json")"
           echo "report=$out.txt"
           echo "json=$out.json"
         } >> "$GITHUB_OUTPUT"
@@ -292,6 +303,7 @@ runs:
           # Abbreviatory's own failure fails the step whatever fail says.
           exit 1
         fi
+        FAIL=$(printf '%s' "$FAIL" | tr '[:upper:]' '[:lower:]')
         if [ "$FAIL" = true ] && [ "$CODE" != 0 ]; then
           echo "::error::the command failed with exit status $CODE"
           exit 1

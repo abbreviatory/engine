@@ -327,4 +327,8 @@ func TestWarningsNeedPreserve(t *testing.T) {
 	if code != 2 || !strings.Contains(errs, "warnings") {
 		t.Errorf("exit %d, %q", code, errs)
 	}
+	// The aliases of warnings count.
+	if _, errs, code := runCLI(t, sample(), "reduce", "-store", dir, "-key", "k", "-warnings", "-preserve", "errors,warn"); code != 0 {
+		t.Errorf("-preserve errors,warn: exit %d, %q", code, errs)
+	}
 }
