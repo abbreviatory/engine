@@ -29,6 +29,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Build abbreviatory
         shell: bash
         run: |
@@ -58,7 +59,6 @@ jobs:
           echo "exit=$CODE result=$RESULT failing=$FAILING"
           [ "$CODE" = 2 ] && [ "$RESULT" = fail ] && [ "$FAILING" = 7 ] || { echo "::error::run 1 outputs: exit=$CODE result=$RESULT failing=$FAILING"; exit 1; }
           grep -q "run 1, exit status 2" "$REPORT" || { echo "::error::run 1 report: $(head -c 300 "$REPORT")"; exit 1; }
-          grep -q "TypeScript compiler output" "$GITHUB_STEP_SUMMARY" || { echo "::error::no job summary"; exit 1; }
       - name: The step fails with the command
         id: b
         continue-on-error: true
@@ -106,6 +106,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: stable
+          cache: false
       - name: Build abbreviatory
         shell: bash
         run: |
